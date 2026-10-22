@@ -1,9 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { Save, User, Camera, Mail, Code, Database, CheckCircle2, XCircle, ExternalLink } from 'lucide-react';
+import { 
+  Save, 
+  User, 
+  Camera, 
+  Mail, 
+  Code, 
+  Database, 
+  CheckCircle2, 
+  XCircle, 
+  ExternalLink,
+  Sparkles,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  AlertCircle
+} from 'lucide-react';
 import { User as UserType } from '../../types';
 import { supabase } from '../../supabase';
+import { getGeminiApiKey, setGeminiApiKey, testGeminiApiKey, hasGeminiApiKey } from '../../lib/gemini';
 
 interface SettingsProps {
   user: UserType | null;
@@ -13,6 +29,38 @@ interface SettingsProps {
 export const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
   const [isDevMode, setIsDevMode] = useState(() => localStorage.getItem('dapathshala_dev_mode') === 'true');
   const [supabaseStatus, setSupabaseStatus] = useState<'checking' | 'connected' | 'error'>('checking');
+
+  // Gemini API Key state
+  const [geminiKey, setGeminiKey] = useState(() => getGeminiApiKey());
+  const [showGeminiKey, setShowGeminiKey] = useState(false);
+  const [isTestingKey, setIsTestingKey] = useState(false);
+  const [apiKeyMsg, setApiKeyMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [apiKeySet, setApiKeySet] = useState(() => hasGeminiApiKey());
+
+  const handleSaveKey = () => {
+    if (!geminiKey.trim()) {
+      setApiKeyMsg({ type: 'error', text: 'দয়া করে একটি বৈধ Gemini API Key লিখুন।' });
+      return;
+    }
+    setGeminiApiKey(geminiKey.trim());
+    setApiKeySet(true);
+    setApiKeyMsg({ type: 'success', text: 'Gemini API Key সফলভাবে সংরক্ষিত হয়েছে!' });
+  };
+
+  const handleTestKey = async () => {
+    if (!geminiKey.trim()) return;
+    setIsTestingKey(true);
+    setApiKeyMsg(null);
+    const res = await testGeminiApiKey(geminiKey.trim());
+    setIsTestingKey(false);
+    if (res.success) {
+      setGeminiApiKey(geminiKey.trim());
+      setApiKeySet(true);
+      setApiKeyMsg({ type: 'success', text: res.message });
+    } else {
+      setApiKeyMsg({ type: 'error', text: res.message });
+    }
+  };
 
   // Profile state
   const [name, setName] = useState(user?.name || '');
@@ -200,6 +248,105 @@ export const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
                 >
                   <ExternalLink size={16} />
                   সুপাবেজ ড্যাশবোর্ড
+                </a>
+              </div>
+            </div>
+          </Card>
+
+          {/* Gemini AI API Key Settings */}
+          <Card className="overflow-hidden">
+            <div className="border-b border-slate-100 bg-slate-50/50 px-6 py-4 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 font-bold text-slate-900">
+                <Sparkles size={18} className="text-emerald-600" />
+                Gemini AI এপিআই কী (API Key)
+              </h2>
+              {apiKeySet ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                  <CheckCircle2 size={13} />
+                  সক্রিয়
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                  সেট করা নেই
+                </span>
+              )}
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                স্মার্ট কোয়েস্ট (প্রশ্ন জেনারেটর), ডাউট সলভার, এআই ওসিআর এবং স্টাডি প্ল্যানারের মতো ফিচারগুলো সক্রিয় রাখতে Gemini API Key প্রয়োজন।
+              </p>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  API Key
+                </label>
+                <div className="relative">
+                  <input
+                    type={showGeminiKey ? 'text' : 'password'}
+                    value={geminiKey}
+                    onChange={(e) => {
+                      setGeminiKey(e.target.value);
+                      setApiKeyMsg(null);
+                    }}
+                    placeholder="AIzaSy..."
+                    className="w-full rounded-xl border border-slate-200 bg-white pl-4 pr-12 py-3 text-slate-900 font-mono text-sm focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowGeminiKey(!showGeminiKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                  >
+                    {showGeminiKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              {apiKeyMsg && (
+                <div className={`p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${
+                  apiKeyMsg.type === 'success' 
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
+                    : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
+                  {apiKeyMsg.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+                  <span>{apiKeyMsg.text}</span>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleTestKey}
+                  isLoading={isTestingKey}
+                  disabled={!geminiKey.trim()}
+                  className="flex-1 rounded-xl py-2.5 text-xs font-semibold gap-1.5"
+                >
+                  <RefreshCw size={14} className={isTestingKey ? 'animate-spin' : ''} />
+                  কানেকশন টেস্ট
+                </Button>
+
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSaveKey}
+                  disabled={!geminiKey.trim()}
+                  className="flex-1 rounded-xl py-2.5 text-xs font-semibold gap-1.5 shadow-md shadow-emerald-200"
+                >
+                  <Save size={14} />
+                  কী সেভ করুন
+                </Button>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-slate-500">ফ্রি API Key নেই?</span>
+                <a
+                  href="https://aistudio.google.com/apikey"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-emerald-600 font-semibold hover:text-emerald-700 inline-flex items-center gap-1"
+                >
+                  Google AI Studio থেকে নিন
+                  <ExternalLink size={12} />
                 </a>
               </div>
             </div>

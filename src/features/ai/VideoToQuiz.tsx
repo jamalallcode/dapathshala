@@ -13,6 +13,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getGeminiApiKey } from '../../lib/gemini';
 
 interface QuizQuestion {
   question: string;
@@ -35,7 +36,7 @@ export const VideoToQuiz: React.FC = () => {
     setError(null);
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY || '';
+      const apiKey = getGeminiApiKey();
       if (!apiKey) {
         setError("এপিআই কী (API Key) সেট করা নেই। দয়া করে সেটিংস থেকে GEMINI_API_KEY যোগ করুন।");
         setIsLoading(false);
@@ -43,7 +44,7 @@ export const VideoToQuiz: React.FC = () => {
       }
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: `Analyze the content of this URL: ${url}. Generate 5 multiple choice questions based on the key information presented in this content. The output MUST be a valid JSON array of objects in Bengali. Each object MUST have: "question", "options" (array of 4), "correctAnswer", and "explanation".`,
         config: {
           tools: [{ urlContext: {} }],

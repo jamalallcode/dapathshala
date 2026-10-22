@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Type } from "@google/genai";
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -15,9 +15,17 @@ import {
   Save, 
   X,
   Download,
-  BookOpen
+  BookOpen,
+  ChevronDown,
+  Key,
+  Layers,
+  Search,
+  AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { CURRICULUM_DATA, POPULAR_SUBJECTS } from '../../lib/curriculumData';
+import { getGeminiApiKey, hasGeminiApiKey } from '../../lib/gemini';
+import { ApiKeyModal } from '../../components/ApiKeyModal';
 
 interface Question {
   id: string;
@@ -29,7 +37,7 @@ interface Question {
 
 export const AIQuestionGenerator: React.FC = () => {
   const [topic, setTopic] = useState('');
-  const [subject, setSubject] = useState('সাধারণ');
+  const [subject, setSubject] = useState('বাংলা');
   const [difficulty, setDifficulty] = useState(1); // 0: সহজ, 1: মাঝারি, 2: কঠিন
   const [qType, setQType] = useState<'mcq' | 'creative'>('mcq');
   const [count, setCount] = useState(5);
@@ -41,27 +49,63 @@ export const AIQuestionGenerator: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const difficultyLabels = ['সহজ', 'মাঝারি', 'কঠিন'];
+  // Topic dropdown state
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const subjects = [
-    'সাধারণ', 'বাংলা', 'ইংরেজি', 'গণিত', 'বিজ্ঞান', 'ইতিহাস', 'ভূগোল', 'ধর্ম', 'আইসিটি'
-  ];
+  // API Key modal
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
+  const [hasKey, setHasKey] = useState(() => hasGeminiApiKey());
+
+  const difficultyLabels = ['সহজ', 'মাঝারি', 'কঠিন'];
+  const subjects = POPULAR_SUBJECTS;
+
+  // Available chapters for the selected subject
+  const availableChapters = CURRICULUM_DATA[subject] || CURRICULUM_DATA['বাংলা'] || [];
+
+  // Filtered chapters if user is typing
+  const filteredChapters = topic.trim() 
+    ? availableChapters.filter(ch => ch.toLowerCase().includes(topic.toLowerCase()))
+    : availableChapters;
+
+  // Close dropdown when clicked outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectChapter = (ch: string) => {
+    setTopic(ch);
+    setIsDropdownOpen(false);
+    setError(null);
+  };
 
   const generateQuestions = async () => {
-    if (!topic) return;
+    if (!topic.trim()) {
+      setError("অনুগ্রহ করে একটি টপিক বা অধ্যায় নির্বাচন অথবা লিখুন।");
+      return;
+    }
     
     setIsLoading(true);
     setQuestions([]);
     setError(null);
     
     try {
-      const apiKey = process.env.GEMINI_API_KEY || '';
+      const apiKey = getGeminiApiKey();
       
       if (!apiKey) {
-        setError("এপিআই কী (API Key) সেট করা নেই। দয়া করে সেটিংস থেকে GEMINI_API_KEY যোগ করুন।");
+        setHasKey(false);
+        setError("এপিআই কী (API Key) সেট করা নেই। দয়া করে নিচের বাটনে ক্লিক করে GEMINI_API_KEY যোগ করুন।");
         setIsLoading(false);
+        setIsApiKeyModalOpen(true);
         return;
       }
+      setHasKey(true);
 
       const ai = new GoogleGenAI({ apiKey });
       const prompt = qType === 'mcq' 
@@ -75,7 +119,7 @@ export const AIQuestionGenerator: React.FC = () => {
            Each object MUST have: "id" (unique string), "question", "options" (empty array []), "correctAnswer" (a model answer), and "explanation" (marking criteria).`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -106,7 +150,7 @@ export const AIQuestionGenerator: React.FC = () => {
         }
       }
     } catch (err: any) {
-      setError(err.message || "প্রশ্ন তৈরি করতে সমস্যা হয়েছে।");
+      setError(err.message || "প্রশ্ন তৈরি করতে সমস্যা হয়েছে। আপনার এপিআই কী সঠিক কিনা যাচাই করুন।");
     } finally {
       setIsLoading(false);
     }
@@ -115,14 +159,16 @@ export const AIQuestionGenerator: React.FC = () => {
   const regenerateSingleQuestion = async (id: string) => {
     setIsRegenerating(id);
     try {
-      const systemKey = process.env.GEMINI_API_KEY;
-      const apiKey = systemKey || localStorage.getItem('dapathshala_gemini_key') || '';
+      const apiKey = getGeminiApiKey();
       
-      if (!apiKey) return;
+      if (!apiKey) {
+        setIsApiKeyModalOpen(true);
+        return;
+      }
 
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: `Generate exactly ONE unique multiple choice question about "${topic}" for the subject "${subject}" in Bengali. 
         Difficulty level: ${difficulty}. 
         The output MUST be a valid JSON object.
@@ -211,10 +257,25 @@ export const AIQuestionGenerator: React.FC = () => {
         {/* Configuration Sidebar */}
         <div className="lg:col-span-4 space-y-6">
           <Card className="border-none shadow-xl shadow-slate-200/50 bg-white/80 backdrop-blur-xl">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-6">
-              <Settings2 size={18} className="text-emerald-600" />
-              স্মার্ট কনফিগারেশন
-            </h2>
+            <div className="flex items-center justify-between mb-6 pb-3 border-b border-slate-100">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Settings2 size={18} className="text-emerald-600" />
+                স্মার্ট কনফিগারেশন
+              </h2>
+              <button
+                type="button"
+                onClick={() => setIsApiKeyModalOpen(true)}
+                className={`text-xs px-2.5 py-1 rounded-full flex items-center gap-1.5 font-semibold transition-all ${
+                  hasKey 
+                    ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' 
+                    : 'bg-amber-100 text-amber-800 hover:bg-amber-200 animate-pulse'
+                }`}
+                title="এপিআই কী পরিবর্তন বা সেট করুন"
+              >
+                <Key size={12} />
+                {hasKey ? 'API Key সক্রিয়' : 'API Key সেট করুন'}
+              </button>
+            </div>
 
             <div className="space-y-5">
               <div className="flex p-1 bg-slate-100 rounded-xl">
@@ -238,23 +299,115 @@ export const AIQuestionGenerator: React.FC = () => {
                   <BookOpen className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                   <select
                     value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 py-3 text-slate-700 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all appearance-none"
+                    onChange={(e) => {
+                      setSubject(e.target.value);
+                      setIsDropdownOpen(false);
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-white pl-12 pr-10 py-3 text-slate-700 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all appearance-none font-medium cursor-pointer"
                   >
                     {subjects.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-700">টপিক বা অধ্যায়</label>
-                <input
-                  type="text"
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  placeholder="উদা: সালোকসংশ্লেষণ, নিউটনের গতিসূত্র..."
-                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all"
-                />
+              {/* Topic / Chapter with Dropdown */}
+              <div className="space-y-1.5 relative" ref={dropdownRef}>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-slate-700">টপিক বা অধ্যায়</label>
+                  <button
+                    type="button"
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="text-xs text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1"
+                  >
+                    <Layers size={13} />
+                    {isDropdownOpen ? 'তালিকা লুকান' : 'অধ্যায়সমূহ দেখুন'}
+                  </button>
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={topic}
+                    onFocus={() => setIsDropdownOpen(true)}
+                    onChange={(e) => {
+                      setTopic(e.target.value);
+                      setIsDropdownOpen(true);
+                      setError(null);
+                    }}
+                    placeholder={`উদা: ${availableChapters[0] || 'নিউটনের গতিসূত্র'}...`}
+                    className="w-full rounded-xl border border-slate-200 bg-white pl-4 pr-11 py-3 text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-all"
+                    title="ড্রপডাউন খুলুন"
+                  >
+                    <ChevronDown size={18} className={`transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
+                  </button>
+                </div>
+
+                {/* Dropdown Menu */}
+                {isDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 max-h-64 overflow-y-auto bg-white rounded-2xl border border-slate-200 shadow-2xl z-40 divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="p-2.5 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between sticky top-0 z-10 border-b border-slate-100">
+                      <span>{subject} বিষয়ের অধ্যায়সমূহ ({filteredChapters.length})</span>
+                      {topic && (
+                        <button
+                          type="button"
+                          onClick={() => setTopic('')}
+                          className="text-emerald-600 hover:underline capitalize"
+                        >
+                          মুছুন
+                        </button>
+                      )}
+                    </div>
+
+                    {filteredChapters.length > 0 ? (
+                      filteredChapters.map((ch, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => handleSelectChapter(ch)}
+                          className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-all flex items-center justify-between gap-2 hover:bg-emerald-50 hover:text-emerald-800 ${
+                            topic === ch ? 'bg-emerald-50 text-emerald-700 font-bold' : 'text-slate-700'
+                          }`}
+                        >
+                          <span className="truncate">{ch}</span>
+                          {topic === ch && <Check size={14} className="text-emerald-600 shrink-0" />}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-4 text-center text-xs text-slate-400">
+                        কোনো অধ্যায় মিল পাওয়া যায়নি। আপনি নিজের মতো লিখতে পারেন।
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Quick Chapter Chips */}
+                {availableChapters.length > 0 && (
+                  <div className="pt-1.5">
+                    <p className="text-[11px] text-slate-400 mb-1.5 font-medium">দ্রুত পছন্দ করুন:</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {availableChapters.slice(0, 4).map((ch, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => handleSelectChapter(ch)}
+                          className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                            topic === ch
+                              ? 'bg-emerald-600 border-emerald-600 text-white font-medium shadow-sm'
+                              : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700'
+                          }`}
+                        >
+                          {ch.split('(')[0].trim()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -289,12 +442,34 @@ export const AIQuestionGenerator: React.FC = () => {
                 />
               </div>
 
+              {/* API Key Missing Callout */}
+              {!hasKey && (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2.5">
+                  <div className="flex items-center gap-2 font-bold text-amber-800">
+                    <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                    <span>Gemini API Key প্রয়োজন</span>
+                  </div>
+                  <p className="text-slate-600 leading-relaxed">
+                    এআই জেনারেট চালু করতে বিনামূল্যে গুগল এআই স্টুডিও থেকে আপনার কী সেট করুন।
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsApiKeyModalOpen(true)}
+                    className="w-full bg-white border-amber-300 text-amber-800 hover:bg-amber-100 font-semibold gap-1.5 rounded-xl py-2 shadow-sm"
+                  >
+                    <Key size={14} />
+                    এপিআই কী সেট করুন
+                  </Button>
+                </div>
+              )}
+
               <Button
                 variant="primary"
                 className="w-full py-6 text-lg rounded-2xl shadow-xl shadow-emerald-200 gap-2"
                 onClick={generateQuestions}
                 isLoading={isLoading}
-                disabled={!topic}
+                disabled={!topic.trim()}
               >
                 {!isLoading && <Sparkles size={20} />}
                 ম্যাজিক জেনারেট
@@ -304,9 +479,20 @@ export const AIQuestionGenerator: React.FC = () => {
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm font-medium"
+                  className="p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm font-medium space-y-2"
                 >
-                  {error}
+                  <p>{error}</p>
+                  {!hasKey && (
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => setIsApiKeyModalOpen(true)}
+                      className="w-full bg-white text-xs py-2 rounded-lg"
+                    >
+                      <Key size={12} className="mr-1" />
+                      এপিআই কী ইনপুট করুন
+                    </Button>
+                  )}
                 </motion.div>
               )}
             </div>
@@ -484,6 +670,15 @@ export const AIQuestionGenerator: React.FC = () => {
           </AnimatePresence>
         </div>
       </div>
+      {/* API Key Configuration Modal */}
+      <ApiKeyModal
+        isOpen={isApiKeyModalOpen}
+        onClose={() => setIsApiKeyModalOpen(false)}
+        onSaved={() => {
+          setHasKey(true);
+          setError(null);
+        }}
+      />
     </div>
   );
 };

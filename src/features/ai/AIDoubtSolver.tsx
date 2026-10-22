@@ -19,6 +19,7 @@ import {
   Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getGeminiApiKey } from '../../lib/gemini';
 
 interface SolvedDoubt {
   id: string;
@@ -109,7 +110,7 @@ export const AIDoubtSolver: React.FC = () => {
     setShowPracticeAnswer(false);
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = getGeminiApiKey();
       if (apiKey) {
         const ai = new GoogleGenAI({ apiKey });
         const prompt = `

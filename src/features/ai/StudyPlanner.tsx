@@ -16,6 +16,7 @@ import {
   Moon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getGeminiApiKey } from '../../lib/gemini';
 
 interface StudySession {
   day: string;
@@ -40,7 +41,7 @@ export const StudyPlanner: React.FC = () => {
     setError(null);
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY || '';
+      const apiKey = getGeminiApiKey();
       if (!apiKey) {
         setError("এপিআই কী (API Key) সেট করা নেই। দয়া করে সেটিংস থেকে GEMINI_API_KEY যোগ করুন।");
         setIsLoading(false);
@@ -48,7 +49,7 @@ export const StudyPlanner: React.FC = () => {
       }
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: `Create a 7-day personalized study plan for the goal: "${goal}". The user can study ${hoursPerDay} hours per day. The output MUST be a valid JSON array of 7 objects. Each object MUST have: "day" (e.g., Day 1), "topic", "duration", "timeOfDay" (one of: morning, afternoon, evening), and "tasks" (array of 3 specific tasks). Language: Bengali.`,
         config: {
           responseMimeType: "application/json",

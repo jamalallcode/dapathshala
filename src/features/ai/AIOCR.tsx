@@ -17,6 +17,7 @@ import {
   FileUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getGeminiApiKey } from '../../lib/gemini';
 
 interface OCRFile {
   id: string;
@@ -70,7 +71,7 @@ export const AIOCR: React.FC = () => {
     setIsProcessingAll(true);
     setAggregatedResult('');
 
-    const apiKey = process.env.GEMINI_API_KEY || '';
+    const apiKey = getGeminiApiKey();
     if (!apiKey) {
       setAggregatedResult("এপিআই কী (API Key) সেট করা নেই। দয়া করে সেটিংস থেকে GEMINI_API_KEY যোগ করুন।");
       setIsProcessingAll(false);
@@ -94,7 +95,7 @@ export const AIOCR: React.FC = () => {
         const mimeType = currentFile.file.type;
         
         const response = await ai.models.generateContent({
-          model: "gemini-3-flash-preview",
+          model: "gemini-2.5-flash",
           contents: {
             parts: [
               {

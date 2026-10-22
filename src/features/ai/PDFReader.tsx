@@ -16,6 +16,7 @@ import {
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getGeminiApiKey } from '../../lib/gemini';
 
 interface ChatMessage {
   role: 'user' | 'ai';
@@ -50,7 +51,7 @@ export const PDFReader: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY || '';
+      const apiKey = getGeminiApiKey();
       if (!apiKey) {
         setChat(prev => [...prev, { role: 'ai', text: "এপিআই কী (API Key) সেট করা নেই। দয়া করে সেটিংস থেকে GEMINI_API_KEY যোগ করুন।" }]);
         setIsLoading(false);
@@ -61,7 +62,7 @@ export const PDFReader: React.FC = () => {
       // In a real app, we would extract text from PDF or send the PDF data.
       // For this demo, we'll use the filename and query as context.
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: `The user is reading a PDF named "${file.name}". User question: "${userMsg}". Please provide a helpful answer in Bengali based on the context of learning and this document.`,
       });
 

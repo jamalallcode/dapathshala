@@ -14,6 +14,7 @@ import {
   XCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getGeminiApiKey } from '../../lib/gemini';
 
 interface Flashcard {
   front: string;
@@ -38,7 +39,7 @@ export const FlashcardFactory: React.FC = () => {
     setError(null);
 
     try {
-      const apiKey = process.env.GEMINI_API_KEY || '';
+      const apiKey = getGeminiApiKey();
       if (!apiKey) {
         setError("এপিআই কী (API Key) সেট করা নেই। দয়া করে সেটিংস থেকে GEMINI_API_KEY যোগ করুন।");
         setIsLoading(false);
@@ -46,7 +47,7 @@ export const FlashcardFactory: React.FC = () => {
       }
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
+        model: "gemini-2.5-flash",
         contents: `Generate 10 educational flashcards about "${topic}" in Bengali. Each card must have a "front" (question/term) and a "back" (answer/definition). The output MUST be a valid JSON array of objects.`,
         config: {
           responseMimeType: "application/json",
