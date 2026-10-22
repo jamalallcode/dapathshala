@@ -60,6 +60,46 @@ import {
   ROLE_LABELS 
 } from './lib/authService';
 
+// Helper to extract examId from URL path, query param, or hash
+const extractExamIdFromUrl = (): string | null => {
+  try {
+    if (typeof window === 'undefined') return null;
+    const url = new URL(window.location.href);
+
+    // 1. Check URL query parameters: ?id=... or ?examId=...
+    const queryId = url.searchParams.get('id') || url.searchParams.get('examId');
+    if (queryId) return queryId;
+
+    // 2. Check path: /exam/live or /exam/live/exam_123
+    const path = url.pathname;
+    if (path.includes('/exam/live') || path.includes('/live-exam')) {
+      const match = path.match(/\/exam\/(?:live\/)?([a-zA-Z0-9_-]+)/);
+      if (match && match[1] && match[1] !== 'live') return match[1];
+      return queryId || 'demo_exam_01';
+    }
+
+    // 3. Check hash: #/exam/live?id=... or #id=...
+    const hash = url.hash;
+    if (hash) {
+      if (hash.includes('?')) {
+        const hashSearch = new URLSearchParams(hash.substring(hash.indexOf('?')));
+        const hashId = hashSearch.get('id') || hashSearch.get('examId');
+        if (hashId) return hashId;
+      }
+      const match = hash.match(/(?:id=|\/)([a-zA-Z0-9_-]+)/);
+      if (match && match[1] && !['exam', 'live', 'home'].includes(match[1])) {
+        return match[1];
+      }
+      if (hash.includes('exam/live') || hash.includes('exam-')) {
+        return 'demo_exam_01';
+      }
+    }
+  } catch (e) {
+    console.warn('URL parsing error:', e);
+  }
+  return null;
+};
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [redirectTab, setRedirectTab] = useState<string | null>(null);
@@ -72,44 +112,13 @@ export default function App() {
   const [showResumeToast, setShowResumeToast] = useState(false);
 
   // Detect live exam URL (?id=... or /exam/live or #exam-live)
-  const [liveExamId, setLiveExamId] = useState<string | null>(() => {
-    try {
-      const path = window.location.pathname;
-      const search = new URLSearchParams(window.location.search);
-      const queryId = search.get('id') || search.get('examId');
-      if (path.includes('/exam/live')) {
-        return queryId || 'demo_exam_01';
-      }
-      if (queryId) {
-        return queryId;
-      }
-      if (window.location.hash.includes('exam/live') || window.location.hash.includes('exam-')) {
-        const hashMatch = window.location.hash.match(/id=([a-zA-Z0-9_-]+)/);
-        if (hashMatch) return hashMatch[1];
-      }
-    } catch (e) {
-      console.warn('URL parsing error:', e);
-    }
-    return null;
-  });
+  const [liveExamId, setLiveExamId] = useState<string | null>(() => extractExamIdFromUrl());
 
   const { savedSession, clearSession } = useResumeSession();
 
   useEffect(() => {
     const handleUrlChange = () => {
-      try {
-        const path = window.location.pathname;
-        const search = new URLSearchParams(window.location.search);
-        const queryId = search.get('id') || search.get('examId');
-        if (path.includes('/exam/live') || queryId) {
-          setLiveExamId(queryId || 'demo_exam_01');
-        } else if (window.location.hash.includes('exam/live') || window.location.hash.includes('exam-')) {
-          const hashMatch = window.location.hash.match(/id=([a-zA-Z0-9_-]+)/);
-          if (hashMatch) setLiveExamId(hashMatch[1]);
-        } else {
-          setLiveExamId(null);
-        }
-      } catch {}
+      setLiveExamId(extractExamIdFromUrl());
     };
 
     window.addEventListener('popstate', handleUrlChange);
@@ -243,6 +252,23 @@ export default function App() {
     child: 'শিক্ষার্থী'
   };
 
+  // PRIORITY 1: Direct Live Exam Screen (Shareable Exam Link immediately launches exam)
+  if (liveExamId) {
+    return (
+      <StartExamScreen 
+        examId={liveExamId} 
+        onExit={() => {
+          setLiveExamId(null);
+          try {
+            const cleanPath = window.location.pathname.replace(/\/exam\/live\/?/, '/') || '/';
+            window.history.pushState({}, '', cleanPath);
+          } catch {}
+        }} 
+      />
+    );
+  }
+
+  // PRIORITY 2: Landing Page if user not logged in or explicitly on landing
   if (showLanding) {
     return (
       <>
@@ -615,20 +641,6 @@ export default function App() {
       default: return null;
     }
   };
-
-  if (liveExamId) {
-    return (
-      <StartExamScreen 
-        examId={liveExamId} 
-        onExit={() => {
-          setLiveExamId(null);
-          try {
-            window.history.pushState({}, '', '/');
-          } catch {}
-        }} 
-      />
-    );
-  }
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-emerald-100 selection:text-emerald-900">
