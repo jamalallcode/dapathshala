@@ -79,6 +79,8 @@ export interface ExamResult {
   wrongAnswers: number;
   timeSpent: number; // in seconds
   answers: Record<string, number>; // questionId -> selectedOptionIndex
+  suspiciousFlags?: number;
+  isViolationTerminated?: boolean;
 }
 
 export interface Note {

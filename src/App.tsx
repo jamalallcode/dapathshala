@@ -19,10 +19,15 @@ import { DeveloperConsole } from './features/developer/DeveloperConsole';
 import { Settings } from './features/settings/Settings';
 import { LandingPage } from './features/landing/LandingPage';
 import { ExamPortal } from './features/exams/ExamPortal';
+import { StartExamScreen } from './features/exams/StartExamScreen';
 import { NoteStore } from './features/notes/NoteStore';
 import { CoachingDashboard } from './features/coaching/CoachingDashboard';
+import { CoachingMarketplace } from './features/coaching/CoachingMarketplace';
+import { NationalLeaderboard } from './features/gamification/NationalLeaderboard';
+import { PaidModelTestStore } from './features/exams/PaidModelTestStore';
 import { AIDoubtSolver } from './features/ai/AIDoubtSolver';
 import { SmartRevisionHub } from './features/students/SmartRevisionHub';
+import { PeerCommunityHub } from './features/community/PeerCommunityHub';
 import { 
   Sparkles, 
   BookOpen, 
@@ -33,7 +38,12 @@ import {
   Star,
   Crown,
   HelpCircle,
-  BrainCircuit
+  BrainCircuit,
+  Swords,
+  Users,
+  Building2,
+  GraduationCap,
+  Search
 } from 'lucide-react';
 import { Card } from './components/ui/Card';
 import { Button } from './components/ui/Button';
@@ -58,9 +68,57 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'signin' | 'register' | 'otp' | 'magic'>('signin');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showResumeToast, setShowResumeToast] = useState(false);
 
+  // Detect live exam URL (?id=... or /exam/live or #exam-live)
+  const [liveExamId, setLiveExamId] = useState<string | null>(() => {
+    try {
+      const path = window.location.pathname;
+      const search = new URLSearchParams(window.location.search);
+      const queryId = search.get('id') || search.get('examId');
+      if (path.includes('/exam/live')) {
+        return queryId || 'demo_exam_01';
+      }
+      if (queryId) {
+        return queryId;
+      }
+      if (window.location.hash.includes('exam/live') || window.location.hash.includes('exam-')) {
+        const hashMatch = window.location.hash.match(/id=([a-zA-Z0-9_-]+)/);
+        if (hashMatch) return hashMatch[1];
+      }
+    } catch (e) {
+      console.warn('URL parsing error:', e);
+    }
+    return null;
+  });
+
   const { savedSession, clearSession } = useResumeSession();
+
+  useEffect(() => {
+    const handleUrlChange = () => {
+      try {
+        const path = window.location.pathname;
+        const search = new URLSearchParams(window.location.search);
+        const queryId = search.get('id') || search.get('examId');
+        if (path.includes('/exam/live') || queryId) {
+          setLiveExamId(queryId || 'demo_exam_01');
+        } else if (window.location.hash.includes('exam/live') || window.location.hash.includes('exam-')) {
+          const hashMatch = window.location.hash.match(/id=([a-zA-Z0-9_-]+)/);
+          if (hashMatch) setLiveExamId(hashMatch[1]);
+        } else {
+          setLiveExamId(null);
+        }
+      } catch {}
+    };
+
+    window.addEventListener('popstate', handleUrlChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    return () => {
+      window.removeEventListener('popstate', handleUrlChange);
+      window.removeEventListener('hashchange', handleUrlChange);
+    };
+  }, []);
 
   useEffect(() => {
     // Check local storage for existing session
@@ -347,6 +405,61 @@ export default function App() {
               </div>
             )}
 
+            {/* Coaching Marketplace & Student Admission Finder Spotlight Banner */}
+            <div className="p-6 sm:p-7 bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white rounded-3xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 border border-emerald-700/40">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-emerald-300 text-xs font-bold">
+                  <Building2 size={14} className="text-emerald-400" />
+                  কোচিং মার্কেটপ্লেস ও স্টুডেন্ট অ্যাডমিশন ফাইন্ডার
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-white">এলাকা ও বিষয় অনুযায়ী সেরা কোচিং খুঁজুন ও অনলাইনে ভর্তি আবেদন করুন</h3>
+                <p className="text-emerald-100 text-xs sm:text-sm max-w-xl">
+                  ফি স্ট্রাকচার, শিক্ষক প্যানেল ও রেটিং পর্যালোচনা করে পছন্দের কোর্সে সরাসরি ভর্তি আবেদন পাঠান। কোচিং ম্যানেজারদের জন্য রয়েছে স্টুডেন্ট লিডস ও ব্যাচ কন্ট্রোল প্যানেল।
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3 shrink-0">
+                <button 
+                  onClick={() => setActiveTab('coaching-marketplace')}
+                  className="bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black px-5 py-3.5 rounded-xl shadow-xl flex items-center gap-2 text-xs sm:text-sm transition-all cursor-pointer"
+                >
+                  <Search size={16} />
+                  <span>কোচিং ফাইন্ডার ডিরেক্টরি</span>
+                  <ChevronRight size={18} className="text-slate-950 stroke-[3]" />
+                </button>
+                <button 
+                  onClick={() => setActiveTab('coaching')}
+                  className="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold px-4 py-3.5 rounded-xl text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <GraduationCap size={16} className="text-emerald-300" />
+                  <span>ম্যানেজার ড্যাশবোর্ড ও লিডস</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Student Peer Community & Challenge System Spotlight Banner */}
+            <div className="p-6 sm:p-7 bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white rounded-3xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-6 border border-purple-700/40">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-amber-300 text-xs font-bold">
+                  <Swords size={14} className="text-amber-400" />
+                  পিয়ার কমিউনিটি ও লাইভ ডুয়েল
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black text-white">সহপাঠীদের প্রশ্ন-উত্তর ফোরাম ও 'Challenge a Friend'</h3>
+                <p className="text-purple-100 text-xs sm:text-sm max-w-xl">
+                  অন্যান্য কোচিং ও কলেজের শিক্ষার্থীদের সাথে প্রশ্ন শেয়ার করুন, লাইভ ১০ কুইজ পরীক্ষায় বন্ধুকে চ্যালেঞ্জ জানান এবং পয়েন্ট স্ক্যানারে জয়ী ট্রফি অর্জন করুন।
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3 shrink-0">
+                <button 
+                  onClick={() => setActiveTab('community')}
+                  className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black px-6 py-3.5 rounded-xl shadow-xl flex items-center gap-2 text-sm transition-all cursor-pointer"
+                >
+                  <Swords size={18} />
+                  <span>কমিউনিটি ও ডুয়েলে প্রবেশ করুন</span>
+                  <ChevronRight size={18} className="text-slate-950 stroke-[3]" />
+                </button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
               <div className="lg:col-span-8 space-y-8">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -488,16 +601,34 @@ export default function App() {
       case 'flashcards': return <FlashcardFactory />;
       case 'study-planner': return <StudyPlanner />;
       case 'leaderboard': return <Leaderboard />;
+      case 'national-leaderboard': return <NationalLeaderboard onStartExam={() => setActiveTab('exams')} onOpenStore={() => setActiveTab('paid-tests')} />;
       case 'achievements': return <Achievements />;
       case 'parent-dashboard': return <ParentDashboard />;
       case 'exams': return <ExamPortal />;
+      case 'paid-tests': return <PaidModelTestStore />;
       case 'notes': return <NoteStore />;
-      case 'coaching': return <CoachingDashboard />;
+      case 'coaching-marketplace': return <CoachingMarketplace onOpenCoachingDashboard={() => setActiveTab('coaching')} />;
+      case 'coaching': return <CoachingDashboard onOpenMarketplace={() => setActiveTab('coaching-marketplace')} />;
+      case 'community': return <PeerCommunityHub />;
       case 'developer': return <DeveloperConsole />;
       case 'settings': return <Settings user={user} onUpdateUser={handleUpdateUser} />;
       default: return null;
     }
   };
+
+  if (liveExamId) {
+    return (
+      <StartExamScreen 
+        examId={liveExamId} 
+        onExit={() => {
+          setLiveExamId(null);
+          try {
+            window.history.pushState({}, '', '/');
+          } catch {}
+        }} 
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-emerald-100 selection:text-emerald-900">
@@ -510,8 +641,10 @@ export default function App() {
               user={user} 
               onLogout={handleLogout}
               onGoToLanding={() => setShowLanding(true)}
+              isSidebarOpen={isSidebarOpen}
+              setIsSidebarOpen={setIsSidebarOpen}
             />
-            <main className="flex-1 lg:pl-64 pt-16 transition-all duration-300">
+            <main className={`flex-1 pt-16 transition-all duration-500 ease-in-out ${isSidebarOpen ? 'lg:pl-64' : 'lg:pl-0'}`}>
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeTab}

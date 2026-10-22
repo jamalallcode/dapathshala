@@ -571,32 +571,35 @@ export const AIQuestionGenerator: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
-              <Sparkles size={24} />
-            </div>
-            Smart Quest <span className="text-emerald-600">এআই জেনারেটর</span>
-          </h1>
-          <p className="mt-1 text-slate-500">অ্যাডভান্সড এআই প্রযুক্তির মাধ্যমে নিখুঁত প্রশ্নপত্র তৈরি করুন।</p>
-        </div>
-        {questions.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-2 rounded-xl" onClick={copyToClipboard}>
-              {copied ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
-              {copied ? 'কপি হয়েছে' : 'সব কপি করুন'}
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2 rounded-xl" onClick={handleDownloadPDF}>
-              <Download size={16} />
-              PDF ডাউনলোড
-            </Button>
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+      {/* Sticky Smart Quest Header - Fixed right below top menu bar (top-16) */}
+      <div className="sticky top-16 z-30 -mt-4 sm:-mt-6 lg:-mt-8 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-3.5 bg-slate-50/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs transition-all">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 max-w-7xl mx-auto">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-emerald-200 shrink-0">
+                <Sparkles size={22} />
+              </div>
+              <span>Smart Quest <span className="text-emerald-600">এআই জেনারেটর</span></span>
+            </h1>
+            <p className="mt-0.5 text-slate-500 text-xs sm:text-sm">অ্যাডভান্সড এআই প্রযুক্তির মাধ্যমে নিখুঁত প্রশ্নপত্র তৈরি করুন।</p>
           </div>
-        )}
-      </header>
+          {questions.length > 0 && (
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" className="gap-2 rounded-xl bg-white shadow-xs" onClick={copyToClipboard}>
+                {copied ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
+                {copied ? 'কপি হয়েছে' : 'সব কপি করুন'}
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2 rounded-xl bg-white shadow-xs" onClick={handleDownloadPDF}>
+                <Download size={16} />
+                PDF ডাউনলোড
+              </Button>
+            </div>
+          )}
+        </header>
+      </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 pt-2">
         {/* Configuration Sidebar */}
         <div className="lg:col-span-4 space-y-6">
           <Card className="border-none shadow-xl shadow-slate-200/50 bg-white/80 backdrop-blur-xl">

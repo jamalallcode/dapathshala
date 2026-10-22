@@ -21,7 +21,8 @@ import {
   MapPin,
   ChevronRight,
   HelpCircle,
-  BrainCircuit
+  BrainCircuit,
+  Building2
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { User } from '../../types';
@@ -69,6 +70,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       title: "অনলাইন এক্সাম পোর্টাল",
       desc: "এমসিকিউ ও সৃজনশীল মডেল টেস্ট, লাইভ টাইমার এবং সারা দেশের শিক্ষার্থীদের সাথে মেধা যাচাই।",
       tab: "exams"
+    },
+    {
+      icon: <Building2 className="text-emerald-600" size={28} />,
+      title: "কোচিং ফাইন্ডার ও ভর্তি",
+      desc: "এলাকা ও বিষয় অনুযায়ী সেরা কোচিং ডিরেক্টরি, ফি কাঠামো যাচাই ও সরাসরি এক ক্লিকে ভর্তি আবেদন।",
+      tab: "coaching-marketplace"
     },
     {
       icon: <Layout className="text-blue-600" size={28} />,
@@ -127,6 +134,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   ];
 
   const navMenuItems = [
+    { label: "কোচিং ফাইন্ডার", action: () => onFeatureClick('coaching-marketplace'), isSpecial: true },
     { label: "ডাউট সলভার", action: () => onFeatureClick('doubt-solver'), isSpecial: true },
     { label: "অভিভাবক প্যানেল", action: () => onFeatureClick('parent-dashboard'), isSpecial: true },
     { label: "অনলাইন এক্সাম পোর্টাল", action: () => onFeatureClick('exams') },

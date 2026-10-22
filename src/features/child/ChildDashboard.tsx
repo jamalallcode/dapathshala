@@ -17,8 +17,37 @@ import {
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ExamAssignment } from '../../types';
+import { FinalMarksheetModal, FinalMarksheetData } from '../exams/FinalMarksheetModal';
 
 export const ChildDashboard: React.FC = () => {
+  const [selectedMarksheet, setSelectedMarksheet] = useState<FinalMarksheetData | null>(null);
+  const [publishedResults, setPublishedResults] = useState<FinalMarksheetData[]>(() => {
+    try {
+      const saved = localStorage.getItem('dapathshala_parent_assigned_tests');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const filtered = parsed.filter((t: any) => t.isPublished || t.status === 'reviewed');
+        if (filtered.length > 0) return filtered;
+      }
+    } catch {}
+    return [
+      {
+        id: 'test-101',
+        title: 'গণিত সাপ্তাহিক মূল্যায়ন',
+        subject: 'গণিত',
+        chapter: 'বীজগণিত ও সমীকরণ',
+        childName: 'আরাফাত রহমান',
+        score: 88,
+        totalScoreObtained: 4.5,
+        totalPossible: 5,
+        publishedAt: 'আজ, দুপুর ১২:১৫',
+        evaluationMode: 'ai',
+        aiFeedback: 'বীজগণিতের সূত্রের প্রয়োগ নিখুঁত হয়েছে। পক্ষান্তরের চিহ্নে সামান্য সতর্কতা আবশ্যক।',
+        parentComment: 'খুব চমৎকার ফলাফল করেছ বাবা! ৩ নম্বর প্রশ্নের চিহ্নটি ঠিক করে নাও, পরের পরীক্ষায় আরো ভালো হবে।',
+        handwrittenImages: ['/assets/aistudio/image_fb59e449.png']
+      }
+    ];
+  });
   const [assignments, setAssignments] = useState<ExamAssignment[]>([
     {
       id: 'exam-2',
@@ -226,20 +255,40 @@ export const ChildDashboard: React.FC = () => {
             )}
           </div>
 
-          <h2 className="text-xl font-bold text-slate-900 mt-12">সাম্প্রতিক ফলাফল</h2>
+          <h2 className="text-xl font-bold text-slate-900 mt-12 flex items-center justify-between">
+            <span>অভিভাবক ও এআই মূল্যায়িত ফলাফল</span>
+            <span className="text-xs font-semibold text-emerald-600">রেজাল্ট শিট প্রস্তুত</span>
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card className="p-4 border-slate-200 flex items-center gap-4">
-              <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 font-bold">
-                ৮৫%
-              </div>
-              <div>
-                <p className="font-bold text-slate-900">বিজ্ঞান - অধ্যায় ২</p>
-                <p className="text-xs text-slate-500">বাবার ফিডব্যাক: "খুব ভালো হয়েছে!"</p>
-              </div>
-              <Button variant="outline" size="sm" className="ml-auto p-2">
-                <Eye size={16} />
-              </Button>
-            </Card>
+            {publishedResults.map((result) => (
+              <Card 
+                key={result.id} 
+                className="p-4 border-slate-200 bg-white hover:border-indigo-200 hover:shadow-md transition-all flex items-center gap-4 cursor-pointer"
+                onClick={() => setSelectedMarksheet(result)}
+              >
+                <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-700 font-black text-sm shrink-0">
+                  {result.score}%
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-900 text-sm truncate">{result.title}</p>
+                  <p className="text-xs text-slate-500 truncate">
+                    অভিভাবকের মন্তব্য: "{result.parentComment || 'খুব ভালো হয়েছে!'}"
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="shrink-0 p-2 text-indigo-600 hover:bg-indigo-50 border-indigo-200"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedMarksheet(result);
+                  }}
+                  title="ফাইনাল মার্কশিট দেখুন"
+                >
+                  <Eye size={16} />
+                </Button>
+              </Card>
+            ))}
           </div>
         </div>
 
@@ -274,6 +323,14 @@ export const ChildDashboard: React.FC = () => {
           </Card>
         </div>
       </div>
+
+      {/* Render Final Marksheet Modal */}
+      {selectedMarksheet && (
+        <FinalMarksheetModal
+          data={selectedMarksheet}
+          onClose={() => setSelectedMarksheet(null)}
+        />
+      )}
     </div>
   );
 };

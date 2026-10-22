@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { 
@@ -18,9 +18,26 @@ import {
   Layers, 
   FileText,
   Send,
-  UserCheck
+  UserCheck,
+  CreditCard,
+  Building2,
+  Sparkles,
+  ShieldCheck,
+  MapPin,
+  RefreshCw,
+  Zap
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { CoachingProfile, SubscriptionState, Invoice } from './types';
+import { DEFAULT_COACHING_PROFILE, INITIAL_SUBSCRIPTION_STATE, INITIAL_INVOICES, SAAS_PLANS } from './coachingConstants';
+import { SubscriptionAlertBanner } from './SubscriptionAlertBanner';
+import { CoachingRegistrationModal } from './CoachingRegistrationModal';
+import { CoachingProfileView } from './CoachingProfileView';
+import { CoachingSubscriptionManager } from './CoachingSubscriptionManager';
+import { PaymentGatewayModal } from './PaymentGatewayModal';
+import { StudentLeadsManager } from './StudentLeadsManager';
+import { AdmissionLead } from './marketplaceTypes';
+import { INITIAL_ADMISSION_LEADS } from './marketplaceData';
 
 interface Student {
   id: string;
@@ -41,12 +58,106 @@ interface Notice {
   description: string;
 }
 
-export const CoachingDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'batches' | 'attendance' | 'fees' | 'notices'>('overview');
+interface CoachingDashboardProps {
+  onOpenMarketplace?: () => void;
+}
+
+export const CoachingDashboard: React.FC<CoachingDashboardProps> = ({
+  onOpenMarketplace
+}) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'leads' | 'batches' | 'attendance' | 'fees' | 'notices' | 'subscription' | 'branding'>('overview');
   const [selectedBatch, setSelectedBatch] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddClassModal, setShowAddClassModal] = useState(false);
   const [showAddNoticeModal, setShowAddNoticeModal] = useState(false);
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [showQuickPayModal, setShowQuickPayModal] = useState(false);
+
+  // Admission Leads state
+  const [leads, setLeads] = useState<AdmissionLead[]>(() => {
+    try {
+      const saved = localStorage.getItem('dapathshala_coaching_leads');
+      return saved ? JSON.parse(saved) : INITIAL_ADMISSION_LEADS;
+    } catch {
+      return INITIAL_ADMISSION_LEADS;
+    }
+  });
+
+  // Keep leads in sync with localStorage
+  useEffect(() => {
+    const handleStorage = () => {
+      try {
+        const saved = localStorage.getItem('dapathshala_coaching_leads');
+        if (saved) setLeads(JSON.parse(saved));
+      } catch {}
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  // Coaching Profile State (saved to localStorage)
+  const [coachingProfile, setCoachingProfile] = useState<CoachingProfile>(() => {
+    try {
+      const saved = localStorage.getItem('dapathshala_coaching_profile');
+      return saved ? JSON.parse(saved) : DEFAULT_COACHING_PROFILE;
+    } catch {
+      return DEFAULT_COACHING_PROFILE;
+    }
+  });
+
+  // Subscription State (saved to localStorage)
+  const [subscription, setSubscription] = useState<SubscriptionState>(() => {
+    try {
+      const saved = localStorage.getItem('dapathshala_coaching_subscription');
+      return saved ? JSON.parse(saved) : INITIAL_SUBSCRIPTION_STATE;
+    } catch {
+      return INITIAL_SUBSCRIPTION_STATE;
+    }
+  });
+
+  // Invoices State (saved to localStorage)
+  const [invoices, setInvoices] = useState<Invoice[]>(() => {
+    try {
+      const saved = localStorage.getItem('dapathshala_coaching_invoices');
+      return saved ? JSON.parse(saved) : INITIAL_INVOICES;
+    } catch {
+      return INITIAL_INVOICES;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('dapathshala_coaching_profile', JSON.stringify(coachingProfile));
+    } catch {}
+  }, [coachingProfile]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('dapathshala_coaching_subscription', JSON.stringify(subscription));
+    } catch {}
+  }, [subscription]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('dapathshala_coaching_invoices', JSON.stringify(invoices));
+    } catch {}
+  }, [invoices]);
+
+  const handleSaveProfile = (newProfile: CoachingProfile) => {
+    setCoachingProfile(newProfile);
+  };
+
+  const handleUpdateSubscription = (newSub: SubscriptionState) => {
+    setSubscription(newSub);
+  };
+
+  const handleAddInvoice = (newInv: Invoice) => {
+    setInvoices([newInv, ...invoices]);
+  };
+
+  const handleToggleAutoRenew = () => {
+    setSubscription(prev => ({ ...prev, autoRenew: !prev.autoRenew }));
+  };
 
   // Batches state
   const [batches, setBatches] = useState([
@@ -135,85 +246,211 @@ export const CoachingDashboard: React.FC = () => {
   const presentCount = students.filter(s => s.attendanceToday === 'present').length;
 
   return (
-    <div className="space-y-8 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold mb-2">
-            <GraduationCap size={14} className="text-emerald-600" />
-            কোচিং ও একাডেমি ম্যানেজমেন্ট সফটওয়্যার
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto font-sans">
+      
+      {/* Top Header with Coaching Branding & Quick Actions */}
+      <header className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
+        <div className="flex items-center gap-4">
+          <div 
+            onClick={() => setShowRegistrationModal(true)}
+            className="w-16 h-16 rounded-2xl flex items-center justify-center text-4xl shadow-md cursor-pointer hover:scale-105 transition-transform shrink-0"
+            style={{ backgroundColor: `${coachingProfile.themeColor}15`, color: coachingProfile.themeColor }}
+            title="লোগো বা প্রোফাইল পরিবর্তন করতে ক্লিক করুন"
+          >
+            {coachingProfile.logo.startsWith('data:') || coachingProfile.logo.startsWith('http') ? (
+              <img src={coachingProfile.logo} alt="Logo" className="w-full h-full object-contain p-1 rounded-2xl" />
+            ) : (
+              <span>{coachingProfile.logo}</span>
+            )}
           </div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">
-            কোচিং ও ব্যাচ <span className="text-emerald-600">ম্যানেজার হাব</span>
-          </h1>
-          <p className="mt-1 text-slate-500 text-sm">
-            আপনার শিক্ষার্থী, ব্যাচ রুটিন, উপস্থিতি, টিউশন ফি ও নোটিশ বোর্ড এক জায়গায় নিয়ন্ত্রণ করুন।
-          </p>
+
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">
+                <GraduationCap size={13} className="text-emerald-600" />
+                কোচিং ও একাডেমি পোর্টাল
+              </span>
+
+              {/* Subscription Status Pill */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('subscription')}
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold border border-indigo-200 transition-colors cursor-pointer"
+              >
+                <Sparkles size={11} className="text-indigo-600" />
+                <span>{subscription.planName}</span>
+                <span className="text-[10px] text-indigo-900">• রিনিউয়াল তারিখ: {new Date(subscription.renewalDate).toLocaleDateString('bn-BD', { month: 'short', day: 'numeric' })}</span>
+              </button>
+            </div>
+
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2">
+              {coachingProfile.name}
+            </h1>
+            
+            <p className="mt-0.5 text-slate-500 text-xs flex flex-wrap items-center gap-3">
+              <span className="flex items-center gap-1 text-slate-600">
+                <MapPin size={12} className="text-emerald-600" />
+                {coachingProfile.address || coachingProfile.district}
+              </span>
+              <span>•</span>
+              <span>ধারণক্ষমতা: {coachingProfile.studentCapacity} শিক্ষার্থী</span>
+              <span>•</span>
+              <span className="text-emerald-600 font-bold">dapathshala.com/c/{coachingProfile.subdomain}</span>
+            </p>
+          </div>
         </div>
-        <div className="flex gap-2">
+
+        {/* Header Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          {onOpenMarketplace && (
+            <Button 
+              variant="outline" 
+              onClick={onOpenMarketplace}
+              className="gap-1.5 cursor-pointer text-xs font-bold border-emerald-300 text-emerald-800 bg-emerald-50 hover:bg-emerald-100"
+            >
+              <Search size={14} className="text-emerald-700" />
+              মার্কেটপ্লেস ডিরেক্টরি
+            </Button>
+          )}
+
+          <Button 
+            variant="outline" 
+            onClick={() => setActiveTab('leads')}
+            className={`gap-1.5 cursor-pointer text-xs font-bold border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 ${
+              activeTab === 'leads' ? 'ring-2 ring-amber-400' : ''
+            }`}
+          >
+            <Users size={15} className="text-amber-600" />
+            <span>ভর্তি আবেদন (Leads)</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white">
+              {leads.filter(l => l.status === 'new').length}
+            </span>
+          </Button>
+
+          <Button 
+            variant="outline" 
+            onClick={() => setShowRegistrationModal(true)}
+            className="gap-1.5 cursor-pointer text-xs font-bold border-slate-300 hover:bg-slate-50"
+          >
+            <Building2 size={15} className="text-emerald-600" />
+            কোচিং তথ্য
+          </Button>
+
+          <Button 
+            variant="outline" 
+            onClick={() => setActiveTab('subscription')}
+            className={`gap-1.5 cursor-pointer text-xs font-bold border-indigo-200 text-indigo-700 hover:bg-indigo-50 ${
+              activeTab === 'subscription' ? 'bg-indigo-100' : ''
+            }`}
+          >
+            <CreditCard size={15} />
+            প্যাকেজ ও বিলিং
+          </Button>
+
           <Button 
             variant="outline" 
             onClick={() => setShowAddNoticeModal(true)}
-            className="gap-2 cursor-pointer text-xs font-bold"
+            className="gap-1.5 cursor-pointer text-xs font-bold"
           >
-            <Bell size={16} />
-            নোটিশ দিন
+            <Bell size={15} />
+            নোটিশ
           </Button>
+
           <Button 
             variant="primary" 
             onClick={() => setShowAddClassModal(true)}
-            className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer text-xs font-bold shadow-md shadow-emerald-200"
+            className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer text-xs font-bold shadow-md shadow-emerald-200"
           >
-            <Plus size={16} />
-            নতুন ক্লাস / ব্যাচ
+            <Plus size={15} />
+            নতুন ব্যাচ
           </Button>
         </div>
       </header>
+
+      {/* Auto-Notification Renewal Alert Banner */}
+      <SubscriptionAlertBanner
+        subscription={subscription}
+        coachingProfile={coachingProfile}
+        onOpenRenew={() => setActiveTab('subscription')}
+        onToggleAutoRenew={handleToggleAutoRenew}
+      />
 
       {/* Navigation Sub-Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
         <button
           onClick={() => setActiveTab('overview')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap cursor-pointer ${
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer ${
             activeTab === 'overview' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
           ওভারভিউ ও অ্যানালিটিক্স
         </button>
         <button
+          onClick={() => setActiveTab('leads')}
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'leads' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'text-slate-700 bg-emerald-50/70 hover:bg-emerald-100'
+          }`}
+        >
+          <Users size={15} />
+          ভর্তি আবেদন (Student Leads)
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+            activeTab === 'leads' ? 'bg-white text-emerald-800' : 'bg-amber-400 text-slate-950'
+          }`}>
+            {leads.filter(l => l.status === 'new').length} নতুন
+          </span>
+        </button>
+        <button
           onClick={() => setActiveTab('batches')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
             activeTab === 'batches' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          <Layers size={16} />
+          <Layers size={15} />
           সক্রিয় ব্যাচসমূহ ({batches.length})
         </button>
         <button
           onClick={() => setActiveTab('attendance')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
             activeTab === 'attendance' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          <UserCheck size={16} />
+          <UserCheck size={15} />
           উপস্থিতি শিট (Attendance)
         </button>
         <button
           onClick={() => setActiveTab('fees')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
             activeTab === 'fees' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          <DollarSign size={16} />
+          <DollarSign size={15} />
           টিউশন ফি ট্র্যাকার
         </button>
         <button
+          onClick={() => setActiveTab('subscription')}
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'subscription' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100'
+          }`}
+        >
+          <CreditCard size={15} />
+          প্যাকেজ ও সাবস্ক্রিপশন (SaaS)
+        </button>
+        <button
+          onClick={() => setActiveTab('branding')}
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'branding' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          <Building2 size={15} />
+          ব্র্যান্ডিং ও প্রোফাইল
+        </button>
+        <button
           onClick={() => setActiveTab('notices')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
+          className={`px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
             activeTab === 'notices' ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
-          <Bell size={16} />
+          <Bell size={15} />
           নোটিশ বোর্ড ({notices.length})
         </button>
       </div>
@@ -223,20 +460,37 @@ export const CoachingDashboard: React.FC = () => {
         <div className="space-y-8">
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { label: 'মোট শিক্ষার্থী', value: '৪৫০ জন', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-              { label: 'সক্রিয় ব্যাচ', value: `${batches.length}টি`, icon: GraduationCap, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-              { label: 'আজ উপস্থিতি হার', value: `${Math.round((presentCount / (students.length || 1)) * 100)}%`, icon: Calendar, color: 'text-amber-600', bg: 'bg-amber-50' },
-              { label: 'চলতি মাসে ফি আদায়', value: `৳${totalFeeCollected.toLocaleString('bn-BD')}`, icon: DollarSign, color: 'text-purple-600', bg: 'bg-purple-50' },
+              { label: 'মোট শিক্ষার্থী', value: '৪৫০ জন', icon: Users, color: 'text-blue-600', bg: 'bg-blue-50', onClick: undefined },
+              { 
+                label: 'ভর্তি আবেদন (Leads)', 
+                value: `${leads.length} জন`, 
+                subtext: `${leads.filter(l => l.status === 'new').length}টি নতুন আবেদন`,
+                icon: Sparkles, 
+                color: 'text-amber-600', 
+                bg: 'bg-amber-50',
+                onClick: () => setActiveTab('leads') 
+              },
+              { label: 'সক্রিয় ব্যাচ', value: `${batches.length}টি`, icon: GraduationCap, color: 'text-emerald-600', bg: 'bg-emerald-50', onClick: () => setActiveTab('batches') },
+              { label: 'চলতি মাসে ফি আদায়', value: `৳${totalFeeCollected.toLocaleString('bn-BD')}`, icon: DollarSign, color: 'text-purple-600', bg: 'bg-purple-50', onClick: () => setActiveTab('fees') },
             ].map((stat) => {
               const Icon = stat.icon;
               return (
-                <Card key={stat.label} className="flex items-center gap-4 border-none shadow-md bg-white">
+                <Card 
+                  key={stat.label} 
+                  onClick={stat.onClick}
+                  className={`flex items-center gap-4 border-none shadow-md bg-white transition-all ${stat.onClick ? 'cursor-pointer hover:shadow-lg hover:border-slate-300' : ''}`}
+                >
                   <div className={`rounded-2xl p-3.5 ${stat.bg}`}>
                     <Icon className={stat.color} size={24} />
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-slate-500">{stat.label}</p>
                     <p className="text-2xl font-black text-slate-900 mt-0.5">{stat.value}</p>
+                    {stat.subtext && (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-md inline-block mt-1">
+                        {stat.subtext}
+                      </span>
+                    )}
                   </div>
                 </Card>
               );
@@ -244,7 +498,8 @@ export const CoachingDashboard: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 space-y-6">
+              {/* Active Classes Card */}
               <Card className="border-none shadow-md bg-white">
                 <div className="mb-6 flex items-center justify-between">
                   <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
@@ -276,6 +531,75 @@ export const CoachingDashboard: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              </Card>
+
+              {/* Recent Student Admission Leads Widget */}
+              <Card className="border-none shadow-md bg-white p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                      <Users size={18} className="text-amber-500" />
+                      নতুন ভর্তি ইচ্ছুক শিক্ষার্থী (Recent Admission Leads)
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">মার্কেটপ্লেস ও ডিরেক্টরি থেকে সরাসরি আসা সর্বশেষ আবেদনসমূহ</p>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setActiveTab('leads')} 
+                    className="text-xs font-bold text-emerald-600 cursor-pointer"
+                  >
+                    সকল আবেদন দেখুন ({leads.length})
+                  </Button>
+                </div>
+
+                <div className="divide-y divide-slate-100">
+                  {leads.slice(0, 3).map((lead) => (
+                    <div key={lead.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 first:pt-0 last:pb-0">
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-800 font-bold flex items-center justify-center text-xs shrink-0">
+                          {lead.studentName.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 text-sm">{lead.studentName}</span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              lead.status === 'new' 
+                                ? 'bg-amber-100 text-amber-800' 
+                                : lead.status === 'enrolled' 
+                                ? 'bg-emerald-100 text-emerald-800' 
+                                : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {lead.status === 'new' ? 'নতুন' : lead.status === 'enrolled' ? 'ভর্তি নিশ্চিত' : 'যোগাযোগকৃত'}
+                            </span>
+                          </div>
+                          <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
+                            <span>{lead.currentInstitution}</span>
+                            <span>•</span>
+                            <span className="text-emerald-700 font-medium">{lead.programInterest}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <a
+                          href={`tel:${lead.phone}`}
+                          className="px-2.5 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1"
+                        >
+                          কল দিন
+                        </a>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setActiveTab('leads')}
+                          className="text-xs font-bold text-slate-700 border-slate-200 cursor-pointer"
+                        >
+                          ফলো-আপ
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </Card>
             </div>
@@ -320,6 +644,14 @@ export const CoachingDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* TAB: STUDENT LEADS */}
+      {activeTab === 'leads' && (
+        <StudentLeadsManager
+          coachingId={coachingProfile.id}
+          coachingName={coachingProfile.name}
+        />
       )}
 
       {/* TAB 2: BATCHES */}
@@ -606,6 +938,25 @@ export const CoachingDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* TAB 6: SUBSCRIPTION & BILLING (SAAS) */}
+      {activeTab === 'subscription' && (
+        <CoachingSubscriptionManager
+          subscription={subscription}
+          coachingProfile={coachingProfile}
+          invoices={invoices}
+          onUpdateSubscription={handleUpdateSubscription}
+          onAddInvoice={handleAddInvoice}
+        />
+      )}
+
+      {/* TAB 7: BRANDING & PROFILE */}
+      {activeTab === 'branding' && (
+        <CoachingProfileView
+          profile={coachingProfile}
+          onEdit={() => setShowRegistrationModal(true)}
+        />
+      )}
+
       {/* MODAL: ADD CLASS */}
       {showAddClassModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
@@ -713,6 +1064,14 @@ export const CoachingDashboard: React.FC = () => {
           </Card>
         </div>
       )}
+
+      {/* MODAL: COACHING REGISTRATION & BRANDING */}
+      <CoachingRegistrationModal
+        isOpen={showRegistrationModal}
+        initialProfile={coachingProfile}
+        onClose={() => setShowRegistrationModal(false)}
+        onSave={handleSaveProfile}
+      />
     </div>
   );
 };
