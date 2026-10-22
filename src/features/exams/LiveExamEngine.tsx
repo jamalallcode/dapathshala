@@ -76,11 +76,15 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [timeExpiredPrompt, setTimeExpiredPrompt] = useState(false);
   const [showFinalMarksheetModal, setShowFinalMarksheetModal] = useState(false);
 
+  const hasEnteredFullscreenRef = useRef<boolean>(false);
+
   // Helper to request fullscreen
   const enterFullscreen = useCallback(() => {
     try {
       if (document.documentElement.requestFullscreen) {
-        document.documentElement.requestFullscreen().catch(() => {});
+        document.documentElement.requestFullscreen().then(() => {
+          hasEnteredFullscreenRef.current = true;
+        }).catch(() => {});
       }
     } catch {}
   }, []);
@@ -258,13 +262,13 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }, 2500);
   }, []);
 
-  // 1. Fullscreen lifecycle & exit detection
+  // 1. Fullscreen lifecycle & exit detection (guarded: only flags if student was actually in fullscreen)
   useEffect(() => {
-    // Attempt fullscreen on mount
-    enterFullscreen();
-
     const handleFullscreenChange = () => {
-      if (!document.fullscreenElement && !isFinished) {
+      if (document.fullscreenElement) {
+        hasEnteredFullscreenRef.current = true;
+      } else if (hasEnteredFullscreenRef.current && !isFinished) {
+        hasEnteredFullscreenRef.current = false;
         triggerViolation('ফুলস্ক্রিন মোড থেকে বের হওয়া সনাক্ত হয়েছে!', 'fullscreen_exit');
       }
     };
@@ -278,9 +282,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         } catch {}
       }
     };
-  }, [isFinished, enterFullscreen, triggerViolation]);
+  }, [isFinished, triggerViolation]);
 
-  // 2. Tab switch & window blur detection
+  // 2. Tab switch detection (only triggers on true tab switch/minimize; window blur removed to avoid false positives on clicks)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && !isFinished) {
@@ -288,18 +292,10 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       }
     };
 
-    const handleBlur = () => {
-      if (!isFinished) {
-        triggerViolation('ব্রাউজার থেকে বের হওয়ার বা উইন্ডো পরিবর্তন করার চেষ্টা করেছে', 'window_blur');
-      }
-    };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleBlur);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleBlur);
     };
   }, [isFinished, triggerViolation]);
 
