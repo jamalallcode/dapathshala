@@ -262,33 +262,28 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }, 2500);
   }, []);
 
-  // 1. Fullscreen lifecycle & exit detection (guarded: only flags if student was actually in fullscreen)
+  const triggerViolationRef = useRef(triggerViolation);
+  triggerViolationRef.current = triggerViolation;
+  const isFinishedRef = useRef(isFinished);
+  isFinishedRef.current = isFinished;
+
+  // 1. Fullscreen change listener (purely updates state; never triggers disruptive violations on click)
   useEffect(() => {
     const handleFullscreenChange = () => {
-      if (document.fullscreenElement) {
-        hasEnteredFullscreenRef.current = true;
-      } else if (hasEnteredFullscreenRef.current && !isFinished) {
-        hasEnteredFullscreenRef.current = false;
-        triggerViolation('ফুলস্ক্রিন মোড থেকে বের হওয়া সনাক্ত হয়েছে!', 'fullscreen_exit');
-      }
+      hasEnteredFullscreenRef.current = !!document.fullscreenElement;
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      if (document.fullscreenElement) {
-        try {
-          document.exitFullscreen().catch(() => {});
-        } catch {}
-      }
     };
-  }, [isFinished, triggerViolation]);
+  }, []);
 
-  // 2. Tab switch detection (only triggers on true tab switch/minimize; window blur removed to avoid false positives on clicks)
+  // 2. Tab switch detection (only triggers when student genuinely leaves the browser tab/minimizes)
   useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden' && !isFinished) {
-        triggerViolation('পরীক্ষা চলাকালীন অন্য ট্যাব খোলার চেষ্টা করেছে', 'tab_switch');
+      if (document.visibilityState === 'hidden' && !isFinishedRef.current) {
+        triggerViolationRef.current('পরীক্ষা চলাকালীন অন্য ট্যাব খোলার চেষ্টা করেছে', 'tab_switch');
       }
     };
 
@@ -297,7 +292,18 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [isFinished, triggerViolation]);
+  }, []);
+
+  // 3. Clean up fullscreen ONLY on component unmount
+  useEffect(() => {
+    return () => {
+      if (document.fullscreenElement) {
+        try {
+          document.exitFullscreen().catch(() => {});
+        } catch {}
+      }
+    };
+  }, []);
 
   // 3. Right-click, Copy, Cut, Paste, Text selection & Devtools keys prevention
   useEffect(() => {
@@ -324,6 +330,10 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     };
 
     const handleSelectStart = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('button') || target?.closest('input') || target?.closest('textarea')) {
+        return true;
+      }
       e.preventDefault();
       return false;
     };
@@ -718,6 +728,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                   const isSelected = answers[currentQuestion.id] === idx;
                   return (
                     <button
+                      type="button"
                       key={idx}
                       onClick={() => handleAnswerSelect(idx)}
                       className={`group relative flex items-center p-4 sm:p-6 rounded-2xl border-2 text-left transition-all cursor-pointer ${
@@ -893,7 +904,6 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                     className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-indigo-200 cursor-pointer"
                     onClick={() => {
                       setWarningModal(null);
-                      enterFullscreen();
                     }}
                   >
                     আমি বুঝতে পেরেছি, পরীক্ষা চালিয়ে যান
