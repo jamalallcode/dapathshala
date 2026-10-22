@@ -39,19 +39,7 @@ export const SecurityShield: React.FC<SecurityShieldProps> = ({ children, user, 
   if (!isEnabled) return <>{children}</>;
 
   return (
-    <div className="relative select-none">
-      {/* Floating Watermark */}
-      {user && (
-        <div className="fixed inset-0 pointer-events-none z-[100] opacity-[0.03] flex items-center justify-center overflow-hidden">
-          <div className="grid grid-cols-3 gap-40 rotate-[-30deg] whitespace-nowrap">
-            {Array.from({ length: 20 }).map((_, i) => (
-              <div key={i} className="text-4xl font-black text-slate-900">
-                {user.email} - {user.id.slice(0, 8)}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+    <div className="relative">
       {children}
     </div>
   );

@@ -35,6 +35,19 @@ interface Question {
   explanation: string;
 }
 
+export type OptionStyle = 'circle' | 'bracket';
+export type OptionLang = 'bn' | 'en';
+
+export const BANGLA_SERIALS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
+export const ENGLISH_SERIALS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+export const getOptionSerial = (index: number, lang: OptionLang = 'bn'): string => {
+  if (lang === 'bn') {
+    return BANGLA_SERIALS[index] || String(index + 1);
+  }
+  return ENGLISH_SERIALS[index] || String.fromCharCode(65 + index);
+};
+
 export const AIQuestionGenerator: React.FC = () => {
   const [topic, setTopic] = useState('');
   const [subject, setSubject] = useState('বাংলা');
@@ -48,6 +61,10 @@ export const AIQuestionGenerator: React.FC = () => {
   const [editForm, setEditForm] = useState<Question | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Option serial style (circle vs bracket) & language (bn vs en)
+  const [optionStyle, setOptionStyle] = useState<OptionStyle>('circle');
+  const [optionLang, setOptionLang] = useState<OptionLang>('bn');
 
   // Topic dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -219,12 +236,178 @@ export const AIQuestionGenerator: React.FC = () => {
   };
 
   const copyToClipboard = () => {
-    const text = questions.map((q, i) => 
-      `${i + 1}. ${q.question}\nOptions: ${q.options.join(', ')}\nCorrect: ${q.correctAnswer}\nExplanation: ${q.explanation}`
-    ).join('\n\n');
+    const text = questions.map((q, i) => {
+      const optionsText = q.options.map((opt, j) => {
+        const serial = getOptionSerial(j, optionLang);
+        return optionStyle === 'bracket' ? `(${serial}) ${opt}` : `${serial}) ${opt}`;
+      }).join('    ');
+      return `${i + 1}. ${q.question}\n${optionsText}\nসঠিক উত্তর: ${q.correctAnswer}\nব্যাখ্যা: ${q.explanation}`;
+    }).join('\n\n');
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownloadPDF = () => {
+    if (questions.length === 0) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+    const html = `<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8">
+  <title>${subject} - ${topic || 'প্রশ্নপত্র'} | দ্যা পাঠশালা</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Hind Siliguri', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 36px;
+      color: #0f172a;
+      line-height: 1.6;
+      max-width: 840px;
+      margin: 0 auto;
+      background: #ffffff;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #059669;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 26px;
+      font-weight: 700;
+      color: #065f46;
+    }
+    .header p {
+      margin: 4px 0 0;
+      color: #475569;
+      font-size: 14px;
+    }
+    .meta-bar {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 600;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 8px 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+    .question-block {
+      margin-bottom: 20px;
+      page-break-inside: avoid;
+    }
+    .q-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #1e293b;
+    }
+    .options-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+      margin-left: 12px;
+    }
+    .opt-item {
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .circle-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 1.5px solid #475569;
+      font-size: 11px;
+      font-weight: bold;
+      color: #1e293b;
+    }
+    .bracket-badge {
+      font-weight: bold;
+      font-size: 14px;
+      color: #1e293b;
+    }
+    .answer-key {
+      margin-top: 40px;
+      border-top: 2px dashed #cbd5e1;
+      padding-top: 20px;
+      page-break-before: auto;
+    }
+    .answer-key h3 {
+      color: #065f46;
+      margin-top: 0;
+      font-size: 16px;
+    }
+    .answer-row {
+      font-size: 13px;
+      margin: 6px 0;
+      color: #334155;
+    }
+    @media print {
+      body { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>দ্যা পাঠশালা • প্রশ্নপত্র</h1>
+    <p>বিষয়: ${subject} • অধ্যায়/টপিক: ${topic || 'সাধারণ'}</p>
+  </div>
+  <div class="meta-bar">
+    <span>মোট প্রশ্ন: ${questions.length}টি</span>
+    <span>পূর্ণমান: ${questions.length}</span>
+    <span>সময়: ${Math.round(questions.length * 1.2)} মিনিট</span>
+  </div>
+  <div class="questions">
+    ${questions.map((q, i) => `
+      <div class="question-block">
+        <div class="q-title">${i + 1}. ${q.question}</div>
+        <div class="options-grid">
+          ${q.options.map((opt, j) => {
+            const serial = getOptionSerial(j, optionLang);
+            const badge = optionStyle === 'circle'
+              ? `<span class="circle-badge">${serial}</span>`
+              : `<span class="bracket-badge">(${serial})</span>`;
+            return `<div class="opt-item">${badge} <span>${opt}</span></div>`;
+          }).join('')}
+        </div>
+      </div>
+    `).join('')}
+  </div>
+  <div class="answer-key">
+    <h3>উত্তরমালা ও ব্যাখ্যা:</h3>
+    ${questions.map((q, i) => `
+      <div class="answer-row">
+        <strong>${i + 1}.</strong> উত্তর: <strong>${q.correctAnswer}</strong>
+        ${q.explanation ? `— <em>${q.explanation}</em>` : ''}
+      </div>
+    `).join('')}
+  </div>
+  <script>
+    window.onload = function() {
+      setTimeout(() => {
+        window.print();
+      }, 300);
+    };
+  </script>
+</body>
+</html>`;
+    printWindow.document.write(html);
+    printWindow.document.close();
   };
 
   return (
@@ -245,7 +428,7 @@ export const AIQuestionGenerator: React.FC = () => {
               {copied ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
               {copied ? 'কপি হয়েছে' : 'সব কপি করুন'}
             </Button>
-            <Button variant="outline" size="sm" className="gap-2 rounded-xl">
+            <Button variant="outline" size="sm" className="gap-2 rounded-xl" onClick={handleDownloadPDF}>
               <Download size={16} />
               PDF ডাউনলোড
             </Button>
@@ -318,7 +501,7 @@ export const AIQuestionGenerator: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className="text-xs text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1"
+                    className="text-xs text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1 cursor-pointer"
                   >
                     <Layers size={13} />
                     {isDropdownOpen ? 'তালিকা লুকান' : 'অধ্যায়সমূহ দেখুন'}
@@ -330,19 +513,23 @@ export const AIQuestionGenerator: React.FC = () => {
                     type="text"
                     value={topic}
                     onFocus={() => setIsDropdownOpen(true)}
+                    onClick={() => setIsDropdownOpen(prev => !prev)}
                     onChange={(e) => {
                       setTopic(e.target.value);
                       setIsDropdownOpen(true);
                       setError(null);
                     }}
                     placeholder={`উদা: ${availableChapters[0] || 'নিউটনের গতিসূত্র'}...`}
-                    className="w-full rounded-xl border border-slate-200 bg-white pl-4 pr-11 py-3 text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all"
+                    className="w-full rounded-xl border border-slate-200 bg-white pl-4 pr-11 py-3 text-slate-900 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 focus:outline-none transition-all cursor-pointer font-medium selection:bg-emerald-100"
                   />
                   <button
                     type="button"
-                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-700 rounded-lg transition-all"
-                    title="ড্রপডাউন খুলুন"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsDropdownOpen(prev => !prev);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-emerald-600 rounded-lg transition-all cursor-pointer"
+                    title="অধ্যায়ের তালিকা খুলুন"
                   >
                     <ChevronDown size={18} className={`transition-transform duration-200 ${isDropdownOpen ? 'rotate-180 text-emerald-600' : ''}`} />
                   </button>
@@ -370,7 +557,7 @@ export const AIQuestionGenerator: React.FC = () => {
                           key={idx}
                           type="button"
                           onClick={() => handleSelectChapter(ch)}
-                          className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-all flex items-center justify-between gap-2 hover:bg-emerald-50 hover:text-emerald-800 ${
+                          className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-all flex items-center justify-between gap-2 hover:bg-emerald-50 hover:text-emerald-800 cursor-pointer ${
                             topic === ch ? 'bg-emerald-50 text-emerald-700 font-bold' : 'text-slate-700'
                           }`}
                         >
@@ -396,7 +583,7 @@ export const AIQuestionGenerator: React.FC = () => {
                           key={i}
                           type="button"
                           onClick={() => handleSelectChapter(ch)}
-                          className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                          className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
                             topic === ch
                               ? 'bg-emerald-600 border-emerald-600 text-white font-medium shadow-sm'
                               : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-emerald-50 hover:border-emerald-200 hover:text-emerald-700'
@@ -509,6 +696,67 @@ export const AIQuestionGenerator: React.FC = () => {
                 animate={{ opacity: 1 }}
                 className="space-y-6"
               >
+                {/* Option Style Controls Toolbar */}
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/70 shadow-xs">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500">অপশন ক্রমিক স্টাইল:</span>
+                    <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setOptionStyle('circle')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          optionStyle === 'circle'
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <span className="w-3.5 h-3.5 rounded-full border-2 border-current inline-flex items-center justify-center text-[8px]">●</span>
+                        গোল বৃত্ত (Circle)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOptionStyle('bracket')}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          optionStyle === 'bracket'
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <span className="font-mono font-bold text-xs">( )</span>
+                        ফার্স্ট ব্র্যাকেট
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500">হরফ:</span>
+                    <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setOptionLang('bn')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          optionLang === 'bn'
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        ক, খ, গ, ঘ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOptionLang('en')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          optionLang === 'en'
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        A, B, C, D
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {questions.map((q, i) => (
                   <motion.div
                     layout
@@ -562,7 +810,9 @@ export const AIQuestionGenerator: React.FC = () => {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             {editForm?.options.map((opt, idx) => (
                               <div key={idx} className="space-y-1">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase">অপশন {String.fromCharCode(65 + idx)}</label>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase">
+                                  অপশন {optionStyle === 'bracket' ? `(${getOptionSerial(idx, optionLang)})` : getOptionSerial(idx, optionLang)}
+                                </label>
                                 <input
                                   type="text"
                                   value={opt}
@@ -607,25 +857,48 @@ export const AIQuestionGenerator: React.FC = () => {
                             <p className="font-bold text-slate-900 text-lg pr-24">{q.question}</p>
                           </div>
                           
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 ml-11">
-                            {q.options.map((opt, j) => (
-                              <div 
-                                key={j} 
-                                className={`p-4 rounded-2xl border transition-all ${
-                                  opt === q.correctAnswer 
-                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-700 font-bold shadow-sm' 
-                                    : 'bg-slate-50 border-slate-100 text-slate-600'
-                                }`}
-                              >
-                                <span className="inline-block w-6 h-6 rounded bg-white border border-inherit flex items-center justify-center text-xs mr-3 font-bold">
-                                  {String.fromCharCode(65 + j)}
-                                </span>
-                                {opt}
-                              </div>
-                            ))}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 ml-0 sm:ml-11">
+                            {q.options.map((opt, j) => {
+                              const isCorrect = opt === q.correctAnswer;
+                              const serial = getOptionSerial(j, optionLang);
+
+                              return (
+                                <div 
+                                  key={j} 
+                                  className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex items-center gap-3 ${
+                                    isCorrect 
+                                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 font-bold shadow-xs ring-1 ring-emerald-200' 
+                                      : 'bg-slate-50 border-slate-200/80 text-slate-700 hover:bg-slate-100/70'
+                                  }`}
+                                >
+                                  {optionStyle === 'circle' ? (
+                                    <span 
+                                      className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all shadow-xs ${
+                                        isCorrect
+                                          ? 'bg-emerald-600 text-white border border-emerald-600 ring-2 ring-emerald-200'
+                                          : 'bg-white border-2 border-slate-300 text-slate-700'
+                                      }`}
+                                    >
+                                      {serial}
+                                    </span>
+                                  ) : (
+                                    <span 
+                                      className={`flex-shrink-0 font-bold text-sm tracking-tight px-1.5 py-0.5 rounded-md transition-all ${
+                                        isCorrect
+                                          ? 'bg-emerald-200/80 text-emerald-900 border border-emerald-300 font-black'
+                                          : 'bg-white border border-slate-200 text-slate-700 shadow-xs'
+                                      }`}
+                                    >
+                                      ({serial})
+                                    </span>
+                                  )}
+                                  <span className="flex-1 text-sm leading-relaxed">{opt}</span>
+                                </div>
+                              );
+                            })}
                           </div>
 
-                          <div className="ml-11 pt-4 border-t border-slate-100">
+                          <div className="ml-0 sm:ml-11 pt-4 border-t border-slate-100">
                             <div className="flex items-center gap-2 text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
                               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                               ব্যাখ্যা
