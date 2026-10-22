@@ -26,28 +26,31 @@ export const ChildDashboard: React.FC = () => {
       const saved = localStorage.getItem('dapathshala_parent_assigned_tests');
       if (saved) {
         const parsed = JSON.parse(saved);
-        const filtered = parsed.filter((t: any) => t.isPublished || t.status === 'reviewed');
-        if (filtered.length > 0) return filtered;
+        if (Array.isArray(parsed)) {
+          return parsed.filter((t: any) => t && (t.isPublished === true || t.status === 'reviewed'));
+        }
       }
     } catch {}
-    return [
-      {
-        id: 'test-101',
-        title: 'গণিত সাপ্তাহিক মূল্যায়ন',
-        subject: 'গণিত',
-        chapter: 'বীজগণিত ও সমীকরণ',
-        childName: 'আরাফাত রহমান',
-        score: 88,
-        totalScoreObtained: 4.5,
-        totalPossible: 5,
-        publishedAt: 'আজ, দুপুর ১২:১৫',
-        evaluationMode: 'ai',
-        aiFeedback: 'বীজগণিতের সূত্রের প্রয়োগ নিখুঁত হয়েছে। পক্ষান্তরের চিহ্নে সামান্য সতর্কতা আবশ্যক।',
-        parentComment: 'খুব চমৎকার ফলাফল করেছ বাবা! ৩ নম্বর প্রশ্নের চিহ্নটি ঠিক করে নাও, পরের পরীক্ষায় আরো ভালো হবে।',
-        handwrittenImages: ['/assets/aistudio/image_fb59e449.png']
-      }
-    ];
+    return [];
   });
+
+  useEffect(() => {
+    const handlePublished = (e: any) => {
+      if (e.detail) {
+        setPublishedResults(prev => {
+          const idx = prev.findIndex(t => t.id === e.detail.id || t.id === e.detail.examId);
+          if (idx >= 0) {
+            const copy = [...prev];
+            copy[idx] = e.detail;
+            return copy;
+          }
+          return [e.detail, ...prev];
+        });
+      }
+    };
+    window.addEventListener('dapathshala_marksheet_published', handlePublished);
+    return () => window.removeEventListener('dapathshala_marksheet_published', handlePublished);
+  }, []);
   const [assignments, setAssignments] = useState<ExamAssignment[]>([
     {
       id: 'exam-2',

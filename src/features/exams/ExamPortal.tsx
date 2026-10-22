@@ -14,7 +14,8 @@ import {
   CheckCircle2, 
   BookOpen, 
   ShieldCheck,
-  UserCheck
+  UserCheck,
+  Lock
 } from 'lucide-react';
 import { EXAMS } from '../../constants';
 import { LiveExamEngine } from './LiveExamEngine';
@@ -26,83 +27,32 @@ export const ExamPortal: React.FC = () => {
   const [examView, setExamView] = useState<'regular' | 'paid_store'>('regular');
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   const [publishedTests, setPublishedTests] = useState<FinalMarksheetData[]>([]);
+  const [pendingReviewTests, setPendingReviewTests] = useState<any[]>([]);
   const [selectedMarksheet, setSelectedMarksheet] = useState<FinalMarksheetData | null>(null);
+  const [lockedToast, setLockedToast] = useState<string | null>(null);
 
-  // Load published tests from localStorage and subscribe to real-time events
+  // Load published tests and pending review tests from localStorage and subscribe to real-time events
   useEffect(() => {
     const loadTests = () => {
       try {
         const saved = localStorage.getItem('dapathshala_parent_assigned_tests');
         if (saved) {
           const parsed = JSON.parse(saved);
-          const published = parsed.filter((t: any) => t.isPublished || t.status === 'reviewed' || t.status === 'completed');
-          if (published.length > 0) {
+          if (Array.isArray(parsed)) {
+            const published = parsed.filter((t: any) => t && (t.isPublished === true || t.status === 'reviewed'));
+            const pending = parsed.filter((t: any) => t && (t.status === 'submitted' || t.status === 'pending_review') && !t.isPublished);
+            
             setPublishedTests(published);
+            setPendingReviewTests(pending);
             return;
           }
         }
       } catch (e) {
-        console.warn('Error loading published tests:', e);
+        console.warn('Error loading tests in ExamPortal:', e);
       }
 
-      // Default sample evaluated test with AI & Parent feedback if none exists
-      const sampleEvaluated: FinalMarksheetData = {
-        id: 'test-101',
-        title: 'গণিত সাপ্তাহিক মূল্যায়ন',
-        subject: 'গণিত',
-        chapter: 'বীজগণিত ও সমীকরণ',
-        childName: 'আরাফাত রহমান',
-        score: 88,
-        totalScoreObtained: 4.5,
-        totalPossible: 5,
-        publishedAt: 'আজ, দুপুর ১২:১৫',
-        evaluationMode: 'ai',
-        aiFeedback: 'বীজগণিতের মৌলিক সূত্রের প্রয়োগ ও প্রতিস্থাপন নির্ভুল হয়েছে। সামগ্রিক উপস্থাপনা ও গাণিতিক নির্ভুলতা চমৎকার। তবে সমীকরণ সমাধানের ৩ নম্বর প্রশ্নে পক্ষান্তরের চিহ্নে সামান্য সতর্কতা আবশ্যক।',
-        parentComment: 'খুব চমৎকার পরীক্ষা দিয়েছ বাবা! বীজগণিতের দক্ষতা অনেক বেড়েছে। ৩ নম্বর প্রশ্নের চিহ্নটি ঠিক করে নাও, আগামী পরীক্ষায় ১০০% আশা করছি!',
-        handwrittenImages: [
-          '/assets/aistudio/image_fb59e449.png'
-        ],
-        aiDetailedMarking: [
-          {
-            questionId: 'q1',
-            isCorrect: true,
-            marksObtained: 1,
-            maxMarks: 1,
-            redInkNote: '✓ সঠিক উত্তর। সূত্রের সম্প্রসারণ ও ধাপসমূহ নির্ভুল হয়েছে।'
-          },
-          {
-            questionId: 'q2',
-            isCorrect: true,
-            marksObtained: 1,
-            maxMarks: 1,
-            redInkNote: '✓ সঠিক উত্তর। (x + 1/x)² - 2 এর মান নির্ণয় নির্ভুল।'
-          },
-          {
-            questionId: 'q3',
-            isCorrect: false,
-            marksObtained: 0.5,
-            maxMarks: 1,
-            isOverridden: true,
-            redInkNote: '✗ ভুল নির্বাচন ছিল। তবে খাতার গাণিতিক যুক্তির আংশিক সঠিকতার কারণে অভিভাবক ০.৫ নম্বর প্রদান করেছেন।'
-          },
-          {
-            questionId: 'q4',
-            isCorrect: true,
-            marksObtained: 1,
-            maxMarks: 1,
-            redInkNote: '✓ সঠিক উত্তর। পিথাগোরাসের উপপাদ্যের প্রয়োগ সঠিক।'
-          },
-          {
-            questionId: 'q5',
-            isCorrect: true,
-            marksObtained: 1,
-            maxMarks: 1,
-            redInkNote: '✓ সঠিক উত্তর। মৌলিক সংখ্যার সংজ্ঞা অনুযায়ী সঠিক বিকল্প ২৩।'
-          }
-        ]
-      };
-
-      setPublishedTests([sampleEvaluated]);
+      setPublishedTests([]);
+      setPendingReviewTests([]);
     };
 
     loadTests();
@@ -119,14 +69,29 @@ export const ExamPortal: React.FC = () => {
           }
           return [e.detail, ...prev];
         });
+        // Remove from pending review
+        setPendingReviewTests(prev => prev.filter(t => t.id !== e.detail.id && t.id !== e.detail.examId));
+      }
+    };
+
+    // Listen for new submission event
+    const handleSubmissionEvent = (e: any) => {
+      if (e.detail && !e.detail.isPublished) {
+        setPendingReviewTests(prev => {
+          const exists = prev.some(t => t.id === e.detail.id || t.id === e.detail.examId);
+          if (exists) return prev;
+          return [e.detail, ...prev];
+        });
       }
     };
 
     window.addEventListener('dapathshala_marksheet_published', handlePublishedEvent);
+    window.addEventListener('dapathshala_exam_submission', handleSubmissionEvent);
     window.addEventListener('storage', loadTests);
 
     return () => {
       window.removeEventListener('dapathshala_marksheet_published', handlePublishedEvent);
+      window.removeEventListener('dapathshala_exam_submission', handleSubmissionEvent);
       window.removeEventListener('storage', loadTests);
     };
   }, []);
@@ -184,6 +149,83 @@ export const ExamPortal: React.FC = () => {
         /* Main Grid */
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
+
+          {/* PENDING PARENT/AI EVALUATION TESTS (UNRELEASED) */}
+          {pendingReviewTests.length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-bold mb-1">
+                    <Clock size={13} className="text-amber-600" />
+                    মূল্যায়ন প্রক্রিয়াধীন
+                  </div>
+                  <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
+                    <Clock className="text-amber-600" size={22} />
+                    জমাকৃত খাতা (অভিভাবক মূল্যায়নের অপেক্ষায়)
+                  </h2>
+                </div>
+                <span className="text-xs font-bold px-2.5 py-1 bg-amber-50 text-amber-800 border border-amber-200 rounded-full">
+                  {pendingReviewTests.length}টি খাতা মূল্যায়নাধীন
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                {pendingReviewTests.map((test, pIdx) => {
+                  const testKey = test.id || test.examId || `pending_${pIdx}`;
+                  const title = test.title || 'কাস্টম মূল্যায়ন পরীক্ষা';
+                  const subject = test.subject || 'সাধারণ';
+                  const chapter = test.chapter || 'অধ্যায় মূল্যায়ন';
+                  const submittedAt = test.submittedAt || 'আজ';
+
+                  return (
+                    <Card 
+                      key={testKey} 
+                      className="p-5 sm:p-6 border-2 border-amber-200/80 bg-gradient-to-r from-amber-50/40 via-white to-orange-50/30 shadow-md rounded-3xl"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-start gap-4">
+                          <div className="w-14 h-14 rounded-2xl bg-amber-500 text-white flex flex-col items-center justify-center font-black shadow-lg shadow-amber-200 shrink-0">
+                            <Clock size={24} />
+                            <span className="text-[9px] font-black uppercase mt-0.5 tracking-tighter">অপেক্ষমান</span>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 text-[10px] font-bold">
+                                {subject}
+                              </span>
+                              <span className="text-xs text-slate-500 font-medium">
+                                • {chapter}
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded-full">
+                                <Clock size={11} /> জমার সময়: {submittedAt}
+                              </span>
+                            </div>
+                            <h3 className="text-lg font-black text-slate-900">
+                              {title}
+                            </h3>
+                            <p className="text-xs text-slate-600 font-medium">
+                              🔒 আপনার উত্তরপত্র অভিভাবকের নিকট জমা রয়েছে। অভিভাবক বা এআই খাতাটি দেখে নম্বর ও লাল কালির দাগ দিলে এবং অনুমোদন করে পাঠালে তখনই ফলাফল উন্মুক্ত হবে।
+                            </p>
+                          </div>
+                        </div>
+
+                        <Button
+                          onClick={() => {
+                            setLockedToast('🔒 আপনার অভিভাবক এখনো খাতাটি মূল্যায়ন বা প্রকাশ করেননি। অভিভাবক খাতা যাচাই করে ফলাফল পাঠালে সম্পূর্ণ মার্কশিট দেখা যাবে।');
+                            setTimeout(() => setLockedToast(null), 5000);
+                          }}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-4 py-3 rounded-2xl flex items-center justify-center gap-2 border border-slate-300 cursor-pointer shrink-0"
+                        >
+                          <Lock size={15} className="text-amber-600" />
+                          ফলাফল সুরক্ষিত (লক)
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* PUBLISHED MARKSHEETS & EVALUATED SCRIPTS SECTION */}
           {publishedTests.length > 0 && (
@@ -372,6 +414,20 @@ export const ExamPortal: React.FC = () => {
           data={selectedMarksheet}
           onClose={() => setSelectedMarksheet(null)}
         />
+      )}
+
+      {/* LOCKED RESULT NOTICE TOAST */}
+      {lockedToast && (
+        <div className="fixed bottom-6 right-6 z-[250] bg-slate-900 text-white px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700 text-xs font-bold max-w-md animate-bounce">
+          <Lock size={18} className="text-amber-400 shrink-0" />
+          <span className="flex-1">{lockedToast}</span>
+          <button 
+            onClick={() => setLockedToast(null)} 
+            className="text-slate-400 hover:text-white p-1 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
       )}
     </div>
   );

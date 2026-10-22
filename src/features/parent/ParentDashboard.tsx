@@ -163,26 +163,45 @@ export const ParentDashboard: React.FC = () => {
     { id: 3, task: 'ইংরেজি গ্রামার রাইট ফর্ম অফ ভার্বস স্টাডি', time: '২ ঘণ্টা আগে', status: 'pending' },
   ];
 
-  // Default seed tests
+  // Default seed questions for math test-101
+  const SAMPLE_MATH_QUESTIONS = [
+    { id: 'q1', text: '(a + b)² এর সঠিক সম্প্রসারিত রূপ কোনটি?', options: ['a² + 2ab + b²', 'a² - 2ab + b²', 'a² + b²', 'a² + ab + b²'], correctAnswer: 0, marks: 1 },
+    { id: 'q2', text: 'যদি x + 1/x = 4 হয়, তবে x² + 1/x² এর মান কত?', options: ['16', '14', '18', '12'], correctAnswer: 1, marks: 1 },
+    { id: 'q3', text: 'একটি দ্বিঘাত সমীকরণের সর্বোচ্চ ঘাত কত?', options: ['১', '২', '৩', '৪'], correctAnswer: 1, marks: 1 },
+    { id: 'q4', text: 'সমকোণী ত্রিভুজের পিথাগোরাসের উপপাদ্য কোনটি?', options: ['অতিভুজ² = লম্ব² + ভূমি²', 'অতিভুজ = লম্ব + ভূমি', 'লম্ব² = অতিভুজ² + ভূমি²', 'ভূমি² = লম্ব² + অতিভুজ²'], correctAnswer: 0, marks: 1 },
+    { id: 'q5', text: 'নিচের কোনটি মৌলিক সংখ্যা?', options: ['৪', '৬', '৯', '১১'], correctAnswer: 3, marks: 1 }
+  ];
+
+  // Default seed tests (Test-101 is initially submitted and waiting for parent/AI review)
   const DEFAULT_ASSIGNED_TESTS = [
     {
       id: 'test-101',
       title: 'গণিত সাপ্তাহিক মূল্যায়ন',
       subject: 'গণিত',
       chapter: 'বীজগণিত ও সমীকরণ',
-      questions: 5,
+      questions: SAMPLE_MATH_QUESTIONS,
       duration: 30,
       totalMarks: 5,
       status: 'submitted',
-      score: 88,
+      isPublished: false,
+      score: null,
       submittedAt: 'আজ, সকাল ১১:৩০',
-      aiFeedback: 'বীজগণিতের সূত্রে খুবই ভালো দখল রয়েছে। তবে ৩ নম্বর প্রশ্নে চিহ্ন সতর্কতার প্রয়োজন।',
-      parentComment: 'খুব ভালো হয়েছে বাবা! পরের পরীক্ষায় ৯০% আশা করছি।',
-      redFlagsCount: 2,
+      aiFeedback: null,
+      parentComment: null,
+      redFlagsCount: 1,
       violations: [
-        'অন্য ট্যাব বা উইন্ডোতে যাওয়ার চেষ্টা করেছে (সতর্কতা ১/৩)',
-        'ফুলস্ক্রিন মোড থেকে বের হওয়ার চেষ্টা করেছে (সতর্কতা ২/৩)'
-      ]
+        'অন্য ট্যাব বা উইন্ডোতে যাওয়ার চেষ্টা করেছে (সতর্কতা ১/৩)'
+      ],
+      handwrittenImages: [
+        '/assets/aistudio/image_fb59e449.png'
+      ],
+      answers: {
+        q1: 0,
+        q2: 1,
+        q3: 0,
+        q4: 0,
+        q5: 3
+      }
     },
     {
       id: 'test-102',
@@ -193,6 +212,7 @@ export const ParentDashboard: React.FC = () => {
       duration: 20,
       totalMarks: 4,
       status: 'pending',
+      isPublished: false,
       score: null,
       submittedAt: null,
       aiFeedback: null,
@@ -200,12 +220,60 @@ export const ParentDashboard: React.FC = () => {
     }
   ];
 
-  // Assigned Tests with LocalStorage persistence
+  // Sanitizer helper to guarantee assignedTests is never corrupted
+  const sanitizeTestsList = (raw: any): any[] => {
+    if (!raw || !Array.isArray(raw)) return DEFAULT_ASSIGNED_TESTS;
+    return raw
+      .filter((item: any) => item && typeof item === 'object')
+      .map((test: any, index: number) => {
+        const id = String(test.id || test.examId || `test_${index}_${Date.now()}`);
+        const title = typeof test.title === 'string' && test.title.trim() ? test.title : 'কাস্টম মূল্যায়ন পরীক্ষা';
+        const subject = typeof test.subject === 'string' && test.subject.trim() ? test.subject : 'সাধারণ';
+        const chapter = typeof test.chapter === 'string' && test.chapter.trim() ? test.chapter : 'অধ্যায় মূল্যায়ন';
+        
+        // Clean violations to be safe string array
+        let safeViolations: string[] = [];
+        if (Array.isArray(test.violations)) {
+          safeViolations = test.violations.map((v: any) => 
+            typeof v === 'string' ? v : (v?.violationDetails || v?.message || 'সন্দেহজনক কার্যকলাপ রেকর্ড')
+          );
+        } else if (typeof test.violations === 'string' && test.violations.trim()) {
+          safeViolations = [test.violations];
+        }
+
+        // Clean handwrittenImages to be safe string array
+        let safeImages: string[] = [];
+        if (Array.isArray(test.handwrittenImages)) {
+          safeImages = test.handwrittenImages.filter((img: any) => typeof img === 'string');
+        } else if (typeof test.handwrittenImages === 'string' && test.handwrittenImages.trim()) {
+          safeImages = [test.handwrittenImages];
+        }
+
+        return {
+          ...test,
+          id,
+          title,
+          subject,
+          chapter,
+          violations: safeViolations,
+          handwrittenImages: safeImages,
+          duration: Number(test.duration) || 30
+        };
+      });
+  };
+
+  // Assigned Tests with LocalStorage persistence and safety sanitization
   const [assignedTests, setAssignedTests] = useState<any[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_TESTS_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch {}
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const sanitized = sanitizeTestsList(parsed);
+        if (sanitized.length > 0) return sanitized;
+      }
+    } catch (e) {
+      console.warn('Error loading tests from storage, using defaults:', e);
+    }
     return DEFAULT_ASSIGNED_TESTS;
   });
 
@@ -217,7 +285,8 @@ export const ParentDashboard: React.FC = () => {
     }
   }, [assignedTests]);
 
-  const [parentFeedbackInput, setParentFeedbackInput] = useState('');
+  // Per-test parent comment inputs map: { [testId]: string }
+  const [parentCommentInputs, setParentCommentInputs] = useState<Record<string, string>>({});
 
   // Fallback curriculum seed generator for instant, resilient questions
   const generateCurriculumFallback = (subject: string, chapter: string, count: number): ParentQuestion[] => {
@@ -584,14 +653,15 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
   };
 
   const handleAddParentComment = (testId: string) => {
-    if (!parentFeedbackInput.trim()) return;
-    setAssignedTests(assignedTests.map(t => {
-      if (t.id === testId) {
-        return { ...t, parentComment: parentFeedbackInput.trim() };
+    const comment = (parentCommentInputs[testId] || '').trim();
+    if (!comment) return;
+    setAssignedTests(prev => prev.map(t => {
+      if (t.id === testId || t.examId === testId) {
+        return { ...t, parentComment: comment };
       }
       return t;
     }));
-    setParentFeedbackInput('');
+    setParentCommentInputs(prev => ({ ...prev, [testId]: '' }));
     setAlertSuccess('আপনার মূল্যায়ন ও উৎসাহব্যঞ্জক বার্তা সন্তানের কাছে পৌঁছে গেছে!');
     setTimeout(() => setAlertSuccess(null), 4000);
   };
@@ -648,7 +718,9 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
     if (test.manualGrades) {
       setManualGrades(test.manualGrades);
     } else {
-      const qList = test.questions && Array.isArray(test.questions) ? test.questions : [];
+      const qList = (test.questions && Array.isArray(test.questions) && test.questions.length > 0) 
+        ? test.questions 
+        : SAMPLE_MATH_QUESTIONS;
       qList.forEach((q: any, i: number) => {
         const qId = q.id || `q_${i + 1}`;
         const isCorrect = test.answers ? test.answers[qId] === q.correctAnswer : false;
@@ -665,9 +737,9 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
     if (!evaluationModalTest) return;
     setIsAIEvaluating(true);
 
-    const qList = evaluationModalTest.questions && Array.isArray(evaluationModalTest.questions) 
+    const qList = (evaluationModalTest.questions && Array.isArray(evaluationModalTest.questions) && evaluationModalTest.questions.length > 0)
       ? evaluationModalTest.questions 
-      : [];
+      : SAMPLE_MATH_QUESTIONS;
 
     // Intelligent AI Detailed Marking with Digital Red Ink stamps
     const detailed = qList.map((q: any, i: number) => {
@@ -785,9 +857,9 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
     if (!evaluationModalTest) return;
 
     const isAIMode = evaluationMode === 'ai';
-    const qList = evaluationModalTest.questions && Array.isArray(evaluationModalTest.questions) 
+    const qList = (evaluationModalTest.questions && Array.isArray(evaluationModalTest.questions) && evaluationModalTest.questions.length > 0)
       ? evaluationModalTest.questions 
-      : [];
+      : SAMPLE_MATH_QUESTIONS;
 
     let totalObtained = 0;
     let maxPossible = 0;
@@ -2184,127 +2256,176 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
           </div>
 
           <div className="space-y-4">
-            {assignedTests.map((test) => (
-              <Card key={test.id} className="p-6 border-none shadow-md bg-white space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <span className="text-xs font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">
-                        {test.subject}
-                      </span>
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                        test.status === 'submitted' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {test.status === 'submitted' ? 'খাতা জমা হয়েছে' : 'পরীক্ষা অপেক্ষায় আছে'}
-                      </span>
-                      {test.redFlagsCount ? (
-                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-800 flex items-center gap-1 border border-red-200">
-                          <Flag size={11} className="text-red-600 fill-red-600" />
-                          <span>রেড ফ্ল্যাগ: {test.redFlagsCount} বার সতর্কতা</span>
-                        </span>
-                      ) : null}
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-900">{test.title}</h3>
-                    <p className="text-xs text-slate-500">{test.chapter} • {test.questions}টি প্রশ্ন • {test.duration} মিনিট</p>
-                  </div>
+            {assignedTests.filter(Boolean).length === 0 ? (
+              <Card className="p-8 text-center bg-white border-dashed border-2 border-slate-200 rounded-3xl">
+                <FileText className="mx-auto text-slate-300 mb-3" size={40} />
+                <h3 className="font-bold text-slate-700 text-base">কোনো পরীক্ষা জমা নেই</h3>
+                <p className="text-xs text-slate-400 mt-1">সন্তান পরীক্ষা সম্পন্ন করে খাতা জমা দিলে তা এখানে মূল্যায়নের জন্য আসবে।</p>
+              </Card>
+            ) : (
+              assignedTests.filter(Boolean).map((test, tIdx) => {
+                const testKey = String(test.id || test.examId || `assigned_test_${tIdx}`);
+                const testTitle = typeof test.title === 'string' && test.title.trim() ? test.title : 'মূল্যায়ন পরীক্ষা';
+                const testSubject = typeof test.subject === 'string' && test.subject.trim() ? test.subject : 'সাধারণ';
+                const testChapter = typeof test.chapter === 'string' && test.chapter.trim() ? test.chapter : 'অধ্যায় মূল্যায়ন';
+                const testDuration = Number(test.duration) || 30;
 
-                  {test.score !== null && (
-                    <div className="text-right sm:self-center">
-                      <div className="text-xs text-slate-400 font-bold uppercase">প্রাপ্ত স্কোর</div>
-                      <div className="text-3xl font-black text-emerald-600">{test.score}%</div>
-                    </div>
-                  )}
-                </div>
+                const qCount = Array.isArray(test.questions)
+                  ? test.questions.length
+                  : typeof test.questions === 'number'
+                  ? test.questions
+                  : (Number(test.totalMarks) || 5);
 
-                {test.status === 'submitted' && (
-                  <div className="space-y-3 pt-1">
-                    {/* Dual Mode Evaluation Action Banner */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-indigo-50/70 rounded-2xl border border-indigo-100">
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-black text-slate-800">খাতা মূল্যায়ন মোড:</span>
+                const isReviewed = Boolean(test.isPublished || test.status === 'reviewed');
+                const isSubmitted = test.status === 'submitted';
+
+                // Safe violations list as strings
+                const safeViolations: string[] = Array.isArray(test.violations)
+                  ? test.violations.map((v: any) => typeof v === 'string' ? v : (v?.violationDetails || v?.message || 'সতর্কতা রেকর্ড'))
+                  : (typeof test.violations === 'string' && test.violations ? [test.violations] : []);
+
+                // Safe handwritten images list
+                const safeImages: string[] = Array.isArray(test.handwrittenImages)
+                  ? test.handwrittenImages.filter((img: any) => typeof img === 'string')
+                  : (typeof test.handwrittenImages === 'string' && test.handwrittenImages ? [test.handwrittenImages] : []);
+
+                const currentCommentInput = parentCommentInputs[testKey] || '';
+
+                return (
+                  <Card key={testKey} className="p-6 border-none shadow-md bg-white space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">
+                            {testSubject}
+                          </span>
                           <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                            test.evaluationMode === 'ai' 
-                              ? 'bg-purple-100 text-purple-800 border border-purple-200' 
-                              : test.evaluationMode === 'manual'
-                              ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                            isReviewed 
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
+                              : isSubmitted 
+                              ? 'bg-blue-100 text-blue-800 border border-blue-200' 
                               : 'bg-amber-100 text-amber-800 border border-amber-200'
                           }`}>
-                            {test.evaluationMode === 'ai' ? '🤖 এআই দিয়ে মূল্যায়িত' : test.evaluationMode === 'manual' ? '✍️ অভিভাবকের স্বহস্তে মূল্যায়িত' : '⏳ মূল্যায়ন অপেক্ষমান'}
+                            {isReviewed 
+                              ? '✓ মূল্যায়ন সম্পন্ন ও প্রকাশিত' 
+                              : isSubmitted 
+                              ? 'নতুন খাতা জমা পড়েছে (মূল্যায়ন অপেক্ষমান)' 
+                              : 'পরীক্ষা অপেক্ষায় আছে'}
                           </span>
+                          {test.redFlagsCount ? (
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-800 flex items-center gap-1 border border-red-200">
+                              <Flag size={11} className="text-red-600 fill-red-600" />
+                              <span>রেড ফ্ল্যাগ: {test.redFlagsCount} বার সতর্কতা</span>
+                            </span>
+                          ) : null}
                         </div>
-                        <p className="text-xs text-slate-500">
-                          {test.handwrittenImages && test.handwrittenImages.length > 0 
-                            ? `হাতের লেখা উত্তরপত্র: ${test.handwrittenImages.length}টি পৃষ্ঠা সংযুক্ত রয়েছে`
-                            : 'ডিজিটাল খাতা জমা পড়েছে'}
-                        </p>
+                        <h3 className="text-lg font-bold text-slate-900">{testTitle}</h3>
+                        <p className="text-xs text-slate-500">{testChapter} • {qCount}টি প্রশ্ন • {testDuration} মিনিট</p>
                       </div>
 
-                      <Button
-                        size="sm"
-                        onClick={() => handleOpenEvaluationModal(test)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-md shadow-indigo-200 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-                      >
-                        <FileCheck size={16} />
-                        {test.evaluationMode ? 'খাতা ও লাল কালির দাগ দেখুন' : 'খাতা মূল্যায়ন করুন (এআই / নিজে)'}
-                      </Button>
+                      {isReviewed && test.score !== null && test.score !== undefined && (
+                        <div className="text-right sm:self-center">
+                          <div className="text-xs text-slate-400 font-bold uppercase">অনুমোদিত স্কোর</div>
+                          <div className="text-3xl font-black text-emerald-600">{test.score}%</div>
+                        </div>
+                      )}
                     </div>
 
-                    {test.violations && test.violations.length > 0 && (
-                      <div className="p-3.5 bg-red-50/90 rounded-xl border border-red-200 text-xs space-y-1.5">
-                        <span className="font-bold text-red-950 flex items-center gap-1.5">
-                          <ShieldAlert size={15} className="text-red-600" />
-                          চিটিং ও সন্দেহজনক কার্যকলাপ রেকর্ড (Supabase Log):
-                        </span>
-                        <ul className="space-y-1 pl-4 list-disc text-red-800 font-medium">
-                          {test.violations.map((v: string, vIdx: number) => (
-                            <li key={vIdx}>{v}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                    {test.aiFeedback && (
-                      <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/60 text-xs">
-                        <span className="font-bold text-slate-800 flex items-center gap-1.5 mb-1">
-                          <Sparkles size={14} className="text-indigo-600" /> এআই খাতা মূল্যায়নের সংক্ষিপ্ত ফিডব্যাক:
-                        </span>
-                        <p className="text-slate-600">{test.aiFeedback}</p>
-                      </div>
-                    )}
+                    {(isSubmitted || isReviewed) && (
+                      <div className="space-y-3 pt-1">
+                        {/* Dual Mode Evaluation Action Banner */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-indigo-50/70 rounded-2xl border border-indigo-100">
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-black text-slate-800">খাতা মূল্যায়ন মোড:</span>
+                              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                                test.evaluationMode === 'ai' 
+                                  ? 'bg-purple-100 text-purple-800 border border-purple-200' 
+                                  : test.evaluationMode === 'manual'
+                                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                                  : 'bg-amber-100 text-amber-800 border border-amber-200'
+                              }`}>
+                                {test.evaluationMode === 'ai' ? '🤖 এআই দিয়ে মূল্যায়িত' : test.evaluationMode === 'manual' ? '✍️ অভিভাবকের স্বহস্তে মূল্যায়িত' : '⏳ মূল্যায়ন অপেক্ষমান'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500">
+                              {safeImages.length > 0 
+                                ? `হাতের লেখা উত্তরপত্র: ${safeImages.length}টি পৃষ্ঠা সংযুক্ত রয়েছে`
+                                : 'ডিজিটাল খাতা জমা পড়েছে'}
+                            </p>
+                          </div>
 
-                    {test.parentComment ? (
-                      <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 text-xs">
-                        <span className="font-bold text-emerald-900 flex items-center gap-1.5 mb-1">
-                          <CheckCircle2 size={14} className="text-emerald-600" /> আপনার মন্তব্য সন্তানের কাছে পাঠানো হয়েছে:
-                        </span>
-                        <p className="text-emerald-800 font-medium">{test.parentComment}</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-700">সন্তানকে উৎসাহ দিতে আপনার মন্তব্য বা পরামর্শ লিখুন:</label>
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="যেমন: শাবাশ! আরো ভালো করতে হবে..."
-                            value={parentFeedbackInput}
-                            onChange={(e) => setParentFeedbackInput(e.target.value)}
-                            className="flex-1 p-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500"
-                          />
                           <Button
                             size="sm"
-                            onClick={() => handleAddParentComment(test.id)}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 rounded-xl cursor-pointer"
+                            onClick={() => handleOpenEvaluationModal(test)}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-md shadow-indigo-200 flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                           >
-                            মন্তব্য পাঠান
+                            <FileCheck size={16} />
+                            {test.isPublished ? 'মূল্যায়িত খাতা ও লাল কালির দাগ দেখুন' : 'খাতা মূল্যায়ন করুন (এআই / নিজে)'}
                           </Button>
                         </div>
+
+                        {safeViolations.length > 0 && (
+                          <div className="p-3.5 bg-red-50/90 rounded-xl border border-red-200 text-xs space-y-1.5">
+                            <span className="font-bold text-red-950 flex items-center gap-1.5">
+                              <ShieldAlert size={15} className="text-red-600" />
+                              চিটিং ও সন্দেহজনক কার্যকলাপ রেকর্ড (Supabase Log):
+                            </span>
+                            <ul className="space-y-1 pl-4 list-disc text-red-800 font-medium">
+                              {safeViolations.map((vStr: string, vIdx: number) => (
+                                <li key={vIdx}>{vStr}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+
+                        {test.aiFeedback && (
+                          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/60 text-xs">
+                            <span className="font-bold text-slate-800 flex items-center gap-1.5 mb-1">
+                              <Sparkles size={14} className="text-indigo-600" /> এআই খাতা মূল্যায়নের সংক্ষিপ্ত ফিডব্যাক:
+                            </span>
+                            <p className="text-slate-600">{test.aiFeedback}</p>
+                          </div>
+                        )}
+
+                        {test.parentComment ? (
+                          <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 text-xs">
+                            <span className="font-bold text-emerald-900 flex items-center gap-1.5 mb-1">
+                              <CheckCircle2 size={14} className="text-emerald-600" /> আপনার মন্তব্য সন্তানের কাছে পাঠানো হয়েছে:
+                            </span>
+                            <p className="text-emerald-800 font-medium">{test.parentComment}</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-700">সন্তানকে উৎসাহ দিতে আপনার মন্তব্য বা পরামর্শ লিখুন:</label>
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                placeholder="যেমন: শাবাশ! আরো ভালো করতে হবে..."
+                                value={currentCommentInput}
+                                onChange={(e) => setParentCommentInputs({
+                                  ...parentCommentInputs,
+                                  [testKey]: e.target.value
+                                })}
+                                className="flex-1 p-2.5 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-indigo-500"
+                              />
+                              <Button
+                                size="sm"
+                                onClick={() => handleAddParentComment(testKey)}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 rounded-xl cursor-pointer"
+                              >
+                                মন্তব্য পাঠান
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
-                )}
-              </Card>
-            ))}
-          </div>
+                  </Card>
+                );
+              })
+        )}
+      </div>
         </div>
       )}
 

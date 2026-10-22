@@ -422,170 +422,258 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const currentQuestion = activeQuestions[currentQuestionIndex] || activeQuestions[0];
   const progress = activeQuestions.length > 0 ? (Object.keys(answers).length / activeQuestions.length) * 100 : 0;
 
-  // Render Result Screen
+  // Render Result Screen / Submission Confirmation
   if (isFinished && result) {
+    const isExamPublished = (exam as any).isPublished === true;
+
     return (
       <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 py-12">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-10"
-          >
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 mb-6">
-              <Trophy size={40} />
-            </div>
-            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 mb-2">পরীক্ষা সম্পন্ন হয়েছে!</h1>
-            <p className="text-slate-500 text-base sm:text-lg">আপনার অর্জিত ফলাফল নিচে দেওয়া হলো</p>
-          </motion.div>
+          {!isExamPublished ? (
+            /* SUBMISSION COMPLETE & PENDING PARENT/AI EVALUATION SCREEN */
+            <div className="space-y-6">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-center mb-8"
+              >
+                <div className="inline-flex items-center justify-center w-24 h-24 rounded-full bg-emerald-100 text-emerald-600 mb-5 shadow-lg shadow-emerald-200">
+                  <CheckCircle2 size={52} />
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-black text-slate-900 mb-2">পরীক্ষা সম্পন্ন ও খাতা জমা নেওয়া হয়েছে!</h1>
+                <p className="text-slate-500 text-base sm:text-lg">
+                  আপনার উত্তরপত্রটি অভিভাবক ও এআই মূল্যায়নের জন্য সফলভাবে প্রেরণ করা হয়েছে
+                </p>
+              </motion.div>
 
-          {/* Exam Completed Success Message Banner */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="p-5 sm:p-6 bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-3xl shadow-xl shadow-emerald-200 border border-emerald-400/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 text-left"
-          >
-            <div className="flex items-start sm:items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
-                <CheckCircle2 size={28} className="text-white" />
-              </div>
-              <div className="space-y-1">
-                <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-[11px] font-black uppercase tracking-wider">
-                  পরীক্ষা সম্পন্ন বার্তা
-                </span>
-                <h2 className="text-xl font-black">
-                  পরীক্ষা সফলভাবে সম্পন্ন হয়েছে!
+              {/* Workflow Status Notice Card */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="p-6 sm:p-7 bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white rounded-3xl shadow-xl shadow-indigo-200 border border-indigo-700/50 space-y-3.5 text-left"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-xs">
+                    <Clock size={14} />
+                    মূল্যায়ন অপেক্ষমান
+                  </span>
+                  <span className="text-xs text-indigo-200 font-semibold">
+                    অভিভাবক ও এআই যৌথ পর্যবেক্ষণ হাব
+                  </span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-black leading-snug">
+                  অভিভাবক খাতা মূল্যায়ন করে নম্বর ও মন্তব্য পাঠানোর পর ফলাফল দেখতে পারবেন
                 </h2>
-                <p className="text-xs text-emerald-100 font-medium">
-                  আপনার উত্তরপত্র এবং {handwrittenImages.length}টি হাতের লেখা খাতার পৃষ্ঠা সফলভাবে জমা নেওয়া হয়েছে। অভিভাবকের ড্যাশবোর্ডে "নতুন খাতা জমা পড়েছে" নোটিফিকেশন পাঠানো হয়েছে।
+                <p className="text-sm text-indigo-100 leading-relaxed font-normal">
+                  পরীক্ষা দেওয়ার পর উত্তরপত্রটি সরাসরি অভিভাবক কন্ট্রোল হাবে পৌঁছায়। অভিভাবক এবং এআই যৌথভাবে খাতাটি যাচাই করবেন, প্রতিটি প্রশ্নের সঠিকতা বিবেচনা করে মার্কস ও ডিজিটাল লাল কালির দাগ দেবেন। অভিভাবক খাতা মূল্যায়ন সম্পন্ন করে <strong>'ফাইনাল মার্কশিট প্রকাশ ও সন্তানের নিকট পাঠান'</strong> করলেই আপনি আপনার অর্জিত নম্বর ও বিস্তারিত খাতা দেখতে পাবেন। তার আগে ফলাফল সুরক্ষিত ও অপ্রকাশিত থাকবে।
                 </p>
-              </div>
-            </div>
-          </motion.div>
+              </motion.div>
 
-          {/* Uploaded Handwritten Scripts Preview if any */}
-          {handwrittenImages.length > 0 && (
-            <Card className="p-5 border-none shadow-lg bg-white rounded-3xl mb-8 text-left space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
-                  <Camera size={16} className="text-indigo-600" />
-                  জমাকৃত হাতের লেখা উত্তরপত্র ({handwrittenImages.length}টি পৃষ্ঠা)
-                </h3>
-                <span className="text-xs text-indigo-600 font-semibold">মূল্যায়নের জন্য প্রস্তুত</span>
+              {/* Submission Summary Details */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <Card className="p-4 text-center bg-white rounded-2xl border border-slate-200/80 shadow-xs">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase block mb-1">পরীক্ষার বিষয়</span>
+                  <span className="text-base font-black text-slate-900">{exam.subject}</span>
+                </Card>
+                <Card className="p-4 text-center bg-white rounded-2xl border border-slate-200/80 shadow-xs">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase block mb-1">উত্তরকৃত প্রশ্ন</span>
+                  <span className="text-base font-black text-indigo-600">{Object.keys(answers).length} / {activeQuestions.length}</span>
+                </Card>
+                <Card className="p-4 text-center bg-white rounded-2xl border border-slate-200/80 shadow-xs">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase block mb-1">জমার সময়</span>
+                  <span className="text-base font-black text-emerald-600">আজ, এখনই</span>
+                </Card>
+                <Card className="p-4 text-center bg-white rounded-2xl border border-slate-200/80 shadow-xs">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase block mb-1">নিরাপত্তা স্ট্যাটাস</span>
+                  <span className={`text-xs font-black ${suspiciousCountRef.current > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    {suspiciousCountRef.current > 0 ? `${suspiciousCountRef.current}টি সতর্কতা সহ জমা` : '১০০% বিশ্বস্ত'}
+                  </span>
+                </Card>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {handwrittenImages.map((img, idx) => (
-                  <div key={idx} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-3/4">
-                    <img src={img} alt={`পৃষ্ঠা ${idx + 1}`} className="w-full h-full object-cover" />
-                    <div className="absolute bottom-1 left-1 bg-slate-900/80 text-white text-[10px] px-2 py-0.5 rounded font-bold">
-                      পৃষ্ঠা {idx + 1}
-                    </div>
+
+              {/* Uploaded Handwritten Scripts Preview if any */}
+              {handwrittenImages.length > 0 && (
+                <Card className="p-5 border-none shadow-md bg-white rounded-3xl text-left space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                      <Camera size={16} className="text-indigo-600" />
+                      সংযুক্ত হাতের লেখা খাতার পৃষ্ঠা ({handwrittenImages.length}টি)
+                    </h3>
+                    <span className="text-xs text-indigo-600 font-semibold">মূল্যায়নের জন্য প্রস্তুত</span>
                   </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* Anti-Cheating Termination Alert */}
-          {result.isViolationTerminated && (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="p-5 bg-red-50 border-2 border-red-200 rounded-3xl flex items-start gap-4 mb-8 text-left shadow-sm"
-            >
-              <div className="w-10 h-10 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
-                <ShieldAlert size={22} />
-              </div>
-              <div className="space-y-1">
-                <h3 className="text-sm sm:text-base font-black text-red-950">
-                  অ্যান্টি-চিটিং অটো-সাবমিট রিপোর্ট (৩টি সতর্কতা অতিক্রান্ত)
-                </h3>
-                <p className="text-xs sm:text-sm text-red-800 leading-relaxed font-medium">
-                  পরীক্ষা চলাকালীন ৩ বার অন্য ট্যাবে যাওয়া, উইন্ডো মিনিমাইজ করা বা অননুমোদিত কার্যকলাপ সনাক্ত হওয়ায় পরীক্ষাটি স্বয়ংক্রিয়ভাবে নির্ধারিত সময়ের আগেই জমা নেওয়া হয়েছে।
-                </p>
-              </div>
-            </motion.div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            <Card className="text-center p-6 border-none shadow-lg bg-white rounded-3xl">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">আপনার স্কোর</p>
-              <p className="text-4xl font-black text-emerald-600">{result.score.toFixed(0)}%</p>
-            </Card>
-            <Card className="text-center p-6 border-none shadow-lg bg-white rounded-3xl">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">সঠিক উত্তর</p>
-              <p className="text-4xl font-black text-blue-600">{result.correctAnswers}/{result.totalQuestions}</p>
-            </Card>
-            <Card className="text-center p-6 border-none shadow-lg bg-white rounded-3xl">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">সময় লেগেছে</p>
-              <p className="text-4xl font-black text-purple-600">{Math.floor(result.timeSpent / 60)} মিনিট</p>
-            </Card>
-          </div>
-
-          <div className="space-y-6 mb-12">
-            <h2 className="text-2xl font-bold text-slate-900">বিস্তারিত পর্যালোচনা</h2>
-            {activeQuestions.map((q, idx) => {
-              const userAnswer = result.answers[q.id];
-              const isCorrect = userAnswer === q.correctAnswer;
-              return (
-                <Card key={q.id} className={`border-2 rounded-3xl ${isCorrect ? 'border-emerald-100 bg-emerald-50/30' : 'border-red-100 bg-red-50/30'}`}>
-                  <div className="flex items-start gap-4 p-5">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold ${isCorrect ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
-                      {idx + 1}
-                    </div>
-                    <div className="space-y-4 flex-1">
-                      <p className="font-bold text-slate-900 text-base sm:text-lg">{q.text}</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {q.options.map((opt, optIdx) => {
-                          const isUserChoice = userAnswer === optIdx;
-                          const isCorrectChoice = q.correctAnswer === optIdx;
-                          return (
-                            <div 
-                              key={optIdx}
-                              className={`p-3 rounded-xl border text-sm font-medium flex items-center justify-between ${
-                                isCorrectChoice ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold' : 
-                                isUserChoice ? 'border-red-500 bg-red-50 text-red-900 font-bold' : 
-                                'border-slate-200 bg-white text-slate-600'
-                              }`}
-                            >
-                              <span>{opt}</span>
-                              {isCorrectChoice && <CheckCircle2 size={16} className="text-emerald-600 shrink-0 ml-2" />}
-                              {isUserChoice && !isCorrectChoice && <AlertCircle size={16} className="text-red-600 shrink-0 ml-2" />}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {q.explanation && (
-                        <div className="p-4 bg-white/70 rounded-xl border border-slate-100 text-xs sm:text-sm text-slate-600">
-                          <span className="font-bold text-slate-900">ব্যাখ্যা:</span> {q.explanation}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {handwrittenImages.map((img, idx) => (
+                      <div key={idx} className="relative rounded-xl overflow-hidden border border-slate-200 aspect-3/4">
+                        <img src={img} alt={`পৃষ্ঠা ${idx + 1}`} className="w-full h-full object-cover" />
+                        <div className="absolute bottom-1 left-1 bg-slate-900/80 text-white text-[10px] px-2 py-0.5 rounded font-bold">
+                          পৃষ্ঠা {idx + 1}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ))}
                   </div>
                 </Card>
-              );
-            })}
-          </div>
+              )}
 
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button 
-              variant="outline" 
-              size="lg" 
-              className="flex-1 rounded-2xl gap-2 py-5 bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-bold cursor-pointer" 
-              onClick={() => setShowFinalMarksheetModal(true)}
-            >
-              <Award size={20} />
-              ফাইনাল যৌথ মার্কশিট ও খাতা দেখুন
-            </Button>
-            <Button variant="primary" size="lg" className="flex-1 rounded-2xl gap-2 py-5" onClick={() => window.location.reload()}>
-              <RotateCcw size={20} />
-              আবার পরীক্ষা দিন
-            </Button>
-            <Button variant="outline" size="lg" className="flex-1 rounded-2xl gap-2 py-5" onClick={onClose}>
-              <Home size={20} />
-              ড্যাশবোর্ডে ফিরে যান
-            </Button>
-          </div>
+              {/* Next Step Notice */}
+              <div className="p-4 bg-slate-100/80 rounded-2xl border border-slate-200 text-xs text-slate-600 space-y-1">
+                <span className="font-bold text-slate-800 block">📌 ফলাফল কোথায় দেখতে পাবেন:</span>
+                <p>
+                  অভিভাবক মূল্যায়ন শেষে পাঠালে 'পরীক্ষা পোর্টাল'-এর <strong>"মূল্যায়িত খাতা ও ফাইনাল রেজাল্ট শিট"</strong> অংশে আপনার মার্কশিট প্রদর্শিত হবে।
+                </p>
+              </div>
+
+              {/* Action Button */}
+              <div className="pt-2">
+                <Button 
+                  variant="primary" 
+                  size="lg" 
+                  className="w-full rounded-2xl gap-2 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold cursor-pointer shadow-lg shadow-indigo-200 text-sm sm:text-base justify-center" 
+                  onClick={onClose}
+                >
+                  <Home size={20} />
+                  পরীক্ষা পোর্টাল / ড্যাশবোর্ডে ফিরে যান
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* PUBLISHED RESULT DETAILS (SHOWN ONLY IF ALREADY REVIEWED AND PUBLISHED) */
+            <>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-center mb-10"
+              >
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 mb-6">
+                  <Trophy size={40} />
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-black text-slate-900 mb-2">পরীক্ষা সম্পন্ন ও মূল্যায়িত!</h1>
+                <p className="text-slate-500 text-base sm:text-lg">অভিভাবক ও এআই অনুমোদিত চূড়ান্ত ফলাফল</p>
+              </motion.div>
+
+              {/* Exam Completed Success Message Banner */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="p-5 sm:p-6 bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-3xl shadow-xl shadow-emerald-200 border border-emerald-400/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 text-left"
+              >
+                <div className="flex items-start sm:items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
+                    <CheckCircle2 size={28} className="text-white" />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-[11px] font-black uppercase tracking-wider">
+                      মূল্যায়ন প্রতিবেদন
+                    </span>
+                    <h2 className="text-xl font-black">
+                      ফলাফল সফলভাবে প্রকাশিত হয়েছে!
+                    </h2>
+                    <p className="text-xs text-emerald-100 font-medium">
+                      অভিভাবক ও এআই যৌথ মূল্যায়নে আপনার খাতা যাচাই ও মার্কশিট অনুমোদন করা হয়েছে।
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+
+              {/* Uploaded Handwritten Scripts Preview if any */}
+              {handwrittenImages.length > 0 && (
+                <Card className="p-5 border-none shadow-lg bg-white rounded-3xl mb-8 text-left space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                      <Camera size={16} className="text-indigo-600" />
+                      জমাকৃত হাতের লেখা উত্তরপত্র ({handwrittenImages.length}টি পৃষ্ঠা)
+                    </h3>
+                    <span className="text-xs text-indigo-600 font-semibold">মূল্যায়িত</span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {handwrittenImages.map((img, idx) => (
+                      <div key={idx} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-3/4">
+                        <img src={img} alt={`পৃষ্ঠা ${idx + 1}`} className="w-full h-full object-cover" />
+                        <div className="absolute bottom-1 left-1 bg-slate-900/80 text-white text-[10px] px-2 py-0.5 rounded font-bold">
+                          পৃষ্ঠা {idx + 1}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                <Card className="text-center p-6 border-none shadow-lg bg-white rounded-3xl">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">আপনার অনুমোদিত স্কোর</p>
+                  <p className="text-4xl font-black text-emerald-600">{result.score.toFixed(0)}%</p>
+                </Card>
+                <Card className="text-center p-6 border-none shadow-lg bg-white rounded-3xl">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">সঠিক উত্তর</p>
+                  <p className="text-4xl font-black text-blue-600">{result.correctAnswers}/{result.totalQuestions}</p>
+                </Card>
+                <Card className="text-center p-6 border-none shadow-lg bg-white rounded-3xl">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">সময় লেগেছে</p>
+                  <p className="text-4xl font-black text-purple-600">{Math.floor(result.timeSpent / 60)} মিনিট</p>
+                </Card>
+              </div>
+
+              <div className="space-y-6 mb-12">
+                <h2 className="text-2xl font-bold text-slate-900">বিস্তারিত পর্যালোচনা</h2>
+                {activeQuestions.map((q, idx) => {
+                  const userAnswer = result.answers[q.id];
+                  const isCorrect = userAnswer === q.correctAnswer;
+                  return (
+                    <Card key={q.id} className={`border-2 rounded-3xl ${isCorrect ? 'border-emerald-100 bg-emerald-50/30' : 'border-red-100 bg-red-50/30'}`}>
+                      <div className="flex items-start gap-4 p-5">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold ${isCorrect ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
+                          {idx + 1}
+                        </div>
+                        <div className="space-y-4 flex-1">
+                          <p className="font-bold text-slate-900 text-base sm:text-lg">{q.text}</p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {q.options.map((opt, optIdx) => {
+                              const isUserChoice = userAnswer === optIdx;
+                              const isCorrectChoice = q.correctAnswer === optIdx;
+                              return (
+                                <div 
+                                  key={optIdx}
+                                  className={`p-3 rounded-xl border text-sm font-medium flex items-center justify-between ${
+                                    isCorrectChoice ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold' : 
+                                    isUserChoice ? 'border-red-500 bg-red-50 text-red-900 font-bold' : 
+                                    'border-slate-200 bg-white text-slate-600'
+                                  }`}
+                                >
+                                  <span>{opt}</span>
+                                  {isCorrectChoice && <CheckCircle2 size={16} className="text-emerald-600 shrink-0 ml-2" />}
+                                  {isUserChoice && !isCorrectChoice && <AlertCircle size={16} className="text-red-600 shrink-0 ml-2" />}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {q.explanation && (
+                            <div className="p-4 bg-white/70 rounded-xl border border-slate-100 text-xs sm:text-sm text-slate-600">
+                              <span className="font-bold text-slate-900">ব্যাখ্যা:</span> {q.explanation}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="flex-1 rounded-2xl gap-2 py-5 bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-bold cursor-pointer" 
+                  onClick={() => setShowFinalMarksheetModal(true)}
+                >
+                  <Award size={20} />
+                  ফাইনাল যৌথ মার্কশিট ও খাতা দেখুন
+                </Button>
+                <Button variant="outline" size="lg" className="flex-1 rounded-2xl gap-2 py-5" onClick={onClose}>
+                  <Home size={20} />
+                  ড্যাশবোর্ডে ফিরে যান
+                </Button>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Final Joint Marksheet Modal */}
