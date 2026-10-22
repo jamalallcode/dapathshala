@@ -65,6 +65,8 @@ export const AIQuestionGenerator: React.FC = () => {
   // Option serial style (circle vs bracket) & language (bn vs en)
   const [optionStyle, setOptionStyle] = useState<OptionStyle>('circle');
   const [optionLang, setOptionLang] = useState<OptionLang>('bn');
+  // Column layout (1 column vs 2 columns with balanced height)
+  const [questionColumns, setQuestionColumns] = useState<1 | 2>(2);
 
   // Topic dropdown state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -265,31 +267,102 @@ export const AIQuestionGenerator: React.FC = () => {
   <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; }
+    @page {
+      size: A4 portrait;
+      margin: 12mm 14mm 12mm 14mm;
+    }
     body {
       font-family: 'Hind Siliguri', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 36px;
+      padding: 24px;
       color: #0f172a;
-      line-height: 1.6;
-      max-width: 840px;
+      line-height: 1.5;
+      max-width: 860px;
       margin: 0 auto;
       background: #ffffff;
     }
+    
+    /* Interactive Toolbar for Print Preview */
+    .no-print-toolbar {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 12px 18px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.06);
+    }
+    .no-print-toolbar .title {
+      font-weight: 700;
+      color: #0f172a;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-toggle-group {
+      display: inline-flex;
+      background: #e2e8f0;
+      padding: 3px;
+      border-radius: 8px;
+    }
+    .btn-toggle {
+      border: none;
+      background: transparent;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #475569;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .btn-toggle.active {
+      background: #059669;
+      color: #ffffff;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .btn-print-action {
+      background: #059669;
+      color: #ffffff;
+      border: none;
+      padding: 8px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 4px rgba(5,150,105,0.25);
+    }
+    .btn-print-action:hover {
+      background: #047857;
+    }
+
     .header {
       text-align: center;
       border-bottom: 2px solid #059669;
       padding-bottom: 12px;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     .header h1 {
       margin: 0;
-      font-size: 26px;
+      font-size: 24px;
       font-weight: 700;
       color: #065f46;
+      letter-spacing: -0.3px;
     }
     .header p {
       margin: 4px 0 0;
       color: #475569;
       font-size: 14px;
+      font-weight: 500;
     }
     .meta-bar {
       display: flex;
@@ -300,69 +373,124 @@ export const AIQuestionGenerator: React.FC = () => {
       border: 1px solid #e2e8f0;
       padding: 8px 16px;
       border-radius: 8px;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
+    }
+
+    /* Balanced Two-Column or Single-Column Layout */
+    .questions.cols-2 {
+      column-count: 2;
+      -webkit-column-count: 2;
+      column-gap: 32px;
+      column-fill: balance;
+      -webkit-column-fill: balance;
+      column-rule: 1px solid #cbd5e1;
+    }
+    .questions.cols-2.no-rule {
+      column-rule: none;
+    }
+    .questions.cols-1 {
+      column-count: 1;
+      -webkit-column-count: 1;
     }
     .question-block {
-      margin-bottom: 20px;
+      break-inside: avoid;
       page-break-inside: avoid;
+      -webkit-column-break-inside: avoid;
+      margin-bottom: 18px;
+      padding-bottom: 4px;
     }
     .q-title {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 700;
-      margin-bottom: 8px;
+      margin-bottom: 7px;
       color: #1e293b;
+      line-height: 1.45;
     }
     .options-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px 16px;
-      margin-left: 12px;
+      gap: 5px 12px;
+      margin-left: 6px;
     }
     .opt-item {
-      font-size: 14px;
+      font-size: 13px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
+      word-break: break-word;
     }
     .circle-badge {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 22px;
-      height: 22px;
+      min-width: 20px;
+      width: 20px;
+      height: 20px;
       border-radius: 50%;
       border: 1.5px solid #475569;
       font-size: 11px;
       font-weight: bold;
       color: #1e293b;
+      flex-shrink: 0;
     }
     .bracket-badge {
       font-weight: bold;
-      font-size: 14px;
+      font-size: 13px;
       color: #1e293b;
+      flex-shrink: 0;
     }
     .answer-key {
-      margin-top: 40px;
+      margin-top: 24px;
       border-top: 2px dashed #cbd5e1;
-      padding-top: 20px;
+      padding-top: 14px;
       page-break-before: auto;
     }
     .answer-key h3 {
       color: #065f46;
-      margin-top: 0;
-      font-size: 16px;
+      margin: 0 0 10px 0;
+      font-size: 15px;
+    }
+    .answer-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 16px;
     }
     .answer-row {
-      font-size: 13px;
-      margin: 6px 0;
+      font-size: 12.5px;
+      margin: 2px 0;
       color: #334155;
     }
+
     @media print {
-      body { padding: 16px; }
+      body {
+        padding: 0;
+        max-width: 100%;
+      }
+      .no-print, .no-print-toolbar {
+        display: none !important;
+      }
     }
   </style>
 </head>
 <body>
+  <div class="no-print-toolbar no-print">
+    <div class="title">📄 প্রশ্নপত্র প্রিন্ট ও সংরক্ষণ সেটিংস</div>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:12px;font-weight:600;color:#64748b;">লেআউট:</span>
+        <div class="btn-toggle-group">
+          <button id="btn-col-1" class="btn-toggle ${questionColumns === 1 ? 'active' : ''}" onclick="changeCols(1)">১ কলাম</button>
+          <button id="btn-col-2" class="btn-toggle ${questionColumns === 2 ? 'active' : ''}" onclick="changeCols(2)">২ কলাম (সমান উচ্চতা)</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:12px;font-weight:600;color:#64748b;">মাঝের বিভাজন রেখা:</span>
+        <button id="btn-rule" class="btn-toggle active" style="background:#059669;color:#fff;" onclick="toggleRule()">দাগ সহ</button>
+      </div>
+      <button class="btn-print-action" onclick="window.print()">🖨️ প্রিন্ট করুন</button>
+    </div>
+  </div>
+
   <div class="header">
     <h1>দ্যা পাঠশালা • প্রশ্নপত্র</h1>
     <p>বিষয়: ${subject} • অধ্যায়/টপিক: ${topic || 'সাধারণ'}</p>
@@ -372,7 +500,7 @@ export const AIQuestionGenerator: React.FC = () => {
     <span>পূর্ণমান: ${questions.length}</span>
     <span>সময়: ${Math.round(questions.length * 1.2)} মিনিট</span>
   </div>
-  <div class="questions">
+  <div id="questions-container" class="questions ${questionColumns === 2 ? 'cols-2' : 'cols-1'}">
     ${questions.map((q, i) => `
       <div class="question-block">
         <div class="q-title">${i + 1}. ${q.question}</div>
@@ -390,18 +518,50 @@ export const AIQuestionGenerator: React.FC = () => {
   </div>
   <div class="answer-key">
     <h3>উত্তরমালা ও ব্যাখ্যা:</h3>
-    ${questions.map((q, i) => `
-      <div class="answer-row">
-        <strong>${i + 1}.</strong> উত্তর: <strong>${q.correctAnswer}</strong>
-        ${q.explanation ? `— <em>${q.explanation}</em>` : ''}
-      </div>
-    `).join('')}
+    <div class="answer-grid">
+      ${questions.map((q, i) => `
+        <div class="answer-row">
+          <strong>${i + 1}.</strong> উত্তর: <strong>${q.correctAnswer}</strong>
+          ${q.explanation ? `— <em>${q.explanation}</em>` : ''}
+        </div>
+      `).join('')}
+    </div>
   </div>
   <script>
+    function changeCols(n) {
+      var el = document.getElementById('questions-container');
+      var b1 = document.getElementById('btn-col-1');
+      var b2 = document.getElementById('btn-col-2');
+      if (n === 2) {
+        el.className = 'questions cols-2' + (el.classList.contains('no-rule') ? ' no-rule' : '');
+        b2.classList.add('active');
+        b1.classList.remove('active');
+      } else {
+        el.className = 'questions cols-1';
+        b1.classList.add('active');
+        b2.classList.remove('active');
+      }
+    }
+    function toggleRule() {
+      var el = document.getElementById('questions-container');
+      var btn = document.getElementById('btn-rule');
+      el.classList.toggle('no-rule');
+      if (el.classList.contains('no-rule')) {
+        btn.textContent = 'দাগ ছাড়া';
+        btn.classList.remove('active');
+        btn.style.background = '#e2e8f0';
+        btn.style.color = '#475569';
+      } else {
+        btn.textContent = 'দাগ সহ';
+        btn.classList.add('active');
+        btn.style.background = '#059669';
+        btn.style.color = '#ffffff';
+      }
+    }
     window.onload = function() {
       setTimeout(() => {
         window.print();
-      }, 300);
+      }, 350);
     };
   </script>
 </body>
@@ -696,10 +856,10 @@ export const AIQuestionGenerator: React.FC = () => {
                 animate={{ opacity: 1 }}
                 className="space-y-6"
               >
-                {/* Option Style Controls Toolbar */}
+                {/* Option Style & Column Controls Toolbar */}
                 <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/70 shadow-xs">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-bold text-slate-500">অপশন ক্রমিক স্টাইল:</span>
+                    <span className="text-xs font-bold text-slate-500">অপশন ক্রমিক:</span>
                     <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl">
                       <button
                         type="button"
@@ -711,7 +871,7 @@ export const AIQuestionGenerator: React.FC = () => {
                         }`}
                       >
                         <span className="w-3.5 h-3.5 rounded-full border-2 border-current inline-flex items-center justify-center text-[8px]">●</span>
-                        গোল বৃত্ত (Circle)
+                        গোল বৃত্ত
                       </button>
                       <button
                         type="button"
@@ -755,17 +915,48 @@ export const AIQuestionGenerator: React.FC = () => {
                       </button>
                     </div>
                   </div>
+
+                  {/* Column Layout Controls: 1 column vs 2 columns with balanced equal height */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-slate-500">কলাম লেআউট:</span>
+                    <div className="inline-flex items-center bg-slate-100 p-1 rounded-xl">
+                      <button
+                        type="button"
+                        onClick={() => setQuestionColumns(1)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          questionColumns === 1
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        ১ কলাম
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setQuestionColumns(2)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          questionColumns === 2
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        ২ কলাম (সমান উচ্চতা)
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
-                {questions.map((q, i) => (
-                  <motion.div
-                    layout
-                    key={q.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                  >
-                    <Card className={`relative border-none shadow-lg transition-all ${editingId === q.id ? 'ring-2 ring-emerald-500 bg-emerald-50/30' : 'bg-white'}`}>
+                <div className={questionColumns === 2 ? "grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch" : "space-y-6"}>
+                  {questions.map((q, i) => (
+                    <motion.div
+                      layout
+                      key={q.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      className={questionColumns === 2 ? "h-full" : ""}
+                    >
+                      <Card className={`relative border-none shadow-lg transition-all h-full flex flex-col justify-between ${editingId === q.id ? 'ring-2 ring-emerald-500 bg-emerald-50/30' : 'bg-white'}`}>
                       {/* Action Toolbar */}
                       <div className="absolute top-4 right-4 flex items-center gap-1">
                         {editingId === q.id ? (
@@ -919,6 +1110,7 @@ export const AIQuestionGenerator: React.FC = () => {
                     </Card>
                   </motion.div>
                 ))}
+                </div>
               </motion.div>
             ) : (
               <motion.div 
