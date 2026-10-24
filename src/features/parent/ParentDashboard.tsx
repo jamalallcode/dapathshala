@@ -2900,19 +2900,11 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                           <span className="text-xs font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">
                             {testSubject}
                           </span>
-                          <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                            isReviewed 
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' 
-                              : isSubmitted 
-                              ? 'bg-blue-100 text-blue-800 border border-blue-200' 
-                              : 'bg-amber-100 text-amber-800 border border-amber-200'
-                          }`}>
-                            {isReviewed 
-                              ? '✓ মূল্যায়ন সম্পন্ন ও প্রকাশিত' 
-                              : isSubmitted 
-                              ? 'নতুন খাতা জমা পড়েছে (মূল্যায়ন অপেক্ষমান)' 
-                              : 'পরীক্ষা অপেক্ষায় আছে'}
-                          </span>
+                          {isReviewed && (
+                            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              ✓ মূল্যায়ন সম্পন্ন ও প্রকাশিত
+                            </span>
+                          )}
                           {test.redFlagsCount ? (
                             <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-800 flex items-center gap-1 border border-red-200">
                               <Flag size={11} className="text-red-600 fill-red-600" />
@@ -2929,6 +2921,10 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                         {/* Pending Controls */}
                         {!isReviewed && !isSubmitted && (
                           <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-bold px-2.5 py-1 rounded-xl bg-amber-50 text-amber-900 border border-amber-300 flex items-center gap-1.5 shadow-xs">
+                              <Clock size={13} className="text-amber-700" />
+                              <span>পরীক্ষা অপেক্ষায় আছে</span>
+                            </span>
                             {test.pin && (
                               <span className="text-xs font-mono font-bold bg-amber-50 text-amber-900 border border-amber-300 px-2 py-1 rounded-lg">
                                 PIN: {test.pin}
@@ -2968,6 +2964,15 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
+                              onClick={() => handleOpenEvaluationModal(test)}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl shadow-md shadow-indigo-200 transition-all cursor-pointer animate-pulse"
+                              title="উত্তরপত্র মূল্যায়ন করুন"
+                            >
+                              <FileCheck size={14} />
+                              <span>উত্তরপত্র</span>
+                            </button>
+                            <button
+                              type="button"
                               onClick={() => handlePreviewExistingTest(test)}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-all cursor-pointer"
                               title="প্রশ্নপত্র দেখুন"
@@ -2989,6 +2994,15 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                         {/* Reviewed Controls */}
                         {isReviewed && (
                           <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEvaluationModal(test)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-300 transition-all cursor-pointer"
+                              title="মূল্যায়িত উত্তরপত্র দেখুন"
+                            >
+                              <FileCheck size={13} className="text-emerald-600" />
+                              <span>উত্তরপত্র</span>
+                            </button>
                             {test.score !== null && test.score !== undefined && (
                               <div className="text-right">
                                 <div className="text-[10px] text-slate-400 font-bold uppercase">অনুমোদিত স্কোর</div>
@@ -3046,58 +3060,7 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                       </div>
                     )}
 
-                    {/* If Pending (পরীক্ষা অপেক্ষায় আছে): Detailed bottom control strip without start test button */}
-                    {!isSubmitted && !isReviewed && (
-                      <div className="space-y-3 pt-1">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 p-4 bg-gradient-to-r from-amber-50 to-orange-50/50 rounded-2xl border border-amber-200">
-                          <div className="space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-xs font-black text-amber-950 flex items-center gap-1.5">
-                                <Clock size={15} className="text-amber-700" />
-                                পরীক্ষাটি শিক্ষার্থী এখনও শুরু বা জমা দেয়নি (অপেক্ষমান)
-                              </span>
-                              {test.pin && (
-                                <span className="text-xs font-mono font-bold bg-white text-amber-900 px-2.5 py-0.5 rounded-lg border border-amber-300 shadow-xs">
-                                  পিন: {test.pin}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-amber-900/80">
-                              শিক্ষার্থীকে পরীক্ষার লিংক বা পিন শেয়ার করুন। শিক্ষার্থী পরীক্ষা সম্পন্ন করে উত্তরপত্র জমা দিলে তা এখানে মূল্যায়নের জন্য চলে আসবে।
-                            </p>
-                          </div>
 
-                          <div className="flex flex-wrap items-center gap-2 shrink-0">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleCopyTestLink(test)}
-                              className="bg-white hover:bg-amber-100/60 border-amber-300 text-amber-950 font-bold text-xs rounded-xl shadow-xs gap-1.5 cursor-pointer"
-                            >
-                              <Link2 size={14} className="text-amber-700" />
-                              {copiedTestId === testKey ? '✓ লিংক কপি হয়েছে!' : 'লিংক ও পিন কপি'}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handlePreviewExistingTest(test)}
-                              className="bg-white hover:bg-slate-100 border-slate-300 text-slate-800 font-bold text-xs rounded-xl shadow-xs gap-1.5 cursor-pointer"
-                            >
-                              <Eye size={14} className="text-indigo-600" />
-                              প্রশ্নপত্র দেখুন ও প্রিন্ট
-                            </Button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteAssignedTest(testKey)}
-                              className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all cursor-pointer border border-transparent hover:border-red-200"
-                              title="পরীক্ষাটি তালিকা থেকে মুছে ফেলুন"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
                     {(isSubmitted || isReviewed) && (
                       <div className="p-4 sm:p-5 bg-slate-50/90 rounded-2xl border border-slate-200/90 space-y-3.5">
