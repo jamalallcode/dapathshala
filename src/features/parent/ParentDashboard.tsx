@@ -2827,33 +2827,27 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
       {/* TAB 3: REVIEW EXAMS */}
       {activeTab === 'review' && (
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 className="text-xl font-black text-slate-900 flex items-center gap-2">
-              <FileCheck className="text-indigo-600" />
-              {currentChild.name} এর নির্ধারিত ও সম্পন্ন হওয়া পরীক্ষাসমূহ
-            </h2>
-            <div className="flex items-center gap-2">
-              {assignedTests.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleClearAllAssignedTests}
-                  className="text-xs font-bold text-red-600 hover:bg-red-50 hover:border-red-300 border-slate-300 cursor-pointer flex items-center gap-1.5"
-                  title="তালিকার সকল পরীক্ষা স্থায়ীভাবে মুছে ফেলুন"
-                >
-                  <Trash2 size={14} />
-                  সকল পরীক্ষা মুছুন
-                </Button>
-              )}
+          <div className="flex items-center justify-end gap-2">
+            {assignedTests.length > 0 && (
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setActiveTab('assign')}
-                className="text-xs font-bold cursor-pointer"
+                onClick={handleClearAllAssignedTests}
+                className="text-xs font-bold text-red-600 hover:bg-red-50 hover:border-red-300 border-slate-300 cursor-pointer flex items-center gap-1.5"
+                title="তালিকার সকল পরীক্ষা স্থায়ীভাবে মুছে ফেলুন"
               >
-                + নতুন পরীক্ষা দিন
+                <Trash2 size={14} />
+                সকল পরীক্ষা মুছুন
               </Button>
-            </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setActiveTab('assign')}
+              className="text-xs font-bold cursor-pointer"
+            >
+              + নতুন পরীক্ষা দিন
+            </Button>
           </div>
 
           <div className="space-y-4">
@@ -3021,20 +3015,20 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                       </div>
                     </div>
 
-                    {/* If Submitted: Highlighted Notice Banner */}
+                    {/* If Submitted: Highlighted Notice Section (Pure White Unified Card) */}
                     {isSubmitted && !isReviewed && (
-                      <div className="p-4 bg-gradient-to-r from-blue-50 via-indigo-50/70 to-blue-50 rounded-2xl border border-indigo-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3.5">
+                      <div className="pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3.5">
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-black text-indigo-950 flex items-center gap-1.5">
+                            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                               <CheckCircle2 size={16} className="text-emerald-600" />
                               শিক্ষার্থী পরীক্ষা সম্পন্ন করে ডিজিটাল খাতা জমা দিয়েছে!
                             </span>
-                            <span className="text-xs font-bold bg-white text-indigo-800 px-2 py-0.5 rounded-md border border-indigo-200">
+                            <span className="text-xs font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200">
                               জমার সময়: {test.submittedAt || 'আজ, এইমাত্র'}
                             </span>
                           </div>
-                          <p className="text-xs text-indigo-900/80">
+                          <p className="text-xs text-slate-500">
                             উত্তরপত্রটি মূল্যায়নের জন্য প্রস্তুত। প্রতিটি প্রশ্নের সঠিকতা যাচাই করে প্রাপ্ত নম্বর ও ডিজিটাল লাল কালির দাগ দিতে <strong>'উত্তরপত্র মূল্যায়ন করুন'</strong> বাটনে চাপ দিন।
                           </p>
                         </div>
@@ -3042,7 +3036,7 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                           <Button
                             size="sm"
                             onClick={() => handleOpenEvaluationModal(test)}
-                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-md shadow-indigo-200 gap-1.5 cursor-pointer animate-pulse"
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl shadow-md shadow-indigo-200 gap-1.5 cursor-pointer animate-pulse"
                           >
                             <FileCheck size={16} />
                             <span>উত্তরপত্র মূল্যায়ন করুন</span>
