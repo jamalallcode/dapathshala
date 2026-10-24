@@ -330,19 +330,61 @@ export const submitExamScript = async (
   try {
     const raw = localStorage.getItem(STORAGE_TESTS_KEY);
     const existing: any[] = raw ? JSON.parse(raw) : [];
-    const index = existing.findIndex(t => 
-      (t.id && (t.id === payload.id || t.id === payload.examId)) ||
-      (t.examId && (t.examId === payload.id || t.examId === payload.examId)) ||
-      ((payload as any).pin && t.pin && String(t.pin) === String((payload as any).pin)) ||
-      ((payload as any).pin && (t.id === (payload as any).pin || t.examId === (payload as any).pin)) ||
-      (payload.title && t.title === payload.title && t.status === 'pending')
-    );
+
+    const norm = (s?: string) => {
+      if (!s) return '';
+      return s.trim().toLowerCase()
+        .replace(/\u09AF\u09BC/g, '\u09DF') // normalize Bengali Ya
+        .replace(/[\s\-_:(),।]/g, '');
+    };
+
+    const targetPin = (payload as any).pin ? String((payload as any).pin).trim() : '';
+    const targetTitle = norm(payload.title);
+    const targetChapter = norm(payload.chapter);
+    const targetSubject = (payload.subject || '').trim();
+
+    // Find the matching test in the assigned tests list
+    let index = existing.findIndex(t => {
+      if (!t) return false;
+      // 1. ID or examId match
+      if (t.id && (t.id === payload.id || t.id === payload.examId)) return true;
+      if (t.examId && (t.examId === payload.id || t.examId === payload.examId)) return true;
+      // 2. PIN match
+      if (targetPin && t.pin && String(t.pin).trim() === targetPin) return true;
+      if (targetPin && (t.id === targetPin || t.examId === targetPin)) return true;
+      // 3. Exact or normalized title match
+      if (targetTitle && norm(t.title) === targetTitle) return true;
+      return false;
+    });
+
+    // If not matched yet, try matching any pending test in the same subject and chapter
+    if (index === -1) {
+      index = existing.findIndex(t => {
+        if (!t || t.status !== 'pending') return false;
+        if (targetSubject && t.subject === targetSubject) {
+          if (targetChapter && (norm(t.chapter).includes(targetChapter) || targetChapter.includes(norm(t.chapter)))) {
+            return true;
+          }
+        }
+        return false;
+      });
+    }
+
+    // If still not matched, and there is only ONE pending test, match that pending test!
+    if (index === -1) {
+      const pendingIndices = existing
+        .map((t, idx) => (t && t.status === 'pending' ? idx : -1))
+        .filter(idx => idx !== -1);
+      if (pendingIndices.length === 1) {
+        index = pendingIndices[0];
+      }
+    }
+
     let updated: any[];
     if (index >= 0) {
       const prevTest = existing[index];
       const prevQ = prevTest.questionsList || prevTest.questions || [];
       const payloadQ = payload.questions || [];
-      // Use whichever questions array has more questions, or fallback to the non-empty one
       const mergedQuestions = (payloadQ.length >= prevQ.length && payloadQ.length > 0)
         ? payloadQ
         : (prevQ.length > 0 ? prevQ : payloadQ);
@@ -351,13 +393,19 @@ export const submitExamScript = async (
       updated[index] = {
         ...prevTest,
         ...payload,
+        pin: prevTest.pin || targetPin,
+        title: prevTest.title || payload.title,
+        subject: prevTest.subject || payload.subject,
+        chapter: prevTest.chapter || payload.chapter,
         status: 'submitted',
+        isSubmitted: true,
+        isViewed: false,
         questions: mergedQuestions,
         questionsList: prevTest.questionsList || mergedQuestions,
         totalMarks: mergedQuestions.length > 0 ? mergedQuestions.length : (payload.totalMarks || prevTest.totalMarks || 15)
       };
     } else {
-      updated = [{ ...payload, status: 'submitted' }, ...existing];
+      updated = [{ ...payload, status: 'submitted', isSubmitted: true, isViewed: false }, ...existing];
     }
     localStorage.setItem(STORAGE_TESTS_KEY, JSON.stringify(updated));
 

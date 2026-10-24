@@ -114,6 +114,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
   const hasEnteredFullscreenRef = useRef<boolean>(false);
   const autoAdvanceTimerRef = useRef<any>(null);
+  const hasSubmittedRef = useRef<boolean>(false);
 
   // Load existing submission data only if in explicit review mode
   useEffect(() => {
@@ -254,6 +255,35 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       isViolationTerminated: violationTerminated
     };
 
+    // Auto-dispatch submitExamScript if not yet submitted
+    if (!hasSubmittedRef.current) {
+      hasSubmittedRef.current = true;
+      const scorePercent = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0;
+      const autoPayload = {
+        id: exam.id || 'sub_' + Date.now(),
+        examId: exam.id,
+        pin: (exam as any).pin,
+        title: exam.title,
+        subject: exam.subject,
+        chapter: (exam as any).chapter || 'মূল্যায়ন পরীক্ষা',
+        questions: activeQuestions,
+        duration: exam.duration,
+        totalMarks: exam.totalMarks || totalQuestions,
+        studentName: studentName || 'আরাফাত রহমান',
+        childId: childId || 'child_1',
+        answers,
+        handwrittenImages,
+        submittedAt: new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }) + ', আজ',
+        status: 'submitted' as const,
+        score: scorePercent,
+        redFlagsCount: finalFlags,
+        violations: finalFlags > 0 ? [
+          'অন্য ট্যাব বা উইন্ডো পরিবর্তনের চেষ্টা সনাক্ত হয়েছে'
+        ] : []
+      };
+      submitExamScript(autoPayload).catch(err => console.warn('Auto submit error:', err));
+    }
+
     setResult(examResult);
     setIsFinished(true);
     localStorage.removeItem(`exam_progress_${exam.id}`);
@@ -268,7 +298,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     if (onFinish) {
       onFinish(examResult);
     }
-  }, [answers, exam.id, startTime, activeQuestions, onFinish]);
+  }, [answers, exam, startTime, activeQuestions, studentName, childId, handwrittenImages, onFinish]);
 
   const handleRetakeExam = () => {
     setIsFinished(false);
@@ -348,6 +378,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     };
 
     try {
+      hasSubmittedRef.current = true;
       await submitExamScript(payload);
     } catch (err) {
       console.warn('Submit script error:', err);

@@ -131,10 +131,12 @@ export const Navigation: React.FC<NavigationProps> = ({
     } catch {}
   };
 
-  // Persist notifications across turns and reloads
+  // Persist notifications across turns and reloads without overwriting with empty
   useEffect(() => {
     try {
-      localStorage.setItem('dapathshala_notifications', JSON.stringify(notifications));
+      if (notifications.length > 0) {
+        localStorage.setItem('dapathshala_notifications', JSON.stringify(notifications));
+      }
     } catch {}
   }, [notifications]);
 
@@ -162,7 +164,7 @@ export const Navigation: React.FC<NavigationProps> = ({
           if (Array.isArray(parsed)) notifs = parsed;
         }
 
-        // Check dapathshala_parent_assigned_tests for any submitted tests not yet in notifications
+        // Check dapathshala_parent_assigned_tests for any submitted tests
         const savedTests = localStorage.getItem('dapathshala_parent_assigned_tests');
         if (savedTests) {
           const tests = JSON.parse(savedTests);
@@ -170,23 +172,34 @@ export const Navigation: React.FC<NavigationProps> = ({
             const submitted = tests.filter((t: any) => t && (t.status === 'submitted' || t.submittedAt) && !t.isPublished);
             submitted.forEach((t: any) => {
               const testKey = t.id || t.examId || t.pin;
-              const alreadyHas = notifs.some(n => n.examId === testKey || (t.pin && n.examId === t.pin) || (t.id && n.examId === t.id));
-              if (!alreadyHas) {
+              const existingIdx = notifs.findIndex(n => n.examId === testKey || (t.pin && n.examId === t.pin) || (t.id && n.examId === t.id));
+              const isNotViewed = !t.isViewed && !t.hasBeenViewed;
+              
+              if (existingIdx === -1) {
                 notifs.unshift({
                   id: 'notif_sub_' + testKey,
                   title: 'নতুন খাতা জমা পড়েছে!',
                   message: `${t.studentName || t.childName || 'সন্তান'} "${t.title || t.subject}" পরীক্ষার খাতা জমা দিয়েছে।`,
                   time: t.submittedAt || 'আজ, এইমাত্র',
-                  read: false,
+                  read: !isNotViewed,
                   examId: testKey
                 });
+              } else if (isNotViewed && notifs[existingIdx].read) {
+                // If test is unviewed, ensure notification is unread so Bell badge shows!
+                notifs[existingIdx] = {
+                  ...notifs[existingIdx],
+                  read: false
+                };
               }
             });
           }
         }
 
         if (notifs.length > 0) {
-          setNotifications(notifs);
+          setNotifications(prev => {
+            const isDifferent = JSON.stringify(prev) !== JSON.stringify(notifs);
+            return isDifferent ? notifs : prev;
+          });
         }
       } catch {}
     };
@@ -205,6 +218,10 @@ export const Navigation: React.FC<NavigationProps> = ({
     window.addEventListener('dapathshala_new_notification', handleNewNotif);
     window.addEventListener('storage', syncNotifs);
     window.addEventListener('focus', syncNotifs);
+    document.addEventListener('visibilitychange', syncNotifs);
+
+    // Active polling interval every 1.5 seconds to guarantee cross-tab/iframe sync
+    const pollInterval = setInterval(syncNotifs, 1500);
 
     const unsubscribe = subscribeToExamSubmissions((newSub: ExamSubmissionPayload) => {
       playAudioChime();
@@ -230,6 +247,8 @@ export const Navigation: React.FC<NavigationProps> = ({
       window.removeEventListener('dapathshala_new_notification', handleNewNotif);
       window.removeEventListener('storage', syncNotifs);
       window.removeEventListener('focus', syncNotifs);
+      document.removeEventListener('visibilitychange', syncNotifs);
+      clearInterval(pollInterval);
       unsubscribe();
     };
   }, []);

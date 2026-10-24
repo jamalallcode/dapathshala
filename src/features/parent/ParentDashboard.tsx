@@ -374,8 +374,27 @@ export const ParentDashboard: React.FC = () => {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_TESTS_KEY, JSON.stringify(assignedTests));
-      if (assignedTests.length === 0) {
+      const rawCurrent = localStorage.getItem(STORAGE_TESTS_KEY);
+      let toPersist = assignedTests;
+      if (rawCurrent) {
+        try {
+          const currentInStorage = JSON.parse(rawCurrent);
+          if (Array.isArray(currentInStorage)) {
+            toPersist = toPersist.map(t => {
+              const inStorage = currentInStorage.find((s: any) => 
+                (s && s.id && (s.id === t.id || s.id === t.examId)) ||
+                (s && s.pin && t.pin && String(s.pin).trim() === String(t.pin).trim())
+              );
+              if (inStorage && (inStorage.status === 'submitted' || inStorage.status === 'reviewed') && t.status === 'pending') {
+                return inStorage;
+              }
+              return t;
+            });
+          }
+        } catch {}
+      }
+      localStorage.setItem(STORAGE_TESTS_KEY, JSON.stringify(toPersist));
+      if (toPersist.length === 0) {
         localStorage.setItem('dapathshala_parent_tests_cleared', 'true');
       } else {
         localStorage.removeItem('dapathshala_parent_tests_cleared');
@@ -885,13 +904,49 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
         playNotificationSound();
       } catch {}
       setAssignedTests(prev => {
-        const idx = prev.findIndex(t => 
-          (t.id && (t.id === newSub.id || t.id === newSub.examId)) ||
-          (t.examId && (t.examId === newSub.id || t.examId === newSub.examId)) ||
-          ((newSub as any).pin && t.pin && String(t.pin) === String((newSub as any).pin)) ||
-          ((newSub as any).pin && (t.id === (newSub as any).pin || t.examId === (newSub as any).pin)) ||
-          (newSub.title && t.title === newSub.title && t.status === 'pending')
-        );
+        const norm = (s?: string) => {
+          if (!s) return '';
+          return s.trim().toLowerCase()
+            .replace(/\u09AF\u09BC/g, '\u09DF')
+            .replace(/[\s\-_:(),।]/g, '');
+        };
+
+        const targetPin = (newSub as any).pin ? String((newSub as any).pin).trim() : '';
+        const targetTitle = norm(newSub.title);
+        const targetChapter = norm(newSub.chapter);
+        const targetSubject = (newSub.subject || '').trim();
+
+        let idx = prev.findIndex(t => {
+          if (!t) return false;
+          if (t.id && (t.id === newSub.id || t.id === newSub.examId)) return true;
+          if (t.examId && (t.examId === newSub.id || t.examId === newSub.examId)) return true;
+          if (targetPin && t.pin && String(t.pin).trim() === targetPin) return true;
+          if (targetPin && (t.id === targetPin || t.examId === targetPin)) return true;
+          if (targetTitle && norm(t.title) === targetTitle) return true;
+          return false;
+        });
+
+        if (idx === -1) {
+          idx = prev.findIndex(t => {
+            if (!t || t.status !== 'pending') return false;
+            if (targetSubject && t.subject === targetSubject) {
+              if (targetChapter && (norm(t.chapter).includes(targetChapter) || targetChapter.includes(norm(t.chapter)))) {
+                return true;
+              }
+            }
+            return false;
+          });
+        }
+
+        if (idx === -1) {
+          const pendingIdxs = prev
+            .map((t, i) => (t && t.status === 'pending' ? i : -1))
+            .filter(i => i !== -1);
+          if (pendingIdxs.length === 1) {
+            idx = pendingIdxs[0];
+          }
+        }
+
         if (idx >= 0) {
           const copy = [...prev];
           const existing = copy[idx];
@@ -904,14 +959,20 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
           copy[idx] = { 
             ...existing, 
             ...newSub,
+            pin: existing.pin || targetPin,
+            title: existing.title || newSub.title,
+            subject: existing.subject || newSub.subject,
+            chapter: existing.chapter || newSub.chapter,
             status: 'submitted',
+            isSubmitted: true,
+            isViewed: false,
             questions: mergedQ,
             questionsList: existing.questionsList || mergedQ,
             totalMarks: mergedQ.length > 0 ? mergedQ.length : (newSub.totalMarks || existing.totalMarks)
           };
           return copy;
         }
-        return [{ ...newSub, status: 'submitted' }, ...prev];
+        return [{ ...newSub, status: 'submitted', isSubmitted: true, isViewed: false }, ...prev];
       });
       setNewSubmissionAlert(newSub);
       setAlertSuccess(`🔔 নতুন খাতা জমা পড়েছে! "${newSub.studentName || 'সন্তান'}" এর '${newSub.title || newSub.subject}' পরীক্ষা সফলভাবে জমা হয়েছে।`);
@@ -923,7 +984,11 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
         if (raw) {
           const list = JSON.parse(raw);
           if (Array.isArray(list) && list.length > 0) {
-            setAssignedTests(list);
+            setAssignedTests(prev => {
+              const prevStr = JSON.stringify(prev);
+              const nextStr = JSON.stringify(list);
+              return prevStr !== nextStr ? list : prev;
+            });
           }
         }
       } catch {}
@@ -931,12 +996,18 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
 
     window.addEventListener('storage', syncTestsFromStorage);
     window.addEventListener('focus', syncTestsFromStorage);
+    document.addEventListener('visibilitychange', syncTestsFromStorage);
+
+    // Active polling interval every 1.5 seconds to guarantee cross-tab/iframe sync
+    const pollInterval = setInterval(syncTestsFromStorage, 1500);
 
     return () => {
       unsubscribeProctoring();
       unsubscribeSubmissions();
       window.removeEventListener('storage', syncTestsFromStorage);
       window.removeEventListener('focus', syncTestsFromStorage);
+      document.removeEventListener('visibilitychange', syncTestsFromStorage);
+      clearInterval(pollInterval);
     };
   }, [activeChild]);
 

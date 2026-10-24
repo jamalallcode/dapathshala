@@ -642,6 +642,7 @@ export const getSharedLiveExam = (idOrPin: string): SharedLiveExam | null => {
 
       const reconstructedExam: SharedLiveExam = {
         id: resolvedId,
+        pin: pinMap[resolvedId] || (cleanKey && cleanKey.length === 6 ? cleanKey : undefined) || generateExamPin(),
         title: `${sub}: ${ch} কাস্টম মূল্যায়ন`,
         subject: sub,
         chapter: ch,
