@@ -104,6 +104,12 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
           (qId && (t.id === qId || t.examId === qId || t.pin === qId))
         );
         if (currentTest) {
+          foundExam.id = currentTest.id || currentTest.examId || foundExam.id;
+          if (currentTest.pin) foundExam.pin = currentTest.pin;
+          if (currentTest.title) foundExam.title = currentTest.title;
+          if (currentTest.subject) foundExam.subject = currentTest.subject;
+          if (currentTest.chapter) (foundExam as any).chapter = currentTest.chapter;
+
           // If the test has all questions saved in questionsList or questions, ensure they are loaded
           const fullQ = currentTest.questionsList || currentTest.questions;
           if (Array.isArray(fullQ) && fullQ.length > 0) {
@@ -152,8 +158,10 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
   if (isExamStarted) {
     const activeExamObject: any = {
       id: examData.id,
+      pin: examData.pin,
       title: examData.title,
       subject: examData.subject,
+      chapter: (examData as any).chapter || 'কাস্টম মূল্যায়ন',
       duration: selectedDuration,
       date: new Date().toISOString(),
       totalMarks: examData.totalMarks || examData.questions.length,

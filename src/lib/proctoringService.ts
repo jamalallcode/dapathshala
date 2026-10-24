@@ -333,7 +333,9 @@ export const submitExamScript = async (
     const index = existing.findIndex(t => 
       (t.id && (t.id === payload.id || t.id === payload.examId)) ||
       (t.examId && (t.examId === payload.id || t.examId === payload.examId)) ||
-      ((payload as any).pin && t.pin === (payload as any).pin)
+      ((payload as any).pin && t.pin && String(t.pin) === String((payload as any).pin)) ||
+      ((payload as any).pin && (t.id === (payload as any).pin || t.examId === (payload as any).pin)) ||
+      (payload.title && t.title === payload.title && t.status === 'pending')
     );
     let updated: any[];
     if (index >= 0) {
@@ -349,12 +351,13 @@ export const submitExamScript = async (
       updated[index] = {
         ...prevTest,
         ...payload,
+        status: 'submitted',
         questions: mergedQuestions,
         questionsList: prevTest.questionsList || mergedQuestions,
         totalMarks: mergedQuestions.length > 0 ? mergedQuestions.length : (payload.totalMarks || prevTest.totalMarks || 15)
       };
     } else {
-      updated = [payload, ...existing];
+      updated = [{ ...payload, status: 'submitted' }, ...existing];
     }
     localStorage.setItem(STORAGE_TESTS_KEY, JSON.stringify(updated));
 
@@ -363,8 +366,8 @@ export const submitExamScript = async (
       const rawLive = localStorage.getItem('dapathshala_live_exams');
       if (rawLive) {
         const liveExams = JSON.parse(rawLive);
-        const lKey = payload.id || payload.examId;
-        if (liveExams[lKey]) {
+        const lKey = payload.id || payload.examId || (payload as any).pin;
+        if (lKey && liveExams[lKey]) {
           liveExams[lKey] = {
             ...liveExams[lKey],
             status: 'submitted',
@@ -384,16 +387,28 @@ export const submitExamScript = async (
   try {
     const notifRaw = localStorage.getItem('dapathshala_notifications');
     const currentNotifs: any[] = notifRaw ? JSON.parse(notifRaw) : [];
+    const testKey = payload.id || payload.examId || (payload as any).pin;
     const notifEntry = {
-      id: 'notif_sub_' + (payload.id || Date.now()),
+      id: 'notif_sub_' + testKey,
       title: 'নতুন খাতা জমা পড়েছে!',
       message: `${payload.studentName || 'সন্তান'} "${payload.title || payload.subject}" পরীক্ষা সম্পন্ন করেছে এবং খাতা জমা দিয়েছে।`,
       time: 'আজ, এইমাত্র',
       read: false,
-      examId: payload.id || payload.examId
+      examId: testKey
     };
-    const filtered = currentNotifs.filter((n: any) => n.examId !== (payload.id || payload.examId));
+    const filtered = currentNotifs.filter((n: any) => 
+      n.examId !== testKey &&
+      n.examId !== payload.id &&
+      n.examId !== payload.examId &&
+      (!((payload as any).pin) || n.examId !== (payload as any).pin)
+    );
     localStorage.setItem('dapathshala_notifications', JSON.stringify([notifEntry, ...filtered]));
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('dapathshala_new_notification', { detail: notifEntry })
+      );
+    }
   } catch {}
 
   // 1c. Trigger cross-tab storage sync event

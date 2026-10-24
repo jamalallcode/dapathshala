@@ -888,7 +888,9 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
         const idx = prev.findIndex(t => 
           (t.id && (t.id === newSub.id || t.id === newSub.examId)) ||
           (t.examId && (t.examId === newSub.id || t.examId === newSub.examId)) ||
-          ((newSub as any).pin && t.pin === (newSub as any).pin)
+          ((newSub as any).pin && t.pin && String(t.pin) === String((newSub as any).pin)) ||
+          ((newSub as any).pin && (t.id === (newSub as any).pin || t.examId === (newSub as any).pin)) ||
+          (newSub.title && t.title === newSub.title && t.status === 'pending')
         );
         if (idx >= 0) {
           const copy = [...prev];
@@ -902,21 +904,39 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
           copy[idx] = { 
             ...existing, 
             ...newSub,
+            status: 'submitted',
             questions: mergedQ,
             questionsList: existing.questionsList || mergedQ,
             totalMarks: mergedQ.length > 0 ? mergedQ.length : (newSub.totalMarks || existing.totalMarks)
           };
           return copy;
         }
-        return [newSub, ...prev];
+        return [{ ...newSub, status: 'submitted' }, ...prev];
       });
       setNewSubmissionAlert(newSub);
       setAlertSuccess(`🔔 নতুন খাতা জমা পড়েছে! "${newSub.studentName || 'সন্তান'}" এর '${newSub.title || newSub.subject}' পরীক্ষা সফলভাবে জমা হয়েছে।`);
     });
 
+    const syncTestsFromStorage = () => {
+      try {
+        const raw = localStorage.getItem('dapathshala_parent_assigned_tests');
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list) && list.length > 0) {
+            setAssignedTests(list);
+          }
+        }
+      } catch {}
+    };
+
+    window.addEventListener('storage', syncTestsFromStorage);
+    window.addEventListener('focus', syncTestsFromStorage);
+
     return () => {
       unsubscribeProctoring();
       unsubscribeSubmissions();
+      window.removeEventListener('storage', syncTestsFromStorage);
+      window.removeEventListener('focus', syncTestsFromStorage);
     };
   }, [activeChild]);
 

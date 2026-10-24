@@ -327,6 +327,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     const payload = {
       id: exam.id || 'sub_' + Date.now(),
       examId: exam.id,
+      pin: (exam as any).pin,
       title: exam.title,
       subject: exam.subject,
       chapter: (exam as any).chapter || 'মূল্যায়ন পরীক্ষা',

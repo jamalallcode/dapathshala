@@ -153,23 +153,85 @@ export const Navigation: React.FC<NavigationProps> = ({
   }, []);
 
   useEffect(() => {
+    const syncNotifs = () => {
+      try {
+        let notifs: any[] = [];
+        const savedNotifs = localStorage.getItem('dapathshala_notifications');
+        if (savedNotifs) {
+          const parsed = JSON.parse(savedNotifs);
+          if (Array.isArray(parsed)) notifs = parsed;
+        }
+
+        // Check dapathshala_parent_assigned_tests for any submitted tests not yet in notifications
+        const savedTests = localStorage.getItem('dapathshala_parent_assigned_tests');
+        if (savedTests) {
+          const tests = JSON.parse(savedTests);
+          if (Array.isArray(tests)) {
+            const submitted = tests.filter((t: any) => t && (t.status === 'submitted' || t.submittedAt) && !t.isPublished);
+            submitted.forEach((t: any) => {
+              const testKey = t.id || t.examId || t.pin;
+              const alreadyHas = notifs.some(n => n.examId === testKey || (t.pin && n.examId === t.pin) || (t.id && n.examId === t.id));
+              if (!alreadyHas) {
+                notifs.unshift({
+                  id: 'notif_sub_' + testKey,
+                  title: 'নতুন খাতা জমা পড়েছে!',
+                  message: `${t.studentName || t.childName || 'সন্তান'} "${t.title || t.subject}" পরীক্ষার খাতা জমা দিয়েছে।`,
+                  time: t.submittedAt || 'আজ, এইমাত্র',
+                  read: false,
+                  examId: testKey
+                });
+              }
+            });
+          }
+        }
+
+        if (notifs.length > 0) {
+          setNotifications(notifs);
+        }
+      } catch {}
+    };
+
+    const handleNewNotif = (e: any) => {
+      const notif = e.detail;
+      if (notif) {
+        playAudioChime();
+        setNotifications(prev => [
+          notif,
+          ...prev.filter(n => n.id !== notif.id && n.examId !== notif.examId)
+        ]);
+      }
+    };
+
+    window.addEventListener('dapathshala_new_notification', handleNewNotif);
+    window.addEventListener('storage', syncNotifs);
+    window.addEventListener('focus', syncNotifs);
+
     const unsubscribe = subscribeToExamSubmissions((newSub: ExamSubmissionPayload) => {
       playAudioChime();
-      const examKey = newSub.id || newSub.examId;
+      const examKey = newSub.id || newSub.examId || (newSub as any).pin;
+      const notifItem = {
+        id: 'notif_' + Date.now(),
+        title: 'নতুন খাতা জমা পড়েছে!',
+        message: `${newSub.studentName || 'সন্তান'} "${newSub.title || newSub.subject}" পরীক্ষা সম্পন্ন করেছে ও খাতা জমা দিয়েছে।`,
+        time: 'আজ, এইমাত্র',
+        read: false,
+        examId: examKey
+      };
       setNotifications(prev => [
-        {
-          id: 'notif_' + Date.now(),
-          title: 'নতুন খাতা জমা পড়েছে!',
-          message: `${newSub.studentName || 'সন্তান'} "${newSub.title || newSub.subject}" পরীক্ষা সম্পন্ন করেছে ও খাতা জমা দিয়েছে।`,
-          time: 'এইমাত্র',
-          read: false,
-          examId: examKey
-        },
-        ...prev.filter(n => n.examId !== examKey)
+        notifItem,
+        ...prev.filter(n => n.examId !== examKey && (!newSub.examId || n.examId !== newSub.examId))
       ]);
     });
 
-    return () => unsubscribe();
+    // Run sync on mount to catch any recent submissions
+    syncNotifs();
+
+    return () => {
+      window.removeEventListener('dapathshala_new_notification', handleNewNotif);
+      window.removeEventListener('storage', syncNotifs);
+      window.removeEventListener('focus', syncNotifs);
+      unsubscribe();
+    };
   }, []);
 
   const unreadCount = notifications.filter(n => !n.read).length;
