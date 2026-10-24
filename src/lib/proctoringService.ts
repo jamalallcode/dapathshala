@@ -88,6 +88,16 @@ export const recordProctoringViolation = async (
     console.warn('BroadcastChannel error:', err);
   }
 
+  // 2b. Forward to server API for instant cross-tab / iframe synchronization
+  try {
+    fetch('/api/proctoring-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newLog),
+      keepalive: true
+    }).catch(() => {});
+  } catch {}
+
   // 3. Dispatch Local CustomEvent for same-tab updates
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
@@ -480,6 +490,16 @@ export const submitExamScript = async (
     console.warn('BroadcastChannel error on submit:', err);
   }
 
+  // 2b. Forward to server API for instant cross-tab / iframe synchronization
+  try {
+    fetch('/api/submissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      keepalive: true
+    }).catch(() => {});
+  } catch {}
+
   // 3. Dispatch window CustomEvent for same-page listeners
   if (typeof window !== 'undefined') {
     window.dispatchEvent(
@@ -511,6 +531,20 @@ export const submitExamScript = async (
   }
 
   return payload;
+};
+
+/**
+ * Fetch all exam submissions from the backend server
+ */
+export const fetchAllServerSubmissions = async (): Promise<ExamSubmissionPayload[]> => {
+  try {
+    const res = await fetch('/api/submissions');
+    if (res.ok) {
+      const list = await res.json();
+      if (Array.isArray(list)) return list;
+    }
+  } catch {}
+  return [];
 };
 
 /**

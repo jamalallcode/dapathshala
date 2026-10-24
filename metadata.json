@@ -1,5 +1,5 @@
 {
-  "name": "Remix dapathshala v9",
+  "name": "dapathshala v10",
   "description": "ছাত্র, কোচিং সেন্টার, অভিভাবক এবং প্রার্থীদের জন্য একটি ব্যাপক শিক্ষামূলক প্ল্যাটফর্ম, যেখানে পরীক্ষা ব্যবস্থাপনা এবং নোট বিক্রির সুবিধা রয়েছে।",
   "requestFramePermissions": [
     "geolocation"
