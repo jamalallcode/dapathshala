@@ -273,9 +273,9 @@ export const Navigation: React.FC<NavigationProps> = ({
     const handleNewNotif = (e: any) => {
       const notif = e.detail;
       if (notif) {
-        const isEvalRequest = notif.title?.includes('খাতা জমা') || notif.message?.includes('মূল্যায়ন করতে');
-        if (isEvalRequest && !isParentUser) return;
-        playAudioChime();
+        if (isParentContext) {
+          playAudioChime();
+        }
         setNotifications(prev => [
           notif,
           ...prev.filter(n => n.id !== notif.id && n.examId !== notif.examId)
@@ -292,22 +292,21 @@ export const Navigation: React.FC<NavigationProps> = ({
     const pollInterval = setInterval(syncNotifs, 1500);
 
     const unsubscribe = subscribeToExamSubmissions((newSub: ExamSubmissionPayload) => {
-      // Only parents/guardians/admins should receive "নতুন খাতা জমা পড়েছে" evaluation alerts!
-      if (!isParentUser) return;
-
-      playAudioChime();
+      if (isParentContext) {
+        playAudioChime();
+      }
       const examKey = newSub.id || newSub.examId || (newSub as any).pin;
       const notifItem = {
-        id: 'notif_' + Date.now(),
+        id: 'notif_sub_' + examKey,
         title: 'নতুন খাতা জমা পড়েছে!',
-        message: `${newSub.studentName || 'সন্তান'} "${newSub.title || newSub.subject}" পরীক্ষা সম্পন্ন করেছে ও খাতা জমা দিয়েছে।`,
-        time: 'আজ, এইমাত্র',
+        message: `${newSub.studentName || 'আরাফাত রহমান'} "${newSub.title || newSub.subject}" পরীক্ষার খাতা জমা দিয়েছে। খাতা মূল্যায়ন করতে এখানে ক্লিক করুন।`,
+        time: newSub.submittedAt || 'আজ, এইমাত্র',
         read: false,
         examId: examKey
       };
       setNotifications(prev => [
         notifItem,
-        ...prev.filter(n => n.examId !== examKey && (!newSub.examId || n.examId !== newSub.examId))
+        ...prev.filter(n => n.id !== notifItem.id && n.examId !== examKey)
       ]);
     });
 
@@ -322,11 +321,18 @@ export const Navigation: React.FC<NavigationProps> = ({
       clearInterval(pollInterval);
       unsubscribe();
     };
-  }, [user?.role]);
+  }, [user?.role, activeTab]);
 
-  const isParentUser = user?.role === 'parent' || user?.role === 'guardian' || user?.role === 'admin';
+  const isParentContext = 
+    activeTab === 'parent-dashboard' || 
+    activeTab === 'proctoring' || 
+    user?.role === 'parent' || 
+    user?.role === 'guardian' || 
+    user?.role === 'admin';
 
-  // Visible notifications filtered strictly according to user role
+  // Visible notifications filtered strictly:
+  // Evaluation requests ("নতুন খাতা জমা পড়েছে") are visible in the Parent Dashboard or to Parents/Guardians/Admins.
+  // They are strictly filtered OUT in the Student's Dashboard!
   const visibleNotifications = notifications.filter(item => {
     const isEvaluationRequest = 
       item.title?.includes('খাতা জমা') || 
@@ -334,8 +340,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       item.message?.includes('খাতা দেখতে');
 
     if (isEvaluationRequest) {
-      // Evaluation requests are strictly for parents/guardians/admins
-      return isParentUser;
+      return isParentContext;
     }
 
     // Student-specific notifications (results, challenges, assignments)
@@ -555,7 +560,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                               setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n));
                               setIsNotificationOpen(false);
 
-                              if (isParentUser) {
+                              if (isParentContext) {
                                 try {
                                   sessionStorage.setItem('dapathshala_pending_eval_id', targetExamId);
                                 } catch {}
@@ -595,7 +600,7 @@ export const Navigation: React.FC<NavigationProps> = ({
                                 </div>
                               </div>
                               <p className="text-xs text-slate-600 leading-snug line-clamp-2">{item.message}</p>
-                              {isParentUser ? (
+                              {isParentContext ? (
                                 <span className="inline-block text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-indigo-200">
                                   খাতা মূল্যায়ন করতে ক্লিক করুন →
                                 </span>
