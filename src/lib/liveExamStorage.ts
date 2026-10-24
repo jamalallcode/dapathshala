@@ -127,8 +127,20 @@ export const saveSharedLiveExam = (exam: SharedLiveExam): void => {
 export const savePublishedMarksheet = (marksheet: any): void => {
   if (!marksheet) return;
   try {
-    const examId = marksheet.id || marksheet.examId;
+    const examId = marksheet.id || marksheet.examId || 'test-101';
     const pin = marksheet.pin;
+    const comment = (marksheet.parentComment || marksheet.parentFeedback || '').trim() || null;
+
+    const enriched = {
+      ...marksheet,
+      id: examId,
+      examId: marksheet.examId || examId,
+      isPublished: true,
+      status: 'reviewed',
+      parentComment: comment,
+      parentFeedback: comment,
+      publishedAt: marksheet.publishedAt || new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }) + ', আজ'
+    };
 
     // 1. Update dapathshala_parent_assigned_tests in localStorage
     try {
@@ -141,11 +153,6 @@ export const savePublishedMarksheet = (marksheet: any): void => {
         (examId === 'test-101' && (t.id === 'demo_exam_01' || t.examId === 'test-101'))
       );
       let updatedTests: any[];
-      const enriched = {
-        ...marksheet,
-        isPublished: true,
-        status: 'reviewed'
-      };
       if (idx >= 0) {
         updatedTests = [...allTests];
         updatedTests[idx] = { ...updatedTests[idx], ...enriched };
@@ -161,19 +168,12 @@ export const savePublishedMarksheet = (marksheet: any): void => {
     try {
       const rawMap = localStorage.getItem(PUBLISHED_MAP_KEY);
       const pubMap: Record<string, any> = rawMap ? JSON.parse(rawMap) : {};
-      const enriched = {
-        ...marksheet,
-        isPublished: true,
-        status: 'reviewed'
-      };
       if (examId) pubMap[examId] = enriched;
       if (marksheet.examId) pubMap[marksheet.examId] = enriched;
       if (marksheet.id) pubMap[marksheet.id] = enriched;
       if (pin) pubMap[pin] = enriched;
-      if (examId === 'demo_exam_01' || examId === 'test-101' || marksheet.examId === 'demo_exam_01' || marksheet.examId === 'test-101') {
-        pubMap['demo_exam_01'] = enriched;
-        pubMap['test-101'] = enriched;
-      }
+      pubMap['demo_exam_01'] = enriched;
+      pubMap['test-101'] = enriched;
       localStorage.setItem(PUBLISHED_MAP_KEY, JSON.stringify(pubMap));
     } catch (e) {
       console.warn('Error saving to PUBLISHED_MAP_KEY:', e);
@@ -181,11 +181,7 @@ export const savePublishedMarksheet = (marksheet: any): void => {
 
     // 3. Update dapathshala_last_published_marksheet
     try {
-      localStorage.setItem(LAST_PUBLISHED_KEY, JSON.stringify({
-        ...marksheet,
-        isPublished: true,
-        status: 'reviewed'
-      }));
+      localStorage.setItem(LAST_PUBLISHED_KEY, JSON.stringify(enriched));
     } catch {}
 
     // 4. Update dapathshala_live_exams storage
@@ -211,23 +207,21 @@ export const savePublishedMarksheet = (marksheet: any): void => {
         totalScoreObtained: marksheet.totalScoreObtained,
         totalPossible: marksheet.totalPossible,
         aiFeedback: marksheet.aiFeedback,
-        parentComment: marksheet.parentComment,
-        parentFeedback: marksheet.parentComment || marksheet.parentFeedback,
+        parentComment: comment,
+        parentFeedback: comment,
         aiDetailedMarking: marksheet.aiDetailedMarking,
         manualGrades: marksheet.manualGrades,
         answers: marksheet.answers,
         handwrittenImages: marksheet.handwrittenImages,
-        publishedAt: marksheet.publishedAt || new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }) + ', আজ'
+        publishedAt: enriched.publishedAt
       };
 
       liveExams[examId] = updatedLiveExam;
       if (marksheet.examId && marksheet.examId !== examId) {
         liveExams[marksheet.examId] = updatedLiveExam;
       }
-      if (examId === 'demo_exam_01' || examId === 'test-101') {
-        liveExams['demo_exam_01'] = updatedLiveExam;
-        liveExams['test-101'] = updatedLiveExam;
-      }
+      liveExams['demo_exam_01'] = updatedLiveExam;
+      liveExams['test-101'] = updatedLiveExam;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(liveExams));
     } catch (e) {
       console.warn('Error updating dapathshala_live_exams:', e);
@@ -239,7 +233,8 @@ export const savePublishedMarksheet = (marksheet: any): void => {
         id: examId,
         examId: marksheet.examId || examId,
         pin,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        marksheet: enriched
       }));
     } catch {}
 
@@ -248,11 +243,7 @@ export const savePublishedMarksheet = (marksheet: any): void => {
       try {
         syncChannel.postMessage({
           type: 'marksheet_published',
-          marksheet: {
-            ...marksheet,
-            isPublished: true,
-            status: 'reviewed'
-          }
+          marksheet: enriched
         });
       } catch {}
     }
@@ -261,11 +252,7 @@ export const savePublishedMarksheet = (marksheet: any): void => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('dapathshala_marksheet_published', { 
-          detail: {
-            ...marksheet,
-            isPublished: true,
-            status: 'reviewed'
-          }
+          detail: enriched
         })
       );
     }
@@ -279,17 +266,33 @@ export const getPublishedMarksheet = (idOrPin?: string | null): any | null => {
   const key = idOrPin ? idOrPin.trim() : '';
 
   try {
+    let urlId = '';
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      urlId = (urlParams.get('id') || urlParams.get('examId') || urlParams.get('pin') || '').trim();
+    } catch {}
+
+    const searchKeys = [key, urlId].filter(Boolean) as string[];
+
     // 1. Check PUBLISHED_MAP_KEY
     const rawMap = localStorage.getItem(PUBLISHED_MAP_KEY);
     if (rawMap) {
       const pubMap = JSON.parse(rawMap);
-      if (key && pubMap[key] && (pubMap[key].isPublished || pubMap[key].status === 'reviewed')) {
-        return pubMap[key];
+      for (const k of searchKeys) {
+        if (pubMap[k] && (pubMap[k].isPublished || pubMap[k].status === 'reviewed')) {
+          return pubMap[k];
+        }
+        const pinMap = getPinMappings();
+        const resolvedId = pinMap[k];
+        if (resolvedId && pubMap[resolvedId] && (pubMap[resolvedId].isPublished || pubMap[resolvedId].status === 'reviewed')) {
+          return pubMap[resolvedId];
+        }
       }
-      const pinMap = getPinMappings();
-      const resolvedId = pinMap[key];
-      if (resolvedId && pubMap[resolvedId] && (pubMap[resolvedId].isPublished || pubMap[resolvedId].status === 'reviewed')) {
-        return pubMap[resolvedId];
+      if (pubMap['test-101'] && (pubMap['test-101'].isPublished || pubMap['test-101'].status === 'reviewed')) {
+        return pubMap['test-101'];
+      }
+      if (pubMap['demo_exam_01'] && (pubMap['demo_exam_01'].isPublished || pubMap['demo_exam_01'].status === 'reviewed')) {
+        return pubMap['demo_exam_01'];
       }
     }
 
@@ -299,17 +302,17 @@ export const getPublishedMarksheet = (idOrPin?: string | null): any | null => {
       const tests = JSON.parse(rawAssigned);
       if (Array.isArray(tests)) {
         const match = tests.find((t: any) => 
-          (t.isPublished === true || t.status === 'reviewed') && (
-            (key && (t.id === key || t.examId === key || t.pin === key)) ||
-            (key === 'demo_exam_01' && (t.id === 'test-101' || t.examId === 'demo_exam_01')) ||
+          (t.isPublished === true || t.status === 'reviewed' || !!t.parentComment || !!t.parentFeedback) && (
+            searchKeys.some(k => t.id === k || t.examId === k || t.pin === k) ||
+            ((key === 'demo_exam_01' || !key) && (t.id === 'test-101' || t.examId === 'demo_exam_01')) ||
             (key === 'test-101' && (t.id === 'demo_exam_01' || t.examId === 'test-101'))
           )
         );
         if (match) return match;
 
-        // If generic/demo ID, check any reviewed test
+        // Fallback to any reviewed test if on demo/generic
         if (!key || key === 'demo_exam_01' || key === 'test-101') {
-          const anyReviewed = tests.find((t: any) => t.isPublished === true || t.status === 'reviewed');
+          const anyReviewed = tests.find((t: any) => t.isPublished === true || t.status === 'reviewed' || !!t.parentComment || !!t.parentFeedback);
           if (anyReviewed) return anyReviewed;
         }
       }
@@ -319,18 +322,18 @@ export const getPublishedMarksheet = (idOrPin?: string | null): any | null => {
     const rawLast = localStorage.getItem(LAST_PUBLISHED_KEY);
     if (rawLast) {
       const last = JSON.parse(rawLast);
-      if (last && (last.isPublished || last.status === 'reviewed')) {
-        if (!key || key === 'demo_exam_01' || key === 'test-101' || last.id === key || last.examId === key || last.pin === key) {
+      if (last && (last.isPublished || last.status === 'reviewed' || !!last.parentComment || !!last.parentFeedback)) {
+        if (!key || key === 'demo_exam_01' || key === 'test-101' || searchKeys.some(k => last.id === k || last.examId === k || last.pin === k)) {
           return last;
         }
       }
     }
 
     // 4. Check dapathshala_live_exams
-    if (key) {
+    for (const k of searchKeys) {
       const allLive = getAllSharedLiveExams();
-      if (allLive[key] && (allLive[key].isPublished || allLive[key].status === 'reviewed')) {
-        return allLive[key];
+      if (allLive[k] && (allLive[k].isPublished || allLive[k].status === 'reviewed' || !!allLive[k].parentComment || !!allLive[k].parentFeedback)) {
+        return allLive[k];
       }
     }
   } catch (err) {
@@ -353,8 +356,19 @@ export const subscribeToPublishedMarksheet = (callback: (marksheet: any) => void
   };
 
   const handleStorage = (event: StorageEvent) => {
-    if (event.key === 'dapathshala_marksheet_pub_sync' || event.key === LAST_PUBLISHED_KEY || event.key === 'dapathshala_parent_assigned_tests') {
-      const latest = getPublishedMarksheet();
+    if (event.key === 'dapathshala_marksheet_pub_sync' || event.key === LAST_PUBLISHED_KEY || event.key === 'dapathshala_parent_assigned_tests' || event.key === PUBLISHED_MAP_KEY) {
+      let latest: any = null;
+      if (event.newValue) {
+        try {
+          const parsed = JSON.parse(event.newValue);
+          if (parsed && (parsed.isPublished || parsed.status === 'reviewed' || parsed.parentComment || parsed.parentFeedback)) {
+            latest = parsed.marksheet || parsed;
+          }
+        } catch {}
+      }
+      if (!latest) {
+        latest = getPublishedMarksheet();
+      }
       if (latest) {
         callback(latest);
       }

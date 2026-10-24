@@ -100,7 +100,7 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
       if (!isRetake) {
         // 1. Direct check from published marksheet registry
         const published = getPublishedMarksheet(targetId) || (qId ? getPublishedMarksheet(qId) : null);
-        if (published && (published.isPublished === true || published.status === 'reviewed')) {
+        if (published && (published.isPublished === true || published.status === 'reviewed' || !!published.parentComment || !!published.parentFeedback)) {
           setMatchedSubmission(published);
           if (published.questions && Array.isArray(published.questions) && published.questions.length > 0) {
             foundExam.questions = published.questions;
@@ -121,7 +121,7 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
               (targetId === 'test-101' && (t.id === 'demo_exam_01' || t.examId === 'test-101'))
             );
 
-            if (matched && (matched.status === 'submitted' || matched.status === 'reviewed' || matched.isPublished === true)) {
+            if (matched && (matched.status === 'submitted' || matched.status === 'reviewed' || matched.isPublished === true || !!matched.parentComment || !!matched.parentFeedback)) {
               setMatchedSubmission(matched);
               if (matched.questions && Array.isArray(matched.questions) && matched.questions.length > 0) {
                 foundExam.questions = matched.questions;
@@ -155,7 +155,7 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
         (qId && (marksheet.id === qId || marksheet.examId === qId)) ||
         (targetId === 'demo_exam_01' && (marksheet.id === 'test-101' || marksheet.examId === 'demo_exam_01')) ||
         (targetId === 'test-101' && (marksheet.id === 'demo_exam_01' || marksheet.examId === 'test-101')) ||
-        (!targetId && marksheet.isPublished);
+        marksheet.isPublished === true;
 
       if (isMatch) {
         setMatchedSubmission(marksheet);
@@ -194,7 +194,7 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
       duration: selectedDuration,
       date: new Date().toISOString(),
       totalMarks: examData.totalMarks || examData.questions.length,
-      isPublished: matchedSubmission?.isPublished === true || matchedSubmission?.status === 'reviewed'
+      isPublished: matchedSubmission?.isPublished === true || matchedSubmission?.status === 'reviewed' || !!matchedSubmission?.parentComment || !!matchedSubmission?.parentFeedback
     };
 
     return (
@@ -203,6 +203,7 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
         questions={examData.questions}
         studentName={studentName || examData.childName || 'আরাফাত রহমান'}
         childId="child_1"
+        initialSubmission={matchedSubmission}
         onClose={() => {
           setIsExamStarted(false);
           if (onExit) onExit();

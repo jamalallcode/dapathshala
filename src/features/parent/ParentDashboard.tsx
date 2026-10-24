@@ -1075,18 +1075,25 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
     });
 
     const finalPercent = maxPossible > 0 ? Math.round((totalScoreObtained / maxPossible) * 100) : 0;
+    const comment = manualParentFeedback && manualParentFeedback.trim() ? manualParentFeedback.trim() : null;
 
     const updated = {
       ...evaluationModalTest,
       evaluationMode: 'manual' as const,
       score: finalPercent,
+      totalScoreObtained,
+      totalPossible: maxPossible,
       manualGrades,
-      parentComment: manualParentFeedback && manualParentFeedback.trim() ? manualParentFeedback.trim() : null
+      parentComment: comment,
+      parentFeedback: comment,
+      status: 'reviewed',
+      isPublished: true
     };
 
     setEvaluationModalTest(updated);
     setAssignedTests(prev => prev.map(t => (t.id === updated.id || t.id === updated.examId) ? updated : t));
-    setAlertSuccess('অভিভাবকের নিজস্ব মূল্যায়ন ও প্রতিটি প্রশ্নের নম্বর সফলভাবে সংরক্ষিত হয়েছে!');
+    savePublishedMarksheet(updated);
+    setAlertSuccess('অভিভাবকের নিজস্ব মূল্যায়ন ও প্রতিটি প্রশ্নের নম্বর সফলভাবে সংরক্ষিত ও প্রকাশিত হয়েছে!');
     setTimeout(() => setAlertSuccess(null), 4000);
     setEvaluationModalTest(null);
   };
@@ -1222,9 +1229,17 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
     }
 
     const finalPercent = maxPossible > 0 ? Math.round((totalObtained / maxPossible) * 100) : 0;
+    const comment = manualParentFeedback && manualParentFeedback.trim() 
+      ? manualParentFeedback.trim() 
+      : (evaluationModalTest.parentComment || evaluationModalTest.parentFeedback || null);
+
+    const targetId = evaluationModalTest.id || evaluationModalTest.examId || 'test-101';
+    const targetExamId = evaluationModalTest.examId || evaluationModalTest.id || 'test-101';
 
     const publishedTest = {
       ...evaluationModalTest,
+      id: targetId,
+      examId: targetExamId,
       status: 'reviewed',
       isPublished: true,
       publishedAt: new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit' }) + ', আজ',
@@ -1233,7 +1248,8 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
       totalPossible: maxPossible,
       evaluationMode: isAIMode ? 'ai' : 'manual',
       aiFeedback: evaluationModalTest.aiFeedback || null,
-      parentComment: manualParentFeedback && manualParentFeedback.trim() ? manualParentFeedback.trim() : null,
+      parentComment: comment,
+      parentFeedback: comment,
       manualGrades: !isAIMode ? manualGrades : undefined,
       aiDetailedMarking: isAIMode ? evaluationModalTest.aiDetailedMarking : undefined
     };

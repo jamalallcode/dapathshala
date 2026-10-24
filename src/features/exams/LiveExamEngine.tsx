@@ -40,6 +40,7 @@ interface LiveExamEngineProps {
   childId?: string;
   onClose: () => void;
   onFinish?: (result: ExamResult) => void;
+  initialSubmission?: any;
 }
 
 export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({ 
@@ -48,14 +49,55 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   studentName = 'আরাফাত রহমান', 
   childId = 'child_1', 
   onClose, 
-  onFinish 
+  onFinish,
+  initialSubmission
 }) => {
   const activeQuestions = questions && questions.length > 0 ? questions : QUESTIONS;
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [answers, setAnswers] = useState<Record<string, number>>(() => initialSubmission?.answers || {});
   const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
-  const [isFinished, setIsFinished] = useState(false);
-  const [result, setResult] = useState<ExamResult | null>(null);
+
+  const isInitialReviewedOrSubmitted = !!(
+    initialSubmission && (
+      initialSubmission.status === 'reviewed' || 
+      initialSubmission.status === 'submitted' || 
+      initialSubmission.isPublished === true ||
+      initialSubmission.parentComment ||
+      initialSubmission.parentFeedback
+    )
+  );
+
+  const [isFinished, setIsFinished] = useState(isInitialReviewedOrSubmitted);
+  const [result, setResult] = useState<ExamResult | null>(() => {
+    if (!initialSubmission) return null;
+    const qList = (initialSubmission.questions && Array.isArray(initialSubmission.questions) && initialSubmission.questions.length > 0)
+      ? initialSubmission.questions
+      : activeQuestions;
+    const totalQ = qList.length;
+    let correctCount = 0;
+    if (initialSubmission.totalScoreObtained !== undefined) {
+      correctCount = Number(initialSubmission.totalScoreObtained);
+    } else {
+      qList.forEach((q: any) => {
+        if (initialSubmission.answers && initialSubmission.answers[q.id] === q.correctAnswer) {
+          correctCount++;
+        }
+      });
+    }
+    const scoreVal = initialSubmission.score !== undefined && initialSubmission.score !== null
+      ? Number(initialSubmission.score)
+      : (totalQ > 0 ? (correctCount / totalQ) * 100 : 0);
+    return {
+      examId: exam.id,
+      score: scoreVal,
+      totalQuestions: totalQ,
+      correctAnswers: correctCount,
+      wrongAnswers: Math.max(0, totalQ - correctCount),
+      timeSpent: 0,
+      answers: initialSubmission.answers || {},
+      suspiciousFlags: initialSubmission.redFlagsCount || 0
+    };
+  });
   const [startTime, setStartTime] = useState(Date.now());
 
   // Anti-Cheating / Anti-Proctoring States
@@ -72,12 +114,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
   // Handwritten Upload & Submit Flow States
   const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const [handwrittenImages, setHandwrittenImages] = useState<string[]>([]);
+  const [handwrittenImages, setHandwrittenImages] = useState<string[]>(() => initialSubmission?.handwrittenImages || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionComplete, setSubmissionComplete] = useState(false);
+  const [submissionComplete, setSubmissionComplete] = useState(isInitialReviewedOrSubmitted);
   const [timeExpiredPrompt, setTimeExpiredPrompt] = useState(false);
   const [showFinalMarksheetModal, setShowFinalMarksheetModal] = useState(false);
-  const [existingSubmission, setExistingSubmission] = useState<any>(null);
+  const [existingSubmission, setExistingSubmission] = useState<any>(() => initialSubmission || null);
 
   const hasEnteredFullscreenRef = useRef<boolean>(false);
   const autoAdvanceTimerRef = useRef<any>(null);
@@ -89,17 +131,20 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       const isRetake = urlParams?.get('retake') === 'true' || urlParams?.get('retake') === '1';
       if (isRetake) return;
 
+      const urlId = (urlParams?.get('id') || urlParams?.get('examId') || '').trim();
+
       // 1. Direct check in published marksheet registry
-      let found = getPublishedMarksheet(exam.id);
+      let found = getPublishedMarksheet(exam.id) || (urlId ? getPublishedMarksheet(urlId) : null);
 
       // 2. If not found, check dapathshala_parent_assigned_tests
       if (!found) {
         const raw = localStorage.getItem('dapathshala_parent_assigned_tests');
-        if (raw && exam.id) {
+        if (raw) {
           const tests = JSON.parse(raw);
           found = tests.find((t: any) => 
             t.id === exam.id || 
             t.examId === exam.id ||
+            (urlId && (t.id === urlId || t.examId === urlId)) ||
             (exam.id === 'demo_exam_01' && (t.id === 'test-101' || t.examId === 'demo_exam_01')) ||
             (exam.id === 'test-101' && (t.id === 'demo_exam_01' || t.examId === 'test-101')) ||
             ((exam as any).pin && t.pin === (exam as any).pin)
@@ -171,9 +216,13 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   useEffect(() => {
     const unsubscribe = subscribeToPublishedMarksheet((updatedTest) => {
       if (!updatedTest) return;
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const urlId = (urlParams?.get('id') || urlParams?.get('examId') || '').trim();
+
       const isMatch = 
         updatedTest.id === exam.id || 
         updatedTest.examId === exam.id ||
+        (urlId && (updatedTest.id === urlId || updatedTest.examId === urlId)) ||
         (exam.id === 'demo_exam_01' && (updatedTest.id === 'test-101' || updatedTest.examId === 'demo_exam_01')) ||
         (exam.id === 'test-101' && (updatedTest.id === 'demo_exam_01' || updatedTest.examId === 'test-101')) ||
         ((exam as any).pin && updatedTest.pin === (exam as any).pin) ||
@@ -220,6 +269,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         });
         setIsFinished(true);
         setSubmissionComplete(true);
+
+        setSecurityToast('🎉 অভিভাবক আপনার খাতাটি মূল্যায়ন সম্পন্ন করেছেন এবং নম্বর ও মন্তব্য প্রকাশ করেছেন!');
+        setTimeout(() => setSecurityToast(null), 6000);
       }
     });
 
@@ -616,7 +668,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     const isExamPublished = 
       (exam as any).isPublished === true || 
       existingSubmission?.isPublished === true || 
-      existingSubmission?.status === 'reviewed';
+      existingSubmission?.status === 'reviewed' ||
+      !!existingSubmission?.parentComment ||
+      !!existingSubmission?.parentFeedback;
 
     return (
       <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto">
