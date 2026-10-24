@@ -2964,17 +2964,8 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              onClick={() => handleOpenEvaluationModal(test)}
-                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl shadow-md shadow-indigo-200 transition-all cursor-pointer animate-pulse"
-                              title="উত্তরপত্র মূল্যায়ন করুন"
-                            >
-                              <FileCheck size={14} />
-                              <span>উত্তরপত্র</span>
-                            </button>
-                            <button
-                              type="button"
                               onClick={() => handlePreviewExistingTest(test)}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-all cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-all cursor-pointer"
                               title="প্রশ্নপত্র দেখুন"
                             >
                               <Eye size={13} />
@@ -3062,34 +3053,11 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
 
 
 
-                    {(isSubmitted || isReviewed) && (
-                      <div className="p-4 sm:p-5 bg-slate-50/90 rounded-2xl border border-slate-200/90 space-y-3.5">
-                        {/* Serial Row 1: Evaluation Mode Status */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                          <div className="space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-xs font-black text-slate-800">খাতা মূল্যায়ন মোড:</span>
-                              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                                test.evaluationMode === 'ai' 
-                                  ? 'bg-purple-100 text-purple-800 border border-purple-200' 
-                                  : test.evaluationMode === 'manual'
-                                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                                  : 'bg-amber-100 text-amber-800 border border-amber-200'
-                              }`}>
-                                {test.evaluationMode === 'ai' ? '🤖 এআই দিয়ে মূল্যায়িত' : test.evaluationMode === 'manual' ? '✍️ অভিভাবকের স্বহস্তে মূল্যায়িত' : '⏳ মূল্যায়ন অপেক্ষমান'}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-500">
-                              {safeImages.length > 0 
-                                ? `হাতের লেখা উত্তরপত্র: ${safeImages.length}টি পৃষ্ঠা সংযুক্ত রয়েছে`
-                                : 'ডিজিটাল খাতা জমা পড়েছে'}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Serial Row 3: AI Evaluation Summary (Only after review if feedback exists) */}
-                        {isReviewed && test.aiFeedback && (
-                          <div className="pt-3 border-t border-slate-200/80 text-xs space-y-1">
+                    {/* Reviewed Summary: AI Feedback & Parent Comment (Only after review if feedback exists) */}
+                    {isReviewed && (test.aiFeedback || test.parentComment) && (
+                      <div className="p-4 bg-slate-50/90 rounded-2xl border border-slate-200/90 space-y-3">
+                        {test.aiFeedback && (
+                          <div className="text-xs space-y-1">
                             <span className="font-bold text-slate-800 flex items-center gap-1.5">
                               <Sparkles size={14} className="text-indigo-600" />
                               এআই খাতা মূল্যায়নের সংক্ষিপ্ত ফিডব্যাক:
@@ -3097,10 +3065,8 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                             <p className="text-slate-600 leading-relaxed pl-5">{test.aiFeedback}</p>
                           </div>
                         )}
-
-                        {/* Serial Row 4: Parent Encouraging Comment (Only after review if comment exists) */}
-                        {isReviewed && test.parentComment && (
-                          <div className="pt-3 border-t border-slate-200/80 text-xs space-y-1">
+                        {test.parentComment && (
+                          <div className={`text-xs space-y-1 ${test.aiFeedback ? 'pt-2.5 border-t border-slate-200/80' : ''}`}>
                             <span className="font-bold text-slate-800 flex items-center gap-1.5">
                               <CheckCircle2 size={14} className="text-emerald-600" />
                               আপনার প্রেরিত উৎসাহমূলক মন্তব্য:
@@ -3108,28 +3074,6 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                             <p className="text-slate-700 font-medium pl-5">{test.parentComment}</p>
                           </div>
                         )}
-
-                        {/* Action Button at bottom of block: অস্পষ্ট (dimmed/muted) if already viewed, bright if not yet viewed */}
-                        {(() => {
-                          const isAnswerSheetViewed = test.isViewed || test.hasBeenViewed || test.status === 'reviewed' || test.isPublished;
-                          return (
-                            <div className="pt-3 border-t border-slate-200/80 flex items-center justify-end">
-                              <Button
-                                size="sm"
-                                onClick={() => handleOpenEvaluationModal(test)}
-                                className={`w-full sm:w-auto text-xs px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap transition-all ${
-                                  isAnswerSheetViewed
-                                    ? 'opacity-40 hover:opacity-85 bg-slate-300 hover:bg-slate-400 text-slate-800 border border-slate-400/60 shadow-none font-bold'
-                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-md shadow-indigo-200 animate-pulse'
-                                }`}
-                                title={isAnswerSheetViewed ? 'উত্তরপত্রটি দেখা হয়েছে (ক্লিক করে পুনরায় দেখতে পারেন)' : 'খাতা দেখতে ক্লিক করুন'}
-                              >
-                                <FileCheck size={16} />
-                                <span>উত্তরপত্রটি দেখুন</span>
-                              </Button>
-                            </div>
-                          );
-                        })()}
                       </div>
                     )}
                   </Card>
