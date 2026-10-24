@@ -101,7 +101,16 @@ export const Navigation: React.FC<NavigationProps> = ({
       }
     } catch {}
 
-    return [];
+    return [
+      {
+        id: 'notif_seed_math',
+        title: 'নতুন খাতা জমা পড়েছে!',
+        message: 'আরাফাত রহমান "গণিত সাপ্তাহিক মূল্যায়ন" পরীক্ষার খাতা জমা দিয়েছে। খাতা দেখতে এখানে ক্লিক করুন।',
+        time: 'আজ, সন্ধ্যা ৭:০৫',
+        read: false,
+        examId: 'test-101'
+      }
+    ];
   });
 
   // Audio notification chime

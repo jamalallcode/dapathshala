@@ -95,7 +95,7 @@ const STORAGE_TESTS_KEY = 'dapathshala_parent_assigned_tests';
 
 export const ParentDashboard: React.FC = () => {
   const [activeChild, setActiveChild] = useState('child_1');
-  const [activeTab, setActiveTab] = useState<'overview' | 'assign' | 'review' | 'report' | 'proctoring'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'assign' | 'review' | 'report' | 'proctoring'>('review');
   
   // Controls state
   const [studyModeLock, setStudyModeLock] = useState(true);
@@ -232,8 +232,81 @@ export const ParentDashboard: React.FC = () => {
 
 
 
-  // Default assigned tests: completely empty list to ensure no default questions or tests auto-generate
-  const DEFAULT_ASSIGNED_TESTS: any[] = [];
+  // Default assigned tests with initial submitted test matching screenshots
+  const DEFAULT_ASSIGNED_TESTS: any[] = [
+    {
+      id: 'test-101',
+      examId: 'test-101',
+      pin: '482910',
+      title: 'গণিত সাপ্তাহিক মূল্যায়ন',
+      subject: 'গণিত',
+      chapter: 'বীজগণিত ও সমীকরণ',
+      duration: 30,
+      totalMarks: 5,
+      childId: 'child_1',
+      studentName: 'আরাফাত রহমান',
+      status: 'submitted',
+      isSubmitted: true,
+      isViewed: false, // Initially false so button is bright; once viewed, turns dim/muted!
+      submittedAt: 'আজ, সন্ধ্যা ৭:০৫',
+      score: 4,
+      evaluationMode: 'ai',
+      answers: {
+        'q_1': 0,
+        'q_2': 1,
+        'q_3': 0,
+        'q_4': 0,
+        'q_5': 0
+      },
+      questions: [
+        {
+          id: 'q_1',
+          question: '(a + b)² এর সঠিক সম্প্রসারিত রূপ কোনটি?',
+          text: '(a + b)² এর সঠিক সম্প্রসারিত রূপ কোনটি?',
+          options: ['a² + 2ab + b²', 'a² - 2ab + b²', 'a² + b²', 'a² + ab + b²'],
+          correctAnswer: 0,
+          marks: 1,
+          explanation: 'বর্গের সম্প্রসারণ সূত্র: (a + b)² = a² + 2ab + b²'
+        },
+        {
+          id: 'q_2',
+          question: 'যদি x + 1/x = 4 হয়, তবে x² + 1/x² এর মান কত?',
+          text: 'যদি x + 1/x = 4 হয়, তবে x² + 1/x² এর মান কত?',
+          options: ['16', '14', '18', '12'],
+          correctAnswer: 1,
+          marks: 1,
+          explanation: 'x² + 1/x² = (x + 1/x)² - 2 = 16 - 2 = 14'
+        },
+        {
+          id: 'q_3',
+          question: 'একটি দ্বিঘাত সমীকরণের সর্বোচ্চ ঘাত কত?',
+          text: 'একটি দ্বিঘাত সমীকরণের সর্বোচ্চ ঘাত কত?',
+          options: ['১', '২', '৩', '৪'],
+          correctAnswer: 1,
+          marks: 1,
+          explanation: 'দ্বিঘাত সমীকরণে চলের সর্বোচ্চ ঘাত সর্বদা ২ হয়।'
+        },
+        {
+          id: 'q_4',
+          question: 'দুটি পরস্পর পূরক কোণের সমষ্টি কত?',
+          text: 'দুটি পরস্পর পূরক কোণের সমষ্টি কত?',
+          options: ['৯০°', '১৮০°', '৩৬০°', '৪৫°'],
+          correctAnswer: 0,
+          marks: 1,
+          explanation: 'দুটি কোণের সমষ্টি ৯০° হলে তাদেরকে পরস্পরের পূরক কোণ বলা হয়।'
+        },
+        {
+          id: 'q_5',
+          question: 'বৃত্তের পরিধি ও ব্যাসের অনুপাতকে কী বলে?',
+          text: 'বৃত্তের পরিধি ও ব্যাসের অনুপাতকে কী বলে?',
+          options: ['π (পাই)', 'θ (থিটা)', 'ব্যাসার্ধ', 'জ্যা'],
+          correctAnswer: 0,
+          marks: 1,
+          explanation: 'বৃত্তের পরিধি ও ব্যাসের অনুপাত সর্বদা নির্দিষ্ট ধ্রুবক π (পাই)।'
+        }
+      ]
+    }
+  ];
 
   // Sanitizer helper to guarantee assignedTests is never corrupted
   const sanitizeTestsList = (raw: any): any[] => {
@@ -868,6 +941,28 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
       });
       setManualGrades(initialGrades);
     }
+
+    // Mark test as viewed in assigned tests so the "উত্তরপত্রটি দেখুন" button becomes dimmed/muted
+    const testKey = test.id || test.examId;
+    setAssignedTests(prev => prev.map(t => {
+      const k = t.id || t.examId;
+      if (k === testKey) {
+        return { ...t, isViewed: true, hasBeenViewed: true };
+      }
+      return t;
+    }));
+
+    // Also update notification in localStorage to mark as read
+    try {
+      const storedNotifs = localStorage.getItem('dapathshala_notifications');
+      if (storedNotifs) {
+        const notifs = JSON.parse(storedNotifs);
+        if (Array.isArray(notifs)) {
+          const updated = notifs.map((n: any) => n.examId === testKey ? { ...n, read: true } : n);
+          localStorage.setItem('dapathshala_notifications', JSON.stringify(updated));
+        }
+      }
+    } catch {}
   };
 
   // Open Evaluation Modal immediately when triggered from Navigation notification
@@ -1349,61 +1444,7 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
         )}
       </AnimatePresence>
 
-      {/* Sub Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap cursor-pointer ${
-            activeTab === 'overview' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          ওভারভিউ ও মনিটরিং
-        </button>
-        <button
-          onClick={() => setActiveTab('assign')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'assign' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Send size={16} />
-          পরীক্ষা নির্ধারণ করুন
-        </button>
-        <button
-          onClick={() => setActiveTab('review')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'review' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <FileCheck size={16} />
-          খাতা মূল্যায়ন ও মন্তব্য ({assignedTests.length})
-        </button>
-        <button
-          onClick={() => {
-            setActiveTab('proctoring');
-            handleMarkAllRead();
-          }}
-          className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'proctoring' 
-              ? 'bg-red-600 text-white shadow-md shadow-red-200' 
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <ShieldAlert size={16} className={activeTab === 'proctoring' ? 'text-white' : 'text-red-600'} />
-          লাইভ প্রক্টরিং ও রেড ফ্ল্যাগ
-          {hasUnreadAlerts && (
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-ping inline-block ml-0.5" />
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab('report')}
-          className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap cursor-pointer flex items-center gap-1.5 ${
-            activeTab === 'report' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <Printer size={16} />
-          ডিজিটাল রিপোর্ট কার্ড
-        </button>
-      </div>
+
 
       {/* TAB 1: OVERVIEW */}
       {activeTab === 'overview' && (
@@ -1669,6 +1710,24 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
       {/* TAB 2: ASSIGN TEST - PARENT QUESTION EDITOR & PREVIEW MODULE */}
       {activeTab === 'assign' && (
         <div className="space-y-6">
+          <div className="flex items-center justify-between max-w-3xl mx-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setActiveTab('review');
+                setAssignStep('config');
+              }}
+              className="text-xs font-bold text-slate-700 hover:bg-slate-100 border-slate-300 cursor-pointer flex items-center gap-1.5"
+            >
+              <ArrowLeft size={14} />
+              পূর্বের তালিকায় ফিরে যান
+            </Button>
+            <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-3 py-1 rounded-full border border-indigo-200">
+              {currentChild.name} এর জন্য নতুন পরীক্ষা তৈরি
+            </span>
+          </div>
+
           {/* STEP 1: CONFIGURATION */}
           {assignStep === 'config' && (
             <Card className="p-6 sm:p-8 border-none shadow-xl bg-white max-w-3xl mx-auto space-y-6">
@@ -3100,21 +3159,6 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                           </div>
                         </div>
 
-                        {/* Serial Row 2: Security & Violation Record (Inside same background) */}
-                        {safeViolations.length > 0 && (
-                          <div className="pt-3 border-t border-slate-200/80 space-y-1 text-xs">
-                            <span className="font-bold text-red-600 flex items-center gap-1.5">
-                              <ShieldAlert size={15} />
-                              চিটিং ও সন্দেহজনক কার্যকলাপ রেকর্ড (Supabase Log):
-                            </span>
-                            <ul className="pl-5 list-disc text-slate-700 font-medium space-y-0.5">
-                              {safeViolations.map((vStr: string, vIdx: number) => (
-                                <li key={vIdx}>{vStr}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-
                         {/* Serial Row 3: AI Evaluation Summary (Only after review if feedback exists) */}
                         {isReviewed && test.aiFeedback && (
                           <div className="pt-3 border-t border-slate-200/80 text-xs space-y-1">
@@ -3137,17 +3181,27 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                           </div>
                         )}
 
-                        {/* Serial Row 5: Action Button at bottom of block (১ম নির্দেশ: 'উত্তরপত্রটি দেখুন' ব্লকটির নিচে থাকবে) */}
-                        <div className="pt-3 border-t border-slate-200/80 flex items-center justify-end">
-                          <Button
-                            size="sm"
-                            onClick={() => handleOpenEvaluationModal(test)}
-                            className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-md shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
-                          >
-                            <FileCheck size={16} />
-                            উত্তরপত্রটি দেখুন
-                          </Button>
-                        </div>
+                        {/* Action Button at bottom of block: অস্পষ্ট (dimmed/muted) if already viewed, bright if not yet viewed */}
+                        {(() => {
+                          const isAnswerSheetViewed = test.isViewed || test.hasBeenViewed || test.status === 'reviewed' || test.isPublished;
+                          return (
+                            <div className="pt-3 border-t border-slate-200/80 flex items-center justify-end">
+                              <Button
+                                size="sm"
+                                onClick={() => handleOpenEvaluationModal(test)}
+                                className={`w-full sm:w-auto text-xs px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap transition-all ${
+                                  isAnswerSheetViewed
+                                    ? 'opacity-40 hover:opacity-85 bg-slate-300 hover:bg-slate-400 text-slate-800 border border-slate-400/60 shadow-none font-bold'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white font-black shadow-md shadow-indigo-200 animate-pulse'
+                                }`}
+                                title={isAnswerSheetViewed ? 'উত্তরপত্রটি দেখা হয়েছে (ক্লিক করে পুনরায় দেখতে পারেন)' : 'খাতা দেখতে ক্লিক করুন'}
+                              >
+                                <FileCheck size={16} />
+                                <span>উত্তরপত্রটি দেখুন</span>
+                              </Button>
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </Card>
@@ -3886,19 +3940,19 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                 </Button>
               </div>
 
-              {/* MARKED SECTION FROM IMAGE 3: Displays how many marks the child got + Publish button */}
-              <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto justify-end">
-                {/* Child's Live Score Card */}
+              {/* MARKED SECTION FROM IMAGE 1: Unified single combined block for live score & publish marksheet button */}
+              <div className="w-full sm:w-auto bg-gradient-to-r from-indigo-50/95 via-indigo-100/80 to-indigo-50/95 border-2 border-indigo-200/90 rounded-2xl p-2 sm:p-2.5 shadow-sm flex flex-col sm:flex-row items-center gap-3">
+                {/* Child's Live Score inside this block */}
                 {(() => {
                   const scoreInfo = getLiveEvaluationScore();
                   return (
-                    <div className="w-full sm:w-auto bg-indigo-50/90 border-2 border-indigo-200 rounded-2xl px-3.5 py-2 flex items-center justify-between sm:justify-end gap-3 shadow-xs">
+                    <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto px-1">
                       <div className="text-left sm:text-right">
-                        <div className="text-[10px] font-bold text-indigo-900 uppercase tracking-wide flex items-center sm:justify-end gap-1">
+                        <div className="text-[10px] font-bold text-indigo-900 uppercase tracking-wide flex items-center gap-1">
                           <Trophy size={13} className="text-amber-500 fill-amber-400" />
                           <span>সন্তানের মোট প্রাপ্ত মার্কস:</span>
                         </div>
-                        <div className="text-lg sm:text-xl font-black text-slate-900 flex items-center sm:justify-end gap-1.5 leading-tight">
+                        <div className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-1.5 leading-tight">
                           <span className="text-indigo-600 font-extrabold">{scoreInfo.obtained}</span>
                           <span className="text-slate-400 text-xs font-bold">/ {scoreInfo.max}</span>
                           <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ml-1 ${
@@ -3913,12 +3967,12 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                         </div>
                       </div>
 
-                      <div className="hidden sm:block text-[10px] text-slate-500 border-l border-indigo-200 pl-2.5 text-left">
-                        <div className="flex items-center gap-1 text-emerald-700 font-bold">
+                      <div className="text-[10px] text-slate-500 border-l border-indigo-200 pl-2.5 text-left">
+                        <div className="flex items-center gap-1 text-emerald-700 font-bold whitespace-nowrap">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                           সঠিক: {scoreInfo.correctCount}টি
                         </div>
-                        <div className="flex items-center gap-1 text-rose-700 font-bold">
+                        <div className="flex items-center gap-1 text-rose-700 font-bold whitespace-nowrap">
                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
                           ভুল: {scoreInfo.wrongCount}টি
                         </div>
@@ -3927,10 +3981,10 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
                   );
                 })()}
 
-                {/* Publish Marksheet Button */}
+                {/* Publish Marksheet Button inside the SAME single block */}
                 <Button
                   onClick={handleFinalSubmitAndPublish}
-                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs sm:text-sm px-6 py-3 rounded-2xl shadow-lg shadow-indigo-300/40 flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99]"
+                  className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs sm:text-sm px-6 py-2.5 rounded-xl shadow-md shadow-indigo-300/40 flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] shrink-0"
                 >
                   <CheckCircle2 size={18} className="stroke-[2.5]" />
                   <span>ফাইনাল সাবমিট ও ফলাফল প্রকাশ করুন (Publish Marksheet)</span>
