@@ -273,6 +273,8 @@ export const Navigation: React.FC<NavigationProps> = ({
     const handleNewNotif = (e: any) => {
       const notif = e.detail;
       if (notif) {
+        const isEvalRequest = notif.title?.includes('খাতা জমা') || notif.message?.includes('মূল্যায়ন করতে');
+        if (isEvalRequest && !isParentUser) return;
         playAudioChime();
         setNotifications(prev => [
           notif,
@@ -290,6 +292,9 @@ export const Navigation: React.FC<NavigationProps> = ({
     const pollInterval = setInterval(syncNotifs, 1500);
 
     const unsubscribe = subscribeToExamSubmissions((newSub: ExamSubmissionPayload) => {
+      // Only parents/guardians/admins should receive "নতুন খাতা জমা পড়েছে" evaluation alerts!
+      if (!isParentUser) return;
+
       playAudioChime();
       const examKey = newSub.id || newSub.examId || (newSub as any).pin;
       const notifItem = {
@@ -317,9 +322,27 @@ export const Navigation: React.FC<NavigationProps> = ({
       clearInterval(pollInterval);
       unsubscribe();
     };
-  }, []);
+  }, [user?.role]);
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const isParentUser = user?.role === 'parent' || user?.role === 'guardian' || user?.role === 'admin';
+
+  // Visible notifications filtered strictly according to user role
+  const visibleNotifications = notifications.filter(item => {
+    const isEvaluationRequest = 
+      item.title?.includes('খাতা জমা') || 
+      item.message?.includes('মূল্যায়ন করতে') || 
+      item.message?.includes('খাতা দেখতে');
+
+    if (isEvaluationRequest) {
+      // Evaluation requests are strictly for parents/guardians/admins
+      return isParentUser;
+    }
+
+    // Student-specific notifications (results, challenges, assignments)
+    return true;
+  });
+
+  const unreadCount = visibleNotifications.filter(n => !n.read).length;
 
   const toggleSidebar = (forcedState?: boolean) => {
     if (typeof forcedState === 'boolean') {
@@ -494,15 +517,21 @@ export const Navigation: React.FC<NavigationProps> = ({
                       <div className="flex items-center gap-2">
                         {unreadCount > 0 && (
                           <button
-                            onClick={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
+                            onClick={() => {
+                              const visibleIds = new Set(visibleNotifications.map(n => n.id));
+                              setNotifications(prev => prev.map(n => visibleIds.has(n.id) ? { ...n, read: true } : n));
+                            }}
                             className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
                           >
                             সব পড়া হয়েছে
                           </button>
                         )}
-                        {notifications.length > 0 && (
+                        {visibleNotifications.length > 0 && (
                           <button
-                            onClick={() => setNotifications([])}
+                            onClick={() => {
+                              const visibleIds = new Set(visibleNotifications.map(n => n.id));
+                              setNotifications(prev => prev.filter(n => !visibleIds.has(n.id)));
+                            }}
                             className="text-[11px] font-bold text-slate-400 hover:text-red-600 cursor-pointer"
                           >
                             সব মুছুন
@@ -513,27 +542,32 @@ export const Navigation: React.FC<NavigationProps> = ({
 
                     {/* Notification List */}
                     <div className="overflow-y-auto divide-y divide-slate-100 p-2 space-y-1">
-                      {notifications.length === 0 ? (
+                      {visibleNotifications.length === 0 ? (
                         <div className="p-6 text-center text-xs text-slate-400 font-semibold">
                           কোনো নতুন বিজ্ঞপ্তি নেই
                         </div>
                       ) : (
-                        notifications.map((item) => (
+                        visibleNotifications.map((item) => (
                           <div
                             key={item.id}
                             onClick={() => {
                               const targetExamId = item.examId || 'test-101';
-                              try {
-                                sessionStorage.setItem('dapathshala_pending_eval_id', targetExamId);
-                              } catch {}
-                              setActiveTab('parent-dashboard');
-                              setIsNotificationOpen(false);
                               setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n));
-                              setTimeout(() => {
-                                window.dispatchEvent(new CustomEvent('dapathshala_open_evaluation', {
-                                  detail: { examId: targetExamId }
-                                }));
-                              }, 50);
+                              setIsNotificationOpen(false);
+
+                              if (isParentUser) {
+                                try {
+                                  sessionStorage.setItem('dapathshala_pending_eval_id', targetExamId);
+                                } catch {}
+                                setActiveTab('parent-dashboard');
+                                setTimeout(() => {
+                                  window.dispatchEvent(new CustomEvent('dapathshala_open_evaluation', {
+                                    detail: { examId: targetExamId }
+                                  }));
+                                }, 50);
+                              } else {
+                                setActiveTab('exams');
+                              }
                             }}
                             className={`p-3 rounded-2xl transition-all cursor-pointer flex items-start gap-3 ${
                               item.read ? 'hover:bg-slate-50 opacity-80' : 'bg-indigo-50/60 hover:bg-indigo-50'
@@ -561,9 +595,15 @@ export const Navigation: React.FC<NavigationProps> = ({
                                 </div>
                               </div>
                               <p className="text-xs text-slate-600 leading-snug line-clamp-2">{item.message}</p>
-                              <span className="inline-block text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-indigo-200">
-                                খাতা মূল্যায়ন করতে ক্লিক করুন →
-                              </span>
+                              {isParentUser ? (
+                                <span className="inline-block text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-indigo-200">
+                                  খাতা মূল্যায়ন করতে ক্লিক করুন →
+                                </span>
+                              ) : (
+                                <span className="inline-block text-[10px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded-md border border-emerald-200">
+                                  পরীক্ষা দেখতে ক্লিক করুন →
+                                </span>
+                              )}
                             </div>
                           </div>
                         ))

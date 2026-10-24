@@ -2926,39 +2926,6 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
 
                       {/* Right Header Controlling Options */}
                       <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
-                        {/* 1. Prominent "উত্তরপত্র" Button - ALWAYS present as requested */}
-                        {isSubmitted ? (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEvaluationModal(test)}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white text-xs font-black rounded-xl shadow-md shadow-indigo-200 transition-all cursor-pointer animate-pulse border border-indigo-400/40"
-                            title="শিক্ষার্থীর জমা দেওয়া খাতা ও উত্তরপত্র মূল্যায়ন করুন"
-                          >
-                            <FileCheck size={16} />
-                            <span>উত্তরপত্র মূল্যায়ন করুন</span>
-                          </button>
-                        ) : isReviewed ? (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEvaluationModal(test)}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 transition-all cursor-pointer shadow-xs"
-                            title="মূল্যায়িত খাতা ও উত্তরপত্র দেখুন"
-                          >
-                            <FileCheck size={14} />
-                            <span>উত্তরপত্র দেখুন</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenEvaluationModal(test)}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 text-xs font-bold rounded-xl border border-slate-200 transition-all cursor-pointer shadow-xs"
-                            title="উত্তরপত্র দেখুন"
-                          >
-                            <FileCheck size={14} className="text-indigo-600" />
-                            <span>উত্তরপত্র</span>
-                          </button>
-                        )}
-
                         {/* Pending Controls */}
                         {!isReviewed && !isSubmitted && (
                           <div className="flex flex-wrap items-center gap-2">
