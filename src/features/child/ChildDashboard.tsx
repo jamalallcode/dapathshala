@@ -51,24 +51,70 @@ export const ChildDashboard: React.FC = () => {
     window.addEventListener('dapathshala_marksheet_published', handlePublished);
     return () => window.removeEventListener('dapathshala_marksheet_published', handlePublished);
   }, []);
-  const [assignments, setAssignments] = useState<ExamAssignment[]>([
-    {
-      id: 'exam-2',
-      parentId: 'parent-1',
-      childId: 'child-1',
-      subject: 'গণিত',
-      chapter: 'অধ্যায় ৩: পরিমাপ',
-      class: '৮ম',
-      duration: 60,
-      status: 'pending',
-      config: { mcqCount: 20, creativeCount: 5, difficulty: 'hard' }
-    }
-  ]);
+  const [assignments, setAssignments] = useState<any[]>(() => {
+    try {
+      const wasCleared = localStorage.getItem('dapathshala_parent_tests_cleared');
+      if (wasCleared === 'true') {
+        return [];
+      }
+      const saved = localStorage.getItem('dapathshala_parent_assigned_tests');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const pending = parsed.filter((t: any) => t && (t.status === 'pending' || !t.status));
+          return pending;
+        }
+      }
+    } catch {}
+    return [];
+  });
 
-  const [activeExam, setActiveExam] = useState<ExamAssignment | null>(null);
+  const [activeExam, setActiveExam] = useState<any | null>(null);
   const [isLockdown, setIsLockdown] = useState(false);
   const [timeLeft, setTimeLeft] = useState(3600); // 60 mins in seconds
   const [tabSwitchCount, setTabSwitchCount] = useState(0);
+
+  // Sync assigned tests in real time
+  useEffect(() => {
+    const reloadAssignedTests = () => {
+      try {
+        const saved = localStorage.getItem('dapathshala_parent_assigned_tests');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            const pending = parsed.filter((t: any) => t && (t.status === 'pending' || !t.status));
+            setAssignments(pending);
+          }
+        }
+      } catch {}
+    };
+
+    const handleAssigned = (e: any) => {
+      if (e.detail) {
+        try {
+          const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.frequency.setValueAtTime(650, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.25);
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.3);
+        } catch {}
+        reloadAssignedTests();
+      }
+    };
+
+    window.addEventListener('dapathshala_test_assigned', handleAssigned);
+    window.addEventListener('storage', reloadAssignedTests);
+    return () => {
+      window.removeEventListener('dapathshala_test_assigned', handleAssigned);
+      window.removeEventListener('storage', reloadAssignedTests);
+    };
+  }, []);
 
   // Lockdown simulation: Tab change detection
   useEffect(() => {
@@ -97,22 +143,23 @@ export const ChildDashboard: React.FC = () => {
     return () => clearInterval(timer);
   }, [isLockdown, timeLeft]);
 
-  const handleStartExam = (exam: ExamAssignment) => {
+  const handleStartExam = (exam: any) => {
+    const examId = exam.examId || exam.id;
+    if (examId) {
+      // Direct jump to the live exam with exact questions and timer
+      window.location.href = `/exam/live?id=${examId}`;
+      return;
+    }
     setActiveExam(exam);
     setIsLockdown(true);
-    setTimeLeft(exam.duration * 60);
-    // Request fullscreen (simulated)
-    if (document.documentElement.requestFullscreen) {
-      // document.documentElement.requestFullscreen(); // Disabled for preview safety
-    }
+    setTimeLeft((exam.duration || 30) * 60);
   };
 
   const handleFinishExam = () => {
     setIsLockdown(false);
     setActiveExam(null);
-    alert('পরীক্ষা সফলভাবে জমা দেওয়া হয়েছে! আপনার বাবার কাছে নোটিফিকেশন পাঠানো হয়েছে।');
-    // Update status in local state
-    setAssignments(prev => prev.map(a => a.id === activeExam?.id ? { ...a, status: 'submitted' } : a));
+    alert('পরীক্ষা সফলভাবে জমা দেওয়া হয়েছে! আপনার অভিভাবকের কাছে নোটিফিকেশন পাঠানো হয়েছে।');
+    setAssignments(prev => prev.map(a => (a.id === activeExam?.id || a.examId === activeExam?.examId) ? { ...a, status: 'submitted' } : a));
   };
 
   const formatTime = (seconds: number) => {

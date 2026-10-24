@@ -59,6 +59,7 @@ import {
   clearCurrentUser, 
   ROLE_LABELS 
 } from './lib/authService';
+import { decodeExamFromUrlPayload } from './lib/liveExamStorage';
 
 // Helper to extract examId from URL path, query param, or hash
 const extractExamIdFromUrl = (): string | null => {
@@ -69,6 +70,13 @@ const extractExamIdFromUrl = (): string | null => {
     // 1. Check URL query parameters: ?id=... or ?examId=...
     const queryId = url.searchParams.get('id') || url.searchParams.get('examId');
     if (queryId) return queryId;
+
+    // 1b. Check URL encoded exam payload: ?data=... or ?payload=...
+    const dataPayload = url.searchParams.get('data') || url.searchParams.get('payload');
+    if (dataPayload) {
+      const decoded = decodeExamFromUrlPayload(dataPayload);
+      if (decoded && decoded.id) return decoded.id;
+    }
 
     // 2. Check path: /exam/live or /exam/live/exam_123
     const path = url.pathname;

@@ -22,13 +22,15 @@ import {
   Send,
   X,
   FileText,
-  Award
+  Award,
+  MessageSquare
 } from 'lucide-react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Exam, Question, ExamResult } from '../../types';
 import { QUESTIONS } from '../../constants';
 import { recordProctoringViolation, submitExamScript } from '../../lib/proctoringService';
+import { getPublishedMarksheet, subscribeToPublishedMarksheet } from '../../lib/liveExamStorage';
 import { FinalMarksheetModal, FinalMarksheetData } from './FinalMarksheetModal';
 
 interface LiveExamEngineProps {
@@ -54,7 +56,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
   const [isFinished, setIsFinished] = useState(false);
   const [result, setResult] = useState<ExamResult | null>(null);
-  const [startTime] = useState(Date.now());
+  const [startTime, setStartTime] = useState(Date.now());
 
   // Anti-Cheating / Anti-Proctoring States
   const [suspiciousCount, setSuspiciousCount] = useState<number>(0);
@@ -75,8 +77,155 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [submissionComplete, setSubmissionComplete] = useState(false);
   const [timeExpiredPrompt, setTimeExpiredPrompt] = useState(false);
   const [showFinalMarksheetModal, setShowFinalMarksheetModal] = useState(false);
+  const [existingSubmission, setExistingSubmission] = useState<any>(null);
 
   const hasEnteredFullscreenRef = useRef<boolean>(false);
+
+  // Check if student already submitted or parent reviewed this test
+  useEffect(() => {
+    try {
+      const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const isRetake = urlParams?.get('retake') === 'true' || urlParams?.get('retake') === '1';
+      if (isRetake) return;
+
+      // 1. Direct check in published marksheet registry
+      let found = getPublishedMarksheet(exam.id);
+
+      // 2. If not found, check dapathshala_parent_assigned_tests
+      if (!found) {
+        const raw = localStorage.getItem('dapathshala_parent_assigned_tests');
+        if (raw && exam.id) {
+          const tests = JSON.parse(raw);
+          found = tests.find((t: any) => 
+            t.id === exam.id || 
+            t.examId === exam.id ||
+            (exam.id === 'demo_exam_01' && (t.id === 'test-101' || t.examId === 'demo_exam_01')) ||
+            (exam.id === 'test-101' && (t.id === 'demo_exam_01' || t.examId === 'test-101')) ||
+            ((exam as any).pin && t.pin === (exam as any).pin)
+          );
+        }
+      }
+
+      if (found) {
+        setExistingSubmission(found);
+        if (found.handwrittenImages && Array.isArray(found.handwrittenImages)) {
+          setHandwrittenImages(found.handwrittenImages);
+        }
+        if (found.answers) {
+          setAnswers(found.answers);
+        }
+
+        const qList = (found.questions && Array.isArray(found.questions) && found.questions.length > 0)
+          ? found.questions
+          : activeQuestions;
+
+        let correctCount = 0;
+        if (found.totalScoreObtained !== undefined) {
+          correctCount = Number(found.totalScoreObtained);
+        } else {
+          qList.forEach((q: any) => {
+            if (found.answers && found.answers[q.id] === q.correctAnswer) {
+              correctCount++;
+            }
+          });
+        }
+
+        const totalQ = qList.length;
+        const calculatedScore = totalQ > 0 ? (correctCount / totalQ) * 100 : (found.score || 0);
+
+        if (found.status === 'reviewed' || found.isPublished === true) {
+          setResult({
+            examId: exam.id,
+            score: found.score !== undefined && found.score !== null ? Number(found.score) : calculatedScore,
+            totalQuestions: totalQ,
+            correctAnswers: correctCount,
+            wrongAnswers: Math.max(0, totalQ - correctCount),
+            timeSpent: 0,
+            answers: found.answers || {},
+            suspiciousFlags: found.redFlagsCount || 0
+          });
+          setIsFinished(true);
+          setSubmissionComplete(true);
+        } else if (found.status === 'submitted') {
+          setResult({
+            examId: exam.id,
+            score: calculatedScore,
+            totalQuestions: totalQ,
+            correctAnswers: correctCount,
+            wrongAnswers: Math.max(0, totalQ - correctCount),
+            timeSpent: 0,
+            answers: found.answers || {},
+            suspiciousFlags: found.redFlagsCount || 0
+          });
+          setSubmissionComplete(true);
+          setIsFinished(true);
+        }
+      }
+    } catch (err) {
+      console.warn('Error loading existing exam status:', err);
+    }
+  }, [exam.id, activeQuestions]);
+
+  // Real-time listener for marksheet published by parent (BroadcastChannel + CustomEvent + Storage)
+  useEffect(() => {
+    const unsubscribe = subscribeToPublishedMarksheet((updatedTest) => {
+      if (!updatedTest) return;
+      const isMatch = 
+        updatedTest.id === exam.id || 
+        updatedTest.examId === exam.id ||
+        (exam.id === 'demo_exam_01' && (updatedTest.id === 'test-101' || updatedTest.examId === 'demo_exam_01')) ||
+        (exam.id === 'test-101' && (updatedTest.id === 'demo_exam_01' || updatedTest.examId === 'test-101')) ||
+        ((exam as any).pin && updatedTest.pin === (exam as any).pin) ||
+        updatedTest.isPublished === true;
+
+      if (isMatch) {
+        setExistingSubmission(updatedTest);
+        if (updatedTest.handwrittenImages && Array.isArray(updatedTest.handwrittenImages)) {
+          setHandwrittenImages(updatedTest.handwrittenImages);
+        }
+        if (updatedTest.answers) {
+          setAnswers(updatedTest.answers);
+        }
+
+        const qList = (updatedTest.questions && Array.isArray(updatedTest.questions) && updatedTest.questions.length > 0)
+          ? updatedTest.questions
+          : activeQuestions;
+
+        const totalQ = qList.length;
+        let correctCount = 0;
+        if (updatedTest.totalScoreObtained !== undefined) {
+          correctCount = Number(updatedTest.totalScoreObtained);
+        } else {
+          qList.forEach((q: any) => {
+            if (updatedTest.answers && updatedTest.answers[q.id] === q.correctAnswer) {
+              correctCount++;
+            }
+          });
+        }
+
+        const calculatedScore = updatedTest.score !== undefined && updatedTest.score !== null
+          ? Number(updatedTest.score)
+          : (totalQ > 0 ? (correctCount / totalQ) * 100 : 0);
+
+        setResult({
+          examId: exam.id,
+          score: calculatedScore,
+          totalQuestions: totalQ,
+          correctAnswers: correctCount,
+          wrongAnswers: Math.max(0, totalQ - correctCount),
+          timeSpent: 0,
+          answers: updatedTest.answers || {},
+          suspiciousFlags: updatedTest.redFlagsCount || 0
+        });
+        setIsFinished(true);
+        setSubmissionComplete(true);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [exam.id, activeQuestions]);
 
   // Helper to request fullscreen
   const enterFullscreen = useCallback(() => {
@@ -130,6 +279,19 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       onFinish(examResult);
     }
   }, [answers, exam.id, startTime, activeQuestions, onFinish]);
+
+  const handleRetakeExam = () => {
+    setIsFinished(false);
+    setSubmissionComplete(false);
+    setResult(null);
+    setAnswers({});
+    setHandwrittenImages([]);
+    setSuspiciousCount(0);
+    suspiciousCountRef.current = 0;
+    setCurrentQuestionIndex(0);
+    setTimeLeft(exam.duration * 60);
+    setStartTime(Date.now());
+  };
 
   const handleOpenSubmitModal = (expired: boolean = false) => {
     setTimeExpiredPrompt(expired);
@@ -424,7 +586,10 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
   // Render Result Screen / Submission Confirmation
   if (isFinished && result) {
-    const isExamPublished = (exam as any).isPublished === true;
+    const isExamPublished = 
+      (exam as any).isPublished === true || 
+      existingSubmission?.isPublished === true || 
+      existingSubmission?.status === 'reviewed';
 
     return (
       <div className="fixed inset-0 z-[100] bg-slate-50 overflow-y-auto">
@@ -541,20 +706,20 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-center mb-10"
+                className="text-center mb-8"
               >
-                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 mb-6">
+                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 mb-4 shadow-lg shadow-emerald-200">
                   <Trophy size={40} />
                 </div>
                 <h1 className="text-3xl sm:text-4xl font-black text-slate-900 mb-2">পরীক্ষা সম্পন্ন ও মূল্যায়িত!</h1>
-                <p className="text-slate-500 text-base sm:text-lg">অভিভাবক ও এআই অনুমোদিত চূড়ান্ত ফলাফল</p>
+                <p className="text-slate-500 text-base sm:text-lg">অভিভাবক ও এআই অনুমোদিত চূড়ান্ত ফলাফল ও মার্কশিট</p>
               </motion.div>
 
               {/* Exam Completed Success Message Banner */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="p-5 sm:p-6 bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-3xl shadow-xl shadow-emerald-200 border border-emerald-400/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 text-left"
+                className="p-5 sm:p-6 bg-gradient-to-r from-emerald-600 to-teal-700 text-white rounded-3xl shadow-xl shadow-emerald-200 border border-emerald-400/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 text-left"
               >
                 <div className="flex items-start sm:items-center gap-4">
                   <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center shrink-0">
@@ -562,17 +727,30 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                   </div>
                   <div className="space-y-1">
                     <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-[11px] font-black uppercase tracking-wider">
-                      মূল্যায়ন প্রতিবেদন
+                      ফলাফল প্রকাশিত
                     </span>
                     <h2 className="text-xl font-black">
-                      ফলাফল সফলভাবে প্রকাশিত হয়েছে!
+                      আপনার খাতা মূল্যায়ন সম্পন্ন হয়েছে!
                     </h2>
                     <p className="text-xs text-emerald-100 font-medium">
-                      অভিভাবক ও এআই যৌথ মূল্যায়নে আপনার খাতা যাচাই ও মার্কশিট অনুমোদন করা হয়েছে।
+                      অভিভাবক খাতাটি যাচাই করে প্রাপ্ত নম্বর অনুমোদন করেছেন। নিচে বিস্তারিত খাতা ও মন্তব্য দেখে নিন।
                     </p>
                   </div>
                 </div>
               </motion.div>
+
+              {/* PARENT'S FEEDBACK & COMMENT BANNER (অভিভাবকের মন্তব্য) */}
+              {(existingSubmission?.parentFeedback || existingSubmission?.parentComment) && (
+                <div className="p-5 bg-amber-50 rounded-3xl border-2 border-amber-300 shadow-xs mb-8 text-left space-y-2">
+                  <div className="flex items-center gap-2 text-amber-900 font-black text-sm">
+                    <MessageSquare size={18} className="text-amber-700" />
+                    <span>অভিভাবকের মন্তব্য ও অনুপ্রেরণামূলক বার্তা:</span>
+                  </div>
+                  <p className="text-slate-800 text-sm font-semibold pl-4 border-l-2 border-amber-500 italic leading-relaxed">
+                    "{existingSubmission.parentFeedback || existingSubmission.parentComment}"
+                  </p>
+                </div>
+              )}
 
               {/* Uploaded Handwritten Scripts Preview if any */}
               {handwrittenImages.length > 0 && (
@@ -597,57 +775,134 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 </Card>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
                 <Card className="text-center p-6 border-none shadow-lg bg-white rounded-3xl">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">আপনার অনুমোদিত স্কোর</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">অনুমোদিত মোট স্কোর</p>
                   <p className="text-4xl font-black text-emerald-600">{result.score.toFixed(0)}%</p>
+                  {existingSubmission?.totalScoreObtained !== undefined && existingSubmission?.totalPossible !== undefined && (
+                    <p className="text-xs font-bold text-slate-500 mt-1">প্রাপ্ত নম্বর: {existingSubmission.totalScoreObtained} / {existingSubmission.totalPossible}</p>
+                  )}
                 </Card>
                 <Card className="text-center p-6 border-none shadow-lg bg-white rounded-3xl">
                   <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">সঠিক উত্তর</p>
                   <p className="text-4xl font-black text-blue-600">{result.correctAnswers}/{result.totalQuestions}</p>
                 </Card>
                 <Card className="text-center p-6 border-none shadow-lg bg-white rounded-3xl">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">সময় লেগেছে</p>
-                  <p className="text-4xl font-black text-purple-600">{Math.floor(result.timeSpent / 60)} মিনিট</p>
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">পরীক্ষার স্থায়িত্ব</p>
+                  <p className="text-4xl font-black text-purple-600">{exam.duration} মিনিট</p>
                 </Card>
               </div>
 
-              <div className="space-y-6 mb-12">
-                <h2 className="text-2xl font-bold text-slate-900">বিস্তারিত পর্যালোচনা</h2>
-                {activeQuestions.map((q, idx) => {
-                  const userAnswer = result.answers[q.id];
-                  const isCorrect = userAnswer === q.correctAnswer;
-                  return (
-                    <Card key={q.id} className={`border-2 rounded-3xl ${isCorrect ? 'border-emerald-100 bg-emerald-50/30' : 'border-red-100 bg-red-50/30'}`}>
-                      <div className="flex items-start gap-4 p-5">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold ${isCorrect ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
-                          {idx + 1}
-                        </div>
-                        <div className="space-y-4 flex-1">
-                          <p className="font-bold text-slate-900 text-base sm:text-lg">{q.text}</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {q.options.map((opt, optIdx) => {
-                              const isUserChoice = userAnswer === optIdx;
-                              const isCorrectChoice = q.correctAnswer === optIdx;
-                              return (
-                                <div 
-                                  key={optIdx}
-                                  className={`p-3 rounded-xl border text-sm font-medium flex items-center justify-between ${
-                                    isCorrectChoice ? 'border-emerald-500 bg-emerald-50 text-emerald-900 font-bold' : 
-                                    isUserChoice ? 'border-red-500 bg-red-50 text-red-900 font-bold' : 
-                                    'border-slate-200 bg-white text-slate-600'
-                                  }`}
-                                >
-                                  <span>{opt}</span>
-                                  {isCorrectChoice && <CheckCircle2 size={16} className="text-emerald-600 shrink-0 ml-2" />}
-                                  {isUserChoice && !isCorrectChoice && <AlertCircle size={16} className="text-red-600 shrink-0 ml-2" />}
+              {/* DETAILED QUESTION BREAKDOWN WITH STRAIGHT GREEN / RED BADGES */}
+              {(() => {
+                const displayQuestions = (existingSubmission?.questions && Array.isArray(existingSubmission.questions) && existingSubmission.questions.length > 0)
+                  ? existingSubmission.questions
+                  : activeQuestions;
+
+                return (
+                  <div className="space-y-5 mb-10 text-left">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xl font-black text-slate-900">বিস্তারিত প্রশ্ন ও খাতার সংশোধন</h2>
+                      <span className="text-xs font-bold text-slate-500">মোট প্রশ্ন: {displayQuestions.length}টি</span>
+                    </div>
+
+                    {displayQuestions.map((q: any, idx: number) => {
+                      const userAnswer = result.answers ? result.answers[q.id] : undefined;
+                      const aiNote = existingSubmission?.aiDetailedMarking?.find((d: any) => d.questionId === q.id);
+                      const manualNote = existingSubmission?.manualGrades ? existingSubmission.manualGrades[q.id] : undefined;
+                      
+                      const maxMarks = q.marks || aiNote?.maxMarks || 1;
+                      const marksObtained = aiNote !== undefined 
+                        ? Number(aiNote.marksObtained ?? (aiNote.isCorrect ? maxMarks : 0))
+                        : (manualNote !== undefined ? Number(manualNote.marks || 0) : (userAnswer === q.correctAnswer ? maxMarks : 0));
+
+                      const isCorrect = marksObtained > 0 || (aiNote === undefined && manualNote === undefined && userAnswer === q.correctAnswer);
+                      const isPartial = marksObtained > 0 && marksObtained < maxMarks;
+                      const noteText = aiNote?.redInkNote || manualNote?.comment || (isCorrect ? '✓ সঠিক উত্তর। সূত্রের প্রয়োগ যথাযথ হয়েছে।' : '✗ ভুল উত্তর। এখানে হিসাবের ত্রুটি রয়েছে।');
+
+                      return (
+                        <Card key={q.id || idx} className={`p-5 rounded-3xl border-2 transition-all ${isCorrect ? 'border-emerald-200 bg-white' : 'border-rose-200 bg-white'}`}>
+                          <div className="space-y-4">
+                            {/* Question Header & Straight Score Badge */}
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                                  isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                                }`}>
+                                  {idx + 1}
                                 </div>
-                              );
-                            })}
+                                <h4 className="font-black text-slate-900 text-sm sm:text-base">
+                                  {q.text || q.question}
+                                </h4>
+                              </div>
+
+                              {/* Straight Green (Correct), Amber (Partial) or Straight Red (Wrong) Badge */}
+                              <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                                {isPartial ? (
+                                  <div className="px-3.5 py-1 rounded-xl border-2 border-amber-600 bg-amber-50 text-amber-700 font-black text-xs flex items-center gap-1.5 shadow-xs select-none">
+                                    <span>⚠️ আংশিক নম্বর (+{marksObtained}/{maxMarks})</span>
+                                  </div>
+                                ) : isCorrect ? (
+                                  <div className="px-3.5 py-1 rounded-xl border-2 border-emerald-600 bg-emerald-50 text-emerald-700 font-black text-xs flex items-center gap-1.5 shadow-xs select-none">
+                                    <CheckCircle2 size={16} className="text-emerald-600 stroke-[3]" />
+                                    <span>✓ সঠিক (+{marksObtained})</span>
+                                  </div>
+                                ) : (
+                                  <div className="px-3.5 py-1 rounded-xl border-2 border-rose-600 bg-rose-50 text-rose-700 font-black text-xs flex items-center gap-1.5 shadow-xs select-none">
+                                    <X size={16} className="text-rose-600 stroke-[3]" />
+                                    <span>✗ ভুল (০/{maxMarks})</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                        {/* Options Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                          {q.options?.map((opt: string, optIdx: number) => {
+                            const isUserChoice = userAnswer === optIdx;
+                            const isCorrectChoice = q.correctAnswer === optIdx;
+
+                            return (
+                              <div 
+                                key={optIdx}
+                                className={`p-3 rounded-2xl border text-xs font-medium flex items-center justify-between ${
+                                  isCorrectChoice ? 'border-emerald-500 bg-emerald-50 text-emerald-950 font-bold' : 
+                                  isUserChoice ? 'border-rose-400 bg-rose-50 text-rose-950 font-bold' : 
+                                  'border-slate-200 bg-slate-50/50 text-slate-600'
+                                }`}
+                              >
+                                <span>{opt}</span>
+                                {isCorrectChoice && (
+                                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                    <CheckCircle2 size={12} /> সঠিক উত্তর
+                                  </span>
+                                )}
+                                {isUserChoice && !isCorrectChoice && (
+                                  <span className="text-[10px] font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                    তোমার উত্তর (ভুল)
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Evaluation Note with straight styling and matching color */}
+                        <div className={`p-3 rounded-xl border text-xs space-y-1 ${
+                          isCorrect ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900' : 'bg-rose-50/80 border-rose-200 text-rose-900'
+                        }`}>
+                          <div className={`font-bold flex items-center gap-1.5 ${isCorrect ? 'text-emerald-700' : 'text-rose-700'}`}>
+                            <span className={`w-2 h-2 rounded-full inline-block ${isCorrect ? 'bg-emerald-600' : 'bg-rose-600'}`} />
+                            {isCorrect ? 'মূল্যায়ন নোট:' : 'ভুল সংশোধনী ও নোট:'}
                           </div>
+                          <p className={`font-semibold italic pl-3 border-l-2 leading-relaxed ${
+                            isCorrect ? 'border-emerald-400 text-emerald-800' : 'border-rose-400 text-rose-800'
+                          }`}>
+                            {noteText}
+                          </p>
                           {q.explanation && (
-                            <div className="p-4 bg-white/70 rounded-xl border border-slate-100 text-xs sm:text-sm text-slate-600">
-                              <span className="font-bold text-slate-900">ব্যাখ্যা:</span> {q.explanation}
+                            <div className="pt-1.5 text-[11px] text-slate-600 border-t border-slate-200/50 mt-1.5">
+                              <span className="font-bold text-slate-800">সঠিক ব্যাখ্যা: </span> {q.explanation}
                             </div>
                           )}
                         </div>
@@ -656,8 +911,18 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                   );
                 })}
               </div>
+            );
+          })()}
 
               <div className="flex flex-col sm:flex-row gap-4">
+                <Button 
+                  size="lg" 
+                  className="flex-1 rounded-2xl gap-2 py-5 bg-emerald-600 hover:bg-emerald-700 text-white font-black cursor-pointer shadow-md shadow-emerald-200" 
+                  onClick={handleRetakeExam}
+                >
+                  <RotateCcw size={20} />
+                  পুনরায় পরীক্ষা দিন
+                </Button>
                 <Button 
                   variant="outline" 
                   size="lg" 
@@ -683,17 +948,19 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               id: exam.id,
               title: exam.title,
               subject: exam.subject,
-              childName: studentName,
+              childName: studentName || existingSubmission?.studentName || 'আরাফাত রহমান',
               score: Math.round(result.score),
-              totalScoreObtained: result.correctAnswers,
-              totalPossible: result.totalQuestions,
-              publishedAt: 'এখনই সম্পন্ন',
-              evaluationMode: 'ai',
-              aiFeedback: `এআই স্বয়ংক্রিয় মূল্যায়নে শিক্ষার্থী ${result.score.toFixed(0)}% স্কোর করেছে। মোট ${result.totalQuestions}টি প্রশ্নের মধ্যে ${result.correctAnswers}টি সঠিক হয়েছে।`,
-              parentComment: 'খাতা মূল্যায়ন ও ফাইনাল ফলাফল অনুমোদন সম্পন্ন হয়েছে। ভালো করে অনুশীলন চালিয়ে যাও!',
-              handwrittenImages: handwrittenImages,
-              questions: activeQuestions,
-              answers: result.answers
+              totalScoreObtained: existingSubmission?.totalScoreObtained !== undefined ? existingSubmission.totalScoreObtained : result.correctAnswers,
+              totalPossible: existingSubmission?.totalPossible || result.totalQuestions,
+              publishedAt: existingSubmission?.publishedAt || 'আজ প্রকাশিত',
+              evaluationMode: existingSubmission?.evaluationMode || 'ai',
+              aiFeedback: existingSubmission?.aiFeedback || `এআই স্বয়ংক্রিয় মূল্যায়নে শিক্ষার্থী ${result.score.toFixed(0)}% স্কোর করেছে। মোট ${result.totalQuestions}টি প্রশ্নের মধ্যে ${result.correctAnswers}টি সঠিক হয়েছে।`,
+              parentComment: existingSubmission?.parentFeedback || existingSubmission?.parentComment || 'খাতা মূল্যায়ন ও ফাইনাল ফলাফল অনুমোদন সম্পন্ন হয়েছে। ভালো করে অনুশীলন চালিয়ে যাও!',
+              handwrittenImages: existingSubmission?.handwrittenImages || handwrittenImages,
+              questions: existingSubmission?.questions || activeQuestions,
+              answers: existingSubmission?.answers || result.answers,
+              aiDetailedMarking: existingSubmission?.aiDetailedMarking,
+              manualGrades: existingSubmission?.manualGrades
             }}
             onClose={() => setShowFinalMarksheetModal(false)}
           />

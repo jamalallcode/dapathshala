@@ -318,21 +318,21 @@ export const FinalMarksheetModal: React.FC<FinalMarksheetModalProps> = ({ data, 
             </Card>
           </div>
 
-          {/* 4. Uploaded Handwritten Sheets Preview (if any) */}
-          {data.handwrittenImages && data.handwrittenImages.length > 0 && (
+          {/* 4. Uploaded Handwritten Sheets Preview (if any genuine images uploaded) */}
+          {data.handwrittenImages && data.handwrittenImages.filter(img => img && !img.includes('image_fb59e449') && !img.includes('picsum.photos')).length > 0 && (
             <Card className="p-5 border-2 border-indigo-100 bg-white shadow-sm rounded-3xl space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FileText className="text-indigo-600" size={18} />
                   <h4 className="text-sm font-black text-slate-900">
-                    তোমার আপলোডকৃত মূল হাতের লেখা উত্তরপত্র ({data.handwrittenImages.length}টি পৃষ্ঠা)
+                    তোমার আপলোডকৃত মূল হাতের লেখা উত্তরপত্র ({data.handwrittenImages.filter(img => img && !img.includes('image_fb59e449') && !img.includes('picsum.photos')).length}টি পৃষ্ঠা)
                   </h4>
                 </div>
                 <span className="text-[11px] font-bold text-slate-400">ছবিতে ক্লিক করে বড় করে দেখুন</span>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                {data.handwrittenImages.map((img, idx) => (
+                {data.handwrittenImages.filter(img => img && !img.includes('image_fb59e449') && !img.includes('picsum.photos')).map((img, idx) => (
                   <div
                     key={idx}
                     onClick={() => setSelectedImage(img)}

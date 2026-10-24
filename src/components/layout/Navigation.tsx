@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Home, 
   Sparkles, 
@@ -27,10 +27,13 @@ import {
   GraduationCap,
   Users,
   Swords,
-  Building2
+  Building2,
+  CheckCircle2,
+  FileCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User } from '../../types';
+import { subscribeToExamSubmissions, ExamSubmissionPayload } from '../../lib/proctoringService';
 
 interface NavigationProps {
   activeTab: string;
@@ -58,6 +61,88 @@ export const Navigation: React.FC<NavigationProps> = ({
   const clickCountRef = React.useRef(0);
   const clickTimerRef = React.useRef<any>(null);
   const [clickPrompt, setClickPrompt] = useState<string | null>(null);
+
+  // Notification states
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Array<{
+    id: string;
+    title: string;
+    message: string;
+    time: string;
+    read: boolean;
+    examId?: string;
+  }>>(() => {
+    try {
+      const saved = localStorage.getItem('dapathshala_notifications');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+
+    const wasCleared = localStorage.getItem('dapathshala_parent_tests_cleared');
+    if (wasCleared === 'true') {
+      return [];
+    }
+
+    // Check if test-101 has already been evaluated or deleted in assigned tests
+    try {
+      const savedTests = localStorage.getItem('dapathshala_parent_assigned_tests');
+      if (savedTests !== null) {
+        const tests = JSON.parse(savedTests);
+        if (Array.isArray(tests)) {
+          if (tests.length === 0) return [];
+          const test101 = tests.find((t: any) => t && (t.id === 'test-101' || t.examId === 'test-101'));
+          if (!test101 || test101.status === 'reviewed' || test101.isPublished) {
+            return [];
+          }
+        }
+      }
+    } catch {}
+
+    return [];
+  });
+
+  // Persist notifications across turns and reloads
+  useEffect(() => {
+    try {
+      localStorage.setItem('dapathshala_notifications', JSON.stringify(notifications));
+    } catch {}
+  }, [notifications]);
+
+  // Auto-remove notification when an exam marksheet is published/evaluated
+  useEffect(() => {
+    const handlePublished = (e: any) => {
+      const publishedExamId = e.detail?.id || e.detail?.examId;
+      if (publishedExamId) {
+        setNotifications(prev => prev.filter(n => n.examId !== publishedExamId));
+      }
+    };
+    window.addEventListener('dapathshala_marksheet_published', handlePublished);
+    return () => {
+      window.removeEventListener('dapathshala_marksheet_published', handlePublished);
+    };
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToExamSubmissions((newSub: ExamSubmissionPayload) => {
+      setNotifications(prev => [
+        {
+          id: 'notif_' + Date.now(),
+          title: 'নতুন খাতা জমা পড়েছে!',
+          message: `${newSub.studentName || 'সন্তান'} "${newSub.title || newSub.subject}" পরীক্ষা সম্পন্ন করেছে (স্কোর: ${newSub.score || 0}%)।`,
+          time: 'এইমাত্র',
+          read: false,
+          examId: newSub.id || newSub.examId
+        },
+        ...prev
+      ]);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const toggleSidebar = (forcedState?: boolean) => {
     if (typeof forcedState === 'boolean') {
@@ -194,10 +279,124 @@ export const Navigation: React.FC<NavigationProps> = ({
             <Zap size={14} className="text-amber-500 fill-amber-500" />
             <span className="text-xs font-bold text-amber-700">{user?.points || 0} XP</span>
           </div>
-          <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-xl relative">
-            <Bell size={20} />
-            <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
-          </button>
+          {/* Real-time Notification Bell & Dropdown */}
+          <div className="relative">
+            <button 
+              onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+              className="p-2 text-slate-500 hover:bg-slate-100 rounded-xl relative cursor-pointer transition-colors"
+              title="বিজ্ঞপ্তি ও সংকেত"
+            >
+              <Bell size={20} className={unreadCount > 0 ? 'text-indigo-600' : ''} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-red-600 text-white text-[10px] font-black rounded-full border-2 border-white flex items-center justify-center animate-pulse shadow-sm">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Dropdown Panel */}
+            <AnimatePresence>
+              {isNotificationOpen && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-[110]" 
+                    onClick={() => setIsNotificationOpen(false)} 
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 z-[120] overflow-hidden flex flex-col max-h-[80vh]"
+                  >
+                    {/* Header */}
+                    <div className="p-4 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Bell size={16} className="text-indigo-600" />
+                        <h4 className="font-black text-slate-900 text-sm">বিজ্ঞপ্তি ও পরীক্ষার সংকেত</h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {unreadCount > 0 && (
+                          <button
+                            onClick={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))}
+                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+                          >
+                            সব পড়া হয়েছে
+                          </button>
+                        )}
+                        {notifications.length > 0 && (
+                          <button
+                            onClick={() => setNotifications([])}
+                            className="text-[11px] font-bold text-slate-400 hover:text-red-600 cursor-pointer"
+                          >
+                            সব মুছুন
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Notification List */}
+                    <div className="overflow-y-auto divide-y divide-slate-100 p-2 space-y-1">
+                      {notifications.length === 0 ? (
+                        <div className="p-6 text-center text-xs text-slate-400 font-semibold">
+                          কোনো নতুন বিজ্ঞপ্তি নেই
+                        </div>
+                      ) : (
+                        notifications.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => {
+                              const targetExamId = item.examId || 'test-101';
+                              try {
+                                sessionStorage.setItem('dapathshala_pending_eval_id', targetExamId);
+                              } catch {}
+                              setActiveTab('parent-dashboard');
+                              setIsNotificationOpen(false);
+                              setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n));
+                              setTimeout(() => {
+                                window.dispatchEvent(new CustomEvent('dapathshala_open_evaluation', {
+                                  detail: { examId: targetExamId }
+                                }));
+                              }, 50);
+                            }}
+                            className={`p-3 rounded-2xl transition-all cursor-pointer flex items-start gap-3 ${
+                              item.read ? 'hover:bg-slate-50 opacity-80' : 'bg-indigo-50/60 hover:bg-indigo-50'
+                            }`}
+                          >
+                            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+                              <FileCheck size={16} />
+                            </div>
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <div className="flex items-center justify-between gap-1">
+                                <h5 className="font-black text-xs text-slate-900 truncate">{item.title}</h5>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <span className="text-[10px] text-slate-400 font-semibold">{item.time}</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setNotifications(prev => prev.filter(n => n.id !== item.id));
+                                    }}
+                                    className="p-1 hover:bg-slate-200 text-slate-400 hover:text-red-600 rounded-lg transition-all cursor-pointer"
+                                    title="বিজ্ঞপ্তিটি মুছুন"
+                                  >
+                                    <X size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-xs text-slate-600 leading-snug line-clamp-2">{item.message}</p>
+                              <span className="inline-block text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-indigo-200">
+                                খাতা মূল্যায়ন করতে ক্লিক করুন →
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
+          </div>
           <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden cursor-pointer">
             <img src={user?.avatar || `https://picsum.photos/seed/${user?.id}/100`} alt="Profile" />
           </div>

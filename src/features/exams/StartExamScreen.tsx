@@ -19,7 +19,9 @@ import { LiveExamEngine } from './LiveExamEngine';
 import { 
   getSharedLiveExam, 
   DEFAULT_DEMO_EXAM, 
-  SharedLiveExam 
+  SharedLiveExam,
+  getPublishedMarksheet,
+  subscribeToPublishedMarksheet
 } from '../../lib/liveExamStorage';
 import { Exam, ExamResult } from '../../types';
 
@@ -34,6 +36,32 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
   const [selectedDuration, setSelectedDuration] = useState<number>(30);
   const [isExamStarted, setIsExamStarted] = useState(false);
   const [examFinishedResult, setExamFinishedResult] = useState<ExamResult | null>(null);
+  const [matchedSubmission, setMatchedSubmission] = useState<any>(null);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+
+  const loadExamByKey = (key: string) => {
+    const found = getSharedLiveExam(key);
+    if (found) {
+      setExamData(found);
+      setSelectedDuration(found.duration || 30);
+      if (found.childName && found.childName !== 'শিক্ষার্থী') {
+        setStudentName(found.childName);
+      }
+      setPinError(null);
+      return true;
+    }
+    return false;
+  };
+
+  const handleLoadByPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pinInput.trim()) return;
+    const success = loadExamByKey(pinInput.trim());
+    if (!success) {
+      setPinError('এই পিন কোড বা আইডি দিয়ে কোনো পরীক্ষা পাওয়া যায়নি। সঠিক ৬-ডিজিটের পিন লিখুন।');
+    }
+  };
 
   useEffect(() => {
     // Attempt to load exam from storage or URL
@@ -45,7 +73,7 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
     if (!foundExam) {
       // Check window query params
       const params = new URLSearchParams(window.location.search);
-      const queryId = params.get('id') || params.get('examId');
+      const queryId = params.get('id') || params.get('examId') || params.get('pin');
       if (queryId) {
         foundExam = getSharedLiveExam(queryId);
       }
@@ -61,7 +89,90 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
     if (foundExam.childName && foundExam.childName !== 'শিক্ষার্থী') {
       setStudentName(foundExam.childName);
     }
+
+    // Check if the student has already taken/submitted or parent has reviewed this exam
+    try {
+      const targetId = foundExam.id || examId;
+      const queryParams = new URLSearchParams(window.location.search);
+      const qId = queryParams.get('id') || queryParams.get('examId');
+      const isRetake = queryParams.get('retake') === 'true' || queryParams.get('retake') === '1';
+
+      if (!isRetake) {
+        // 1. Direct check from published marksheet registry
+        const published = getPublishedMarksheet(targetId) || (qId ? getPublishedMarksheet(qId) : null);
+        if (published && (published.isPublished === true || published.status === 'reviewed')) {
+          setMatchedSubmission(published);
+          if (published.questions && Array.isArray(published.questions) && published.questions.length > 0) {
+            foundExam.questions = published.questions;
+          }
+          if (published.studentName) {
+            setStudentName(published.studentName);
+          }
+          setIsExamStarted(true);
+        } else {
+          // 2. Check dapathshala_parent_assigned_tests
+          const assignedRaw = localStorage.getItem('dapathshala_parent_assigned_tests');
+          if (assignedRaw) {
+            const assignedList = JSON.parse(assignedRaw);
+            const matched = assignedList.find((t: any) => 
+              (t.id && (t.id === targetId || (qId && t.id === qId))) || 
+              (t.examId && (t.examId === targetId || (qId && t.examId === qId))) ||
+              (targetId === 'demo_exam_01' && (t.id === 'test-101' || t.examId === 'demo_exam_01')) ||
+              (targetId === 'test-101' && (t.id === 'demo_exam_01' || t.examId === 'test-101'))
+            );
+
+            if (matched && (matched.status === 'submitted' || matched.status === 'reviewed' || matched.isPublished === true)) {
+              setMatchedSubmission(matched);
+              if (matched.questions && Array.isArray(matched.questions) && matched.questions.length > 0) {
+                foundExam.questions = matched.questions;
+              }
+              if (matched.studentName) {
+                setStudentName(matched.studentName);
+              }
+              // Launch LiveExamEngine to render the evaluated result or submitted state
+              setIsExamStarted(true);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error checking existing exam submission state:', e);
+    }
   }, [examId]);
+
+  // Real-time listener for marksheet published while on StartExamScreen
+  useEffect(() => {
+    const unsubscribe = subscribeToPublishedMarksheet((marksheet) => {
+      if (!marksheet) return;
+      const targetId = examData?.id || examId;
+      const qParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+      const qId = qParams?.get('id') || qParams?.get('examId');
+      const isRetake = qParams?.get('retake') === 'true' || qParams?.get('retake') === '1';
+      if (isRetake) return;
+
+      const isMatch = 
+        (targetId && (marksheet.id === targetId || marksheet.examId === targetId)) ||
+        (qId && (marksheet.id === qId || marksheet.examId === qId)) ||
+        (targetId === 'demo_exam_01' && (marksheet.id === 'test-101' || marksheet.examId === 'demo_exam_01')) ||
+        (targetId === 'test-101' && (marksheet.id === 'demo_exam_01' || marksheet.examId === 'test-101')) ||
+        (!targetId && marksheet.isPublished);
+
+      if (isMatch) {
+        setMatchedSubmission(marksheet);
+        if (marksheet.questions && marksheet.questions.length > 0) {
+          setExamData(prev => prev ? { ...prev, questions: marksheet.questions } : prev);
+        }
+        if (marksheet.studentName) {
+          setStudentName(marksheet.studentName);
+        }
+        setIsExamStarted(true);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [examData?.id, examId]);
 
   if (!examData) {
     return (
@@ -76,13 +187,14 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
 
   // If exam has started, render LiveExamEngine
   if (isExamStarted) {
-    const activeExamObject: Exam = {
+    const activeExamObject: any = {
       id: examData.id,
       title: examData.title,
       subject: examData.subject,
       duration: selectedDuration,
       date: new Date().toISOString(),
-      totalMarks: examData.totalMarks || examData.questions.length
+      totalMarks: examData.totalMarks || examData.questions.length,
+      isPublished: matchedSubmission?.isPublished === true || matchedSubmission?.status === 'reviewed'
     };
 
     return (
@@ -129,6 +241,35 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
             সুরক্ষিত অনলাইন পরীক্ষা কেন্দ্র
           </div>
         </div>
+
+        {/* Quick PIN Code Bar */}
+        <form onSubmit={handleLoadByPin} className="p-3 bg-white rounded-2xl border border-slate-200/80 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-xs font-bold text-slate-700 whitespace-nowrap">অন্য কোনো পরীক্ষার পিন কোড আছে?</span>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <input
+              type="text"
+              value={pinInput}
+              onChange={(e) => setPinInput(e.target.value)}
+              placeholder="৬-সংখ্যার পিন (যেমন: 489210)"
+              className="flex-1 sm:w-48 p-2 rounded-xl border border-slate-200 text-xs font-mono font-bold text-slate-800 uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50"
+            />
+            <button
+              type="submit"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors shadow-xs"
+            >
+              পরীক্ষা খুঁজুন
+            </button>
+          </div>
+        </form>
+
+        {pinError && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-700 font-bold flex items-center justify-between">
+            <span>⚠️ {pinError}</span>
+            <button onClick={() => setPinError(null)} className="text-red-500 font-bold p-1">✕</button>
+          </div>
+        )}
 
         {/* Hero Card */}
         <Card className="p-6 sm:p-10 border-2 border-indigo-100 shadow-xl bg-white rounded-3xl space-y-8 relative overflow-hidden">
