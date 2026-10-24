@@ -172,8 +172,10 @@ export const savePublishedMarksheet = (marksheet: any): void => {
       if (marksheet.examId) pubMap[marksheet.examId] = enriched;
       if (marksheet.id) pubMap[marksheet.id] = enriched;
       if (pin) pubMap[pin] = enriched;
-      pubMap['demo_exam_01'] = enriched;
-      pubMap['test-101'] = enriched;
+      if (examId === 'demo_exam_01' || examId === 'test-101') {
+        pubMap['demo_exam_01'] = enriched;
+        pubMap['test-101'] = enriched;
+      }
       localStorage.setItem(PUBLISHED_MAP_KEY, JSON.stringify(pubMap));
     } catch (e) {
       console.warn('Error saving to PUBLISHED_MAP_KEY:', e);
@@ -220,8 +222,10 @@ export const savePublishedMarksheet = (marksheet: any): void => {
       if (marksheet.examId && marksheet.examId !== examId) {
         liveExams[marksheet.examId] = updatedLiveExam;
       }
-      liveExams['demo_exam_01'] = updatedLiveExam;
-      liveExams['test-101'] = updatedLiveExam;
+      if (examId === 'demo_exam_01' || examId === 'test-101') {
+        liveExams['demo_exam_01'] = updatedLiveExam;
+        liveExams['test-101'] = updatedLiveExam;
+      }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(liveExams));
     } catch (e) {
       console.warn('Error updating dapathshala_live_exams:', e);
@@ -288,10 +292,10 @@ export const getPublishedMarksheet = (idOrPin?: string | null): any | null => {
           return pubMap[resolvedId];
         }
       }
-      if (pubMap['test-101'] && (pubMap['test-101'].isPublished || pubMap['test-101'].status === 'reviewed')) {
+      if (searchKeys.includes('test-101') && pubMap['test-101'] && (pubMap['test-101'].isPublished || pubMap['test-101'].status === 'reviewed')) {
         return pubMap['test-101'];
       }
-      if (pubMap['demo_exam_01'] && (pubMap['demo_exam_01'].isPublished || pubMap['demo_exam_01'].status === 'reviewed')) {
+      if (searchKeys.includes('demo_exam_01') && pubMap['demo_exam_01'] && (pubMap['demo_exam_01'].isPublished || pubMap['demo_exam_01'].status === 'reviewed')) {
         return pubMap['demo_exam_01'];
       }
     }
@@ -303,18 +307,12 @@ export const getPublishedMarksheet = (idOrPin?: string | null): any | null => {
       if (Array.isArray(tests)) {
         const match = tests.find((t: any) => 
           (t.isPublished === true || t.status === 'reviewed' || !!t.parentComment || !!t.parentFeedback) && (
-            searchKeys.some(k => t.id === k || t.examId === k || t.pin === k) ||
-            ((key === 'demo_exam_01' || !key) && (t.id === 'test-101' || t.examId === 'demo_exam_01')) ||
+            searchKeys.some(k => (t.id && t.id === k) || (t.examId && t.examId === k) || (t.pin && t.pin === k)) ||
+            (key === 'demo_exam_01' && (t.id === 'test-101' || t.examId === 'demo_exam_01')) ||
             (key === 'test-101' && (t.id === 'demo_exam_01' || t.examId === 'test-101'))
           )
         );
         if (match) return match;
-
-        // Fallback to any reviewed test if on demo/generic
-        if (!key || key === 'demo_exam_01' || key === 'test-101') {
-          const anyReviewed = tests.find((t: any) => t.isPublished === true || t.status === 'reviewed' || !!t.parentComment || !!t.parentFeedback);
-          if (anyReviewed) return anyReviewed;
-        }
       }
     }
 
@@ -323,7 +321,9 @@ export const getPublishedMarksheet = (idOrPin?: string | null): any | null => {
     if (rawLast) {
       const last = JSON.parse(rawLast);
       if (last && (last.isPublished || last.status === 'reviewed' || !!last.parentComment || !!last.parentFeedback)) {
-        if (!key || key === 'demo_exam_01' || key === 'test-101' || searchKeys.some(k => last.id === k || last.examId === k || last.pin === k)) {
+        if (searchKeys.some(k => (last.id && last.id === k) || (last.examId && last.examId === k) || (last.pin && last.pin === k)) ||
+            (key === 'demo_exam_01' && (last.id === 'test-101' || last.examId === 'demo_exam_01')) ||
+            (key === 'test-101' && (last.id === 'demo_exam_01' || last.examId === 'test-101'))) {
           return last;
         }
       }
@@ -493,6 +493,7 @@ export const getSharedLiveExam = (idOrPin: string): SharedLiveExam | null => {
             };
           }) : [];
 
+          const fallbackCount = match.questionCount || match.totalMarks || (formattedQuestions.length > 0 ? formattedQuestions.length : 15);
           const convertedExam: SharedLiveExam = {
             id: match.id || resolvedId,
             pin: match.pin,
@@ -500,11 +501,11 @@ export const getSharedLiveExam = (idOrPin: string): SharedLiveExam | null => {
             subject: match.subject || 'সাধারণ',
             chapter: match.chapter || '',
             duration: match.duration || 30,
-            totalMarks: match.totalMarks || (formattedQuestions.length > 0 ? formattedQuestions.length : 5),
+            totalMarks: match.totalMarks || (formattedQuestions.length > 0 ? formattedQuestions.length : fallbackCount),
             childName: match.childName || match.studentName || 'শিক্ষার্থী',
             parentName: 'অভিভাবক',
             createdAt: Date.now(),
-            questions: formattedQuestions.length > 0 ? formattedQuestions : getQuestionsForChapter(match.subject || 'বাংলা', match.chapter || '', 5, 1),
+            questions: formattedQuestions.length > 0 ? formattedQuestions : getQuestionsForChapter(match.subject || 'বাংলা', match.chapter || '', fallbackCount, 1),
             isPublished: match.isPublished === true || match.status === 'reviewed',
             status: match.status,
             score: match.score,
@@ -545,6 +546,7 @@ export const getSharedLiveExam = (idOrPin: string): SharedLiveExam | null => {
           };
         }) : [];
 
+        const pubFallbackCount = pub.questionCount || pub.totalMarks || pub.totalPossible || (formattedQuestions.length > 0 ? formattedQuestions.length : 15);
         const pubExam: SharedLiveExam = {
           id: pub.id || pub.examId || resolvedId,
           pin: pub.pin,
@@ -552,11 +554,11 @@ export const getSharedLiveExam = (idOrPin: string): SharedLiveExam | null => {
           subject: pub.subject || 'সাধারণ',
           chapter: pub.chapter || '',
           duration: pub.duration || 30,
-          totalMarks: pub.totalMarks || pub.totalPossible || (formattedQuestions.length > 0 ? formattedQuestions.length : 5),
+          totalMarks: pub.totalMarks || pub.totalPossible || (formattedQuestions.length > 0 ? formattedQuestions.length : pubFallbackCount),
           childName: pub.childName || pub.studentName || 'শিক্ষার্থী',
           parentName: 'অভিভাবক',
           createdAt: Date.now(),
-          questions: formattedQuestions.length > 0 ? formattedQuestions : getQuestionsForChapter(pub.subject || 'বাংলা', pub.chapter || '', 5, 1),
+          questions: formattedQuestions.length > 0 ? formattedQuestions : getQuestionsForChapter(pub.subject || 'বাংলা', pub.chapter || '', pubFallbackCount, 1),
           isPublished: true,
           status: 'reviewed',
           score: pub.score,

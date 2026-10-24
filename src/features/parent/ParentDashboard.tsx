@@ -805,8 +805,24 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
         };
       });
     } else {
-      const count = Number(test.totalMarks) || 15;
-      formattedQuestions = generateCurriculumFallback(test.subject || 'বাংলা', test.chapter || '', count);
+      const live = getSharedLiveExam(test.id || test.examId || test.pin);
+      if (live && Array.isArray(live.questions) && live.questions.length > 0) {
+        formattedQuestions = live.questions.map((q: any, i: number) => {
+          let optArr = Array.isArray(q.options) ? q.options : ['ক', 'খ', 'গ', 'ঘ'];
+          let correctStr = typeof q.correctAnswer === 'number' ? (optArr[q.correctAnswer] || optArr[0]) : (q.correctAnswer || optArr[0]);
+          return {
+            id: q.id || `pq_${i + 1}`,
+            question: q.text || q.question || `প্রশ্ন ${i + 1}`,
+            options: optArr,
+            correctAnswer: correctStr,
+            marks: 1,
+            explanation: q.explanation || ''
+          };
+        });
+      } else {
+        const count = Number(test.totalMarks) || 15;
+        formattedQuestions = generateCurriculumFallback(test.subject || 'বাংলা', test.chapter || '', count);
+      }
     }
 
     setPreviewPaperData({
@@ -869,10 +885,27 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
         playNotificationSound();
       } catch {}
       setAssignedTests(prev => {
-        const idx = prev.findIndex(t => t.id === newSub.id || t.id === newSub.examId);
+        const idx = prev.findIndex(t => 
+          (t.id && (t.id === newSub.id || t.id === newSub.examId)) ||
+          (t.examId && (t.examId === newSub.id || t.examId === newSub.examId)) ||
+          ((newSub as any).pin && t.pin === (newSub as any).pin)
+        );
         if (idx >= 0) {
           const copy = [...prev];
-          copy[idx] = { ...copy[idx], ...newSub };
+          const existing = copy[idx];
+          const existingQ = existing.questionsList || existing.questions || [];
+          const incomingQ = newSub.questions || [];
+          const mergedQ = (incomingQ.length >= existingQ.length && incomingQ.length > 0)
+            ? incomingQ
+            : (existingQ.length > 0 ? existingQ : incomingQ);
+
+          copy[idx] = { 
+            ...existing, 
+            ...newSub,
+            questions: mergedQ,
+            questionsList: existing.questionsList || mergedQ,
+            totalMarks: mergedQ.length > 0 ? mergedQ.length : (newSub.totalMarks || existing.totalMarks)
+          };
           return copy;
         }
         return [newSub, ...prev];
@@ -892,9 +925,30 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
       ? test.handwrittenImages.filter((img: any) => typeof img === 'string' && img.trim() && !img.includes('image_fb59e449') && !img.includes('picsum.photos'))
       : [];
     
-    const qList = (test.questions && Array.isArray(test.questions) && test.questions.length > 0) 
+    let qList = (test.questions && Array.isArray(test.questions) && test.questions.length > 0) 
       ? test.questions 
       : [];
+    if (qList.length === 0 && test.questionsList && Array.isArray(test.questionsList) && test.questionsList.length > 0) {
+      qList = test.questionsList.map((q: any, i: number) => {
+        let optArr = Array.isArray(q.options) ? q.options : ['ক', 'খ', 'গ', 'ঘ'];
+        let correctIdx = typeof q.correctAnswer === 'number' ? q.correctAnswer : optArr.findIndex(o => o.trim() === String(q.correctAnswer).trim());
+        return {
+          id: q.id || `q_${i + 1}`,
+          question: q.text || q.question || `প্রশ্ন ${i + 1}`,
+          text: q.text || q.question || `প্রশ্ন ${i + 1}`,
+          options: optArr,
+          correctAnswer: correctIdx >= 0 ? correctIdx : 0,
+          marks: q.marks || 1,
+          explanation: q.explanation || ''
+        };
+      });
+    }
+    if (qList.length === 0) {
+      const live = getSharedLiveExam(test.id || test.examId || test.pin);
+      if (live && Array.isArray(live.questions) && live.questions.length > 0) {
+        qList = live.questions;
+      }
+    }
 
     // Ensure aiDetailedMarking is pre-populated if missing so markings and score are instantly active
     let initialAiDetailed = test.aiDetailedMarking;
@@ -2482,426 +2536,6 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
               </>
             )}
           </AnimatePresence>
-
-          {/* MODAL 2: PRINT & EXAM VIEW PREVIEW MODAL */}
-          <AnimatePresence>
-            {showPreviewModal && (
-              <>
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setShowPreviewModal(false)}
-                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[160]"
-                />
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                  className="fixed inset-2 sm:inset-6 md:inset-10 lg:inset-16 bg-white rounded-3xl shadow-2xl z-[161] overflow-hidden flex flex-col max-w-4xl mx-auto"
-                >
-                  {/* Top Modal Controls */}
-                  <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
-                    <div className="flex items-center gap-2 font-black text-slate-800 text-sm sm:text-base">
-                      <FileText className="text-indigo-600" size={20} />
-                      {previewPaperData ? `${previewPaperData.subject} কাস্টম মূল্যায়ন প্রশ্নপত্র (বোর্ড ফরম্যাট)` : 'প্রশ্নপত্র প্রিন্ট ও পরীক্ষার পূর্ণাঙ্গ প্রিভিউ'}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => window.print()}
-                        className="rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs gap-1.5 cursor-pointer"
-                      >
-                        <Printer size={15} />
-                        <span className="hidden sm:inline">প্রিন্ট / PDF</span>
-                      </Button>
-                      <button
-                        onClick={() => {
-                          setShowPreviewModal(false);
-                          setPreviewPaperData(null);
-                        }}
-                        className="p-1.5 hover:bg-slate-200 text-slate-500 rounded-xl transition-all cursor-pointer"
-                      >
-                        <X size={20} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Exam Paper Sheet (Authentic Bangladesh Board Exam Format - Image 3 Requirement) */}
-                  {(() => {
-                    const activePaperQuestions = previewPaperData ? previewPaperData.questions : questions;
-                    const activePaperSubject = previewPaperData ? previewPaperData.subject : assignForm.subject;
-                    const activePaperChapter = previewPaperData ? previewPaperData.chapter : assignForm.chapter;
-                    const activePaperDuration = previewPaperData ? previewPaperData.duration : assignForm.duration;
-                    const totalPaperMarks = activePaperQuestions.reduce((s, q) => s + (q.marks || 1), 0);
-
-                    return (
-                      <>
-                        <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-5 bg-white font-serif text-slate-900 print:p-0">
-                          {/* Board Exam Sheet Header */}
-                          <div className="flex flex-col sm:flex-row items-start justify-between gap-4 border-b-2 border-slate-900 pb-4">
-                            {/* Left: Exam Info */}
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-4 text-xs font-bold text-slate-600">
-                                <span>যমুনা / দা-পাঠশালা</span>
-                                <span>•</span>
-                                <span>পত্র নং: ০১</span>
-                              </div>
-                              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                                বহুনির্বাচনি অভীক্ষা
-                              </h2>
-                              <h3 className="text-base sm:text-lg font-bold text-slate-800">
-                                {activePaperSubject} ({activePaperChapter})
-                              </h3>
-                              <p className="text-xs text-slate-600 font-sans">
-                                [{new Date().getFullYear()} সালের বোর্ড সিলেবাস অনুযায়ী]
-                              </p>
-                              <div className="flex items-center gap-6 text-xs sm:text-sm font-bold text-slate-800 pt-1 font-sans">
-                                <span>সময় — {activePaperDuration} মিনিট</span>
-                                <span>পূর্ণমান — {totalPaperMarks}</span>
-                              </div>
-                            </div>
-
-                            {/* Right: Board Boxes (Subject Code & Set Box as shown in Image 3) */}
-                            <div className="flex flex-col items-end gap-2 shrink-0 self-end sm:self-start">
-                              {/* Subject Code Box */}
-                              <div className="border-2 border-slate-900 p-2 text-center bg-white">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-bold font-sans">বিষয় কোড :</span>
-                                  <div className="flex border border-slate-900">
-                                    <span className="w-6 h-6 border-r border-slate-900 flex items-center justify-center font-mono font-black text-xs">১</span>
-                                    <span className="w-6 h-6 border-r border-slate-900 flex items-center justify-center font-mono font-black text-xs">০</span>
-                                    <span className="w-6 h-6 flex items-center justify-center font-mono font-black text-xs">১</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Set Box */}
-                              <div className="border-2 border-slate-900 p-2 text-center bg-white flex items-center gap-2">
-                                <span className="text-xs font-bold font-sans">সেট :</span>
-                                <span className="w-7 h-7 border border-slate-900 flex items-center justify-center font-bold text-sm bg-slate-50">খ</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Board Special Instructions (Matching Image 3) */}
-                          <div className="p-2.5 bg-slate-50 border border-slate-300 text-[11px] sm:text-xs text-slate-800 leading-relaxed font-sans space-y-0.5">
-                            <p className="font-semibold">
-                              [বিশেষ দ্রষ্টব্য: সরবরাহকৃত বহুনির্বাচনি অভীক্ষার উত্তরপত্রে প্রশ্নের ক্রমিক নম্বরের বিপরীতে প্রদত্ত বর্ণসংবলিত বৃত্তসমূহ হতে সঠিক/সর্বোৎকৃষ্ট উত্তরের বৃত্তটি বল পয়েন্ট কলম দ্বারা সম্পূর্ণ ভরাট কর। প্রতিটি প্রশ্নের মান ১।]
-                            </p>
-                            <p className="text-red-700 font-bold text-[10px] sm:text-[11px]">
-                              প্রশ্নপত্রে কোনো প্রকার দাগ/চিহ্ন দেওয়া যাবে না।
-                            </p>
-                          </div>
-
-                          {/* TWO-COLUMN BOARD EXAM QUESTIONS GRID (Exact Image 3 Layout) */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 items-start divide-y md:divide-y-0 md:divide-x divide-slate-200">
-                            {/* Column 1 (Left: Questions 1 to N/2) */}
-                            <div className="space-y-4">
-                              {activePaperQuestions.slice(0, Math.ceil(activePaperQuestions.length / 2)).map((q, idx) => {
-                                const qNumber = idx + 1;
-                                const optLetters = ['(ক)', '(খ)', '(গ)', '(ঘ)'];
-                                return (
-                                  <div key={q.id} className="space-y-1.5 text-xs sm:text-sm border-b border-slate-100 pb-3">
-                                    <div className="flex items-start gap-1 font-bold text-slate-900 leading-snug">
-                                      <span className="shrink-0">{qNumber}।</span>
-                                      <span>{q.question}</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 pl-4 text-[11px] sm:text-xs text-slate-800 font-sans">
-                                      {q.options.map((opt, optIdx) => (
-                                        <div key={optIdx} className="flex items-baseline gap-1">
-                                          <span className="font-bold text-slate-600">{optLetters[optIdx]}</span>
-                                          <span>{opt}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-
-                            {/* Column 2 (Right: Questions N/2+1 to N) */}
-                            <div className="space-y-4 md:pl-8 pt-4 md:pt-0">
-                              {activePaperQuestions.slice(Math.ceil(activePaperQuestions.length / 2)).map((q, idx) => {
-                                const qNumber = Math.ceil(activePaperQuestions.length / 2) + idx + 1;
-                                const optLetters = ['(ক)', '(খ)', '(গ)', '(ঘ)'];
-                                return (
-                                  <div key={q.id} className="space-y-1.5 text-xs sm:text-sm border-b border-slate-100 pb-3">
-                                    <div className="flex items-start gap-1 font-bold text-slate-900 leading-snug">
-                                      <span className="shrink-0">{qNumber}।</span>
-                                      <span>{q.question}</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-x-2 gap-y-1 pl-4 text-[11px] sm:text-xs text-slate-800 font-sans">
-                                      {q.options.map((opt, optIdx) => (
-                                        <div key={optIdx} className="flex items-baseline gap-1">
-                                          <span className="font-bold text-slate-600">{optLetters[optIdx]}</span>
-                                          <span>{opt}</span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-
-                          {/* Answer Key Footer (For Guardian / Teacher Reference) */}
-                          <div className="mt-8 pt-4 border-t-2 border-slate-300 font-sans text-xs">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="font-bold uppercase tracking-wider text-slate-600">অভিভাবক সমাধান নির্দেশিকা (উত্তরমালা):</span>
-                              <span className="text-[11px] text-slate-400">প্রিন্ট করার সময় প্রয়োজনে আলাদা পাতা হিসেবে ব্যবহারযোগ্য</span>
-                            </div>
-                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 text-[11px]">
-                              {activePaperQuestions.map((q, i) => (
-                                <div key={q.id} className="p-1.5 bg-slate-50 border border-slate-200 rounded flex items-center justify-between">
-                                  <span className="font-bold text-slate-600">{i + 1} :</span>
-                                  <span className="font-bold text-emerald-800 truncate max-w-[70px]">{q.correctAnswer}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Bottom Action Footer */}
-                        {previewPaperData ? (
-                          <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
-                            <span className="text-xs text-slate-500 font-sans">
-                              * সংরক্ষিত কাস্টম পরীক্ষার পূর্ণাঙ্গ প্রশ্নপত্র। এটি সরাসরি প্রিন্ট করে শিক্ষার্থীকে দেওয়া যাবে।
-                            </span>
-                            <div className="flex items-center gap-2.5">
-                              <Button
-                                size="sm"
-                                onClick={() => window.print()}
-                                className="rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs gap-1.5 cursor-pointer"
-                              >
-                                <Printer size={15} />
-                                প্রিন্ট / PDF
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setShowPreviewModal(false);
-                                  setPreviewPaperData(null);
-                                }}
-                                className="rounded-xl border-slate-300 font-bold text-xs cursor-pointer"
-                              >
-                                বন্ধ করুন
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
-                            <span className="text-xs text-slate-500 text-center sm:text-left">
-                              প্রশ্নপত্র সন্তোষজনক হলে সরাসরি সন্তানকে পাঠান অথবা লিংক তৈরি করে মেসেজে দিন।
-                            </span>
-                            <div className="flex items-center gap-2.5">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleGenerateLink}
-                                className="rounded-xl border-slate-300 font-bold text-xs"
-                              >
-                                <Link2 size={16} className="text-emerald-600" />
-                                লিংক তৈরি করুন
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={handleSendToStudent}
-                                className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-md shadow-indigo-200"
-                              >
-                                <Send size={16} />
-                                সরাসরি সন্তানকে পাঠান
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
-
-          {/* MODAL 3: GENERATE LINK MODAL (শেয়ার লিংক মডাল) */}
-          <AnimatePresence>
-            {shareLinkModalData && (
-              <>
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setShareLinkModalData(null)}
-                  className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-[170]"
-                />
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                  className="fixed inset-4 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-w-lg sm:w-full bg-white rounded-3xl shadow-2xl z-[171] overflow-hidden p-6 sm:p-7 space-y-5 max-h-[90vh] overflow-y-auto"
-                >
-                    {/* Modal Header */}
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                          <Link2 size={22} />
-                        </div>
-                        <div>
-                          <h3 className="font-black text-slate-900 text-base">ইউনিক এক্সাম লিংক তৈরি হয়েছে</h3>
-                          <p className="text-xs text-slate-500">{shareLinkModalData.subject} • {shareLinkModalData.questionCount}টি প্রশ্ন</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setShareLinkModalData(null)}
-                        className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-400 cursor-pointer"
-                      >
-                        <X size={20} />
-                      </button>
-                    </div>
-
-                    {/* Duration Setter (সময়সীমা নির্ধারণ) */}
-                    <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100 space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                          <Clock size={15} className="text-indigo-600" />
-                          পরীক্ষার সময়সীমা (Duration) নির্ধারণ করুন:
-                        </label>
-                        <span className="text-xs font-black text-indigo-700 bg-white px-2 py-0.5 rounded-lg border border-indigo-200">
-                          {shareLinkModalData.duration} মিনিট
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {[10, 15, 20, 25, 30, 45, 60].map((mins) => (
-                          <button
-                            key={mins}
-                            type="button"
-                            onClick={() => handleUpdateModalDuration(mins)}
-                            className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                              shareLinkModalData.duration === mins
-                                ? 'bg-indigo-600 text-white shadow-xs'
-                                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                            }`}
-                          >
-                            {mins} মিনিট
-                          </button>
-                        ))}
-                      </div>
-                      <p className="text-[11px] text-slate-500">
-                        * সন্তান যখন লিংকে প্রবেশ করবে তখন এই সময়সীমা অনুযায়ী টাইমার সক্রিয় হবে।
-                      </p>
-                    </div>
-
-                    {/* Exam PIN Code Box */}
-                    {shareLinkModalData.pin && (
-                      <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200 flex items-center justify-between">
-                        <div>
-                          <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">সহজ ৬-সংখ্যার পরীক্ষার পিন (Exam PIN):</span>
-                          <span className="text-2xl font-black text-amber-950 tracking-widest">{shareLinkModalData.pin}</span>
-                          <span className="text-[10px] text-amber-700 block mt-0.5">সন্তান লিংকে না গিয়ে এই পিন লিখেও পরীক্ষা শুরু করতে পারবে</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText(shareLinkModalData.pin || '');
-                            setIsLinkCopied(true);
-                            setTimeout(() => setIsLinkCopied(false), 2500);
-                          }}
-                          className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs"
-                        >
-                          পিন কপি
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Shareable Link Box with Quick Copy */}
-                    <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">ছোট ও নিরাপদ পরীক্ষার ইউনিক লিংক:</span>
-                      <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200">
-                        <input
-                          type="text"
-                          readOnly
-                          value={shareLinkModalData.url}
-                          className="w-full text-xs font-mono text-slate-700 bg-transparent border-none focus:outline-none select-all font-semibold"
-                        />
-                        <button
-                          onClick={handleCopyShareLink}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
-                            isLinkCopied 
-                              ? 'bg-emerald-600 text-white' 
-                              : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
-                          }`}
-                        >
-                          {isLinkCopied ? (
-                            <>
-                              <CheckCheck size={14} />
-                              <span>কপি হয়েছে</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy size={14} />
-                              <span>কপি করুন</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Share Action Buttons (WhatsApp & Direct Send) */}
-                    <div className="space-y-2 pt-1">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">সরাসরি শেয়ার করুন:</span>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {/* WhatsApp Share Action Button */}
-                        <a
-                          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                            `📝 *দা পাঠশালা - অনলাইন পরীক্ষা*\nবিষয়: ${shareLinkModalData.subject}\nঅধ্যায়: ${shareLinkModalData.chapter}\nসময়সীমা: ${shareLinkModalData.duration} মিনিট | পূর্ণমান: ${shareLinkModalData.totalMarks}\n${shareLinkModalData.pin ? `পিন কোড: ${shareLinkModalData.pin}\n` : ''}\nপরীক্ষা দিতে নিচের লিংকে প্রবেশ করো:\n${shareLinkModalData.url}`
-                          )}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-full py-3 px-3 bg-[#25D366] hover:bg-[#1EBE5D] text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-                        >
-                          <Share2 size={16} />
-                          <span>WhatsApp-এ পাঠান</span>
-                        </a>
-
-                        {/* Direct Send to Student Dashboard */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            handleSendToStudent();
-                            setShareLinkModalData(null);
-                          }}
-                          className="w-full py-3 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
-                        >
-                          <Send size={16} />
-                          <span>সন্তানের অ্যাকাউন্টে পাঠান</span>
-                        </button>
-                      </div>
-
-                      {/* Open / Test Start Exam screen */}
-                      <a
-                        href={shareLinkModalData.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
-                      >
-                        <ExternalLink size={15} className="text-slate-600" />
-                        <span>লিংকটি নিজে ওপেন করে প্রিভিউ করুন</span>
-                      </a>
-
-                      <Button
-                        variant="outline"
-                        onClick={() => setShareLinkModalData(null)}
-                        className="w-full text-xs font-bold rounded-xl cursor-pointer mt-1"
-                      >
-                        বন্ধ করুন
-                      </Button>
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
         </div>
       )}
 
@@ -4042,6 +3676,416 @@ id (string), question (string in Bengali), options (array of 4 Bengali strings),
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* ROOT LEVEL MODAL: PRINT & EXAM VIEW PREVIEW MODAL (ACCESSIBLE FROM REVIEW AND ALL TABS) */}
+      <AnimatePresence>
+        {showPreviewModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowPreviewModal(false)}
+              className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[160]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-2 sm:inset-6 md:inset-10 lg:inset-16 bg-white rounded-3xl shadow-2xl z-[161] overflow-hidden flex flex-col max-w-4xl mx-auto"
+            >
+              {/* Top Modal Controls */}
+              <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2 font-black text-slate-800 text-sm sm:text-base">
+                  <FileText className="text-indigo-600" size={20} />
+                  {previewPaperData ? `${previewPaperData.subject} কাস্টম মূল্যায়ন প্রশ্নপত্র (বোর্ড ফরম্যাট)` : 'প্রশ্নপত্র প্রিন্ট ও পরীক্ষার পূর্ণাঙ্গ প্রিভিউ'}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => window.print()}
+                    className="rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs gap-1.5 cursor-pointer"
+                  >
+                    <Printer size={15} />
+                    <span className="hidden sm:inline">প্রিন্ট / PDF</span>
+                  </Button>
+                  <button
+                    onClick={() => {
+                      setShowPreviewModal(false);
+                      setPreviewPaperData(null);
+                    }}
+                    className="p-1.5 hover:bg-slate-200 text-slate-500 rounded-xl transition-all cursor-pointer"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Exam Paper Sheet */}
+              {(() => {
+                const activePaperQuestions = previewPaperData ? previewPaperData.questions : questions;
+                const activePaperSubject = previewPaperData ? previewPaperData.subject : assignForm.subject;
+                const activePaperChapter = previewPaperData ? previewPaperData.chapter : assignForm.chapter;
+                const activePaperDuration = previewPaperData ? previewPaperData.duration : assignForm.duration;
+                const totalPaperMarks = activePaperQuestions.reduce((s, q) => s + (q.marks || 1), 0);
+
+                return (
+                  <>
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-5 bg-white font-serif text-slate-900 print:p-0">
+                      {/* Board Exam Sheet Header */}
+                      <div className="flex flex-col sm:flex-row items-start justify-between gap-4 border-b-2 border-slate-900 pb-4">
+                        {/* Left: Exam Info */}
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-4 text-xs font-bold text-slate-600">
+                            <span>যমুনা / দা-পাঠশালা</span>
+                            <span>•</span>
+                            <span>পত্র নং: ০১</span>
+                          </div>
+                          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                            বহুনির্বাচনি অভীক্ষা
+                          </h2>
+                          <h3 className="text-base sm:text-lg font-bold text-slate-800">
+                            {activePaperSubject} ({activePaperChapter})
+                          </h3>
+                          <p className="text-xs text-slate-600 font-sans">
+                            [{new Date().getFullYear()} সালের বোর্ড সিলেবাস অনুযায়ী]
+                          </p>
+                          <div className="flex items-center gap-6 text-xs sm:text-sm font-bold text-slate-800 pt-1 font-sans">
+                            <span>সময় — {activePaperDuration} মিনিট</span>
+                            <span>পূর্ণমান — {totalPaperMarks}</span>
+                          </div>
+                        </div>
+
+                        {/* Right: Board Boxes */}
+                        <div className="flex flex-col items-end gap-2 shrink-0 self-end sm:self-start">
+                          <div className="border-2 border-slate-900 p-2 text-center bg-white">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold font-sans">বিষয় কোড :</span>
+                              <div className="flex border border-slate-900">
+                                <span className="w-6 h-6 border-r border-slate-900 flex items-center justify-center font-mono font-black text-xs">১</span>
+                                <span className="w-6 h-6 border-r border-slate-900 flex items-center justify-center font-mono font-black text-xs">০</span>
+                                <span className="w-6 h-6 flex items-center justify-center font-mono font-black text-xs">১</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="border-2 border-slate-900 p-2 text-center bg-white flex items-center gap-2">
+                            <span className="text-xs font-bold font-sans">সেট :</span>
+                            <span className="w-7 h-7 border border-slate-900 flex items-center justify-center font-bold text-sm bg-slate-50">খ</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Board Special Instructions */}
+                      <div className="p-2.5 bg-slate-50 border border-slate-300 text-[11px] sm:text-xs text-slate-800 leading-relaxed font-sans space-y-0.5">
+                        <p className="font-semibold">
+                          [বিশেষ দ্রষ্টব্য: সরবরাহকৃত বহুনির্বাচনি অভীক্ষার উত্তরপত্রে প্রশ্নের ক্রমিক নম্বরের বিপরীতে প্রদত্ত বর্ণসংবলিত বৃত্তসমূহ হতে সঠিক/সর্বোৎকৃষ্ট উত্তরের বৃত্তটি বল পয়েন্ট কলম দ্বারা সম্পূর্ণ ভরাট কর। প্রতিটি প্রশ্নের মান ১।]
+                        </p>
+                        <p className="text-red-700 font-bold text-[10px] sm:text-[11px]">
+                          প্রশ্নপত্রে কোনো প্রকার দাগ/চিহ্ন দেওয়া যাবে না।
+                        </p>
+                      </div>
+
+                      {/* TWO-COLUMN BOARD EXAM QUESTIONS GRID */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 items-start divide-y md:divide-y-0 md:divide-x divide-slate-200">
+                        {/* Column 1 (Left) */}
+                        <div className="space-y-4">
+                          {activePaperQuestions.slice(0, Math.ceil(activePaperQuestions.length / 2)).map((q, idx) => {
+                            const qNumber = idx + 1;
+                            const optLetters = ['(ক)', '(খ)', '(গ)', '(ঘ)'];
+                            return (
+                              <div key={q.id} className="space-y-1.5 text-xs sm:text-sm border-b border-slate-100 pb-3">
+                                <div className="flex items-start gap-1 font-bold text-slate-900 leading-snug">
+                                  <span className="shrink-0">{qNumber}।</span>
+                                  <span>{q.question}</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-2 gap-y-1 pl-4 text-[11px] sm:text-xs text-slate-800 font-sans">
+                                  {q.options.map((opt, optIdx) => (
+                                    <div key={optIdx} className="flex items-baseline gap-1">
+                                      <span className="font-bold text-slate-600">{optLetters[optIdx]}</span>
+                                      <span>{opt}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Column 2 (Right) */}
+                        <div className="space-y-4 md:pl-8 pt-4 md:pt-0">
+                          {activePaperQuestions.slice(Math.ceil(activePaperQuestions.length / 2)).map((q, idx) => {
+                            const qNumber = Math.ceil(activePaperQuestions.length / 2) + idx + 1;
+                            const optLetters = ['(ক)', '(খ)', '(গ)', '(ঘ)'];
+                            return (
+                              <div key={q.id} className="space-y-1.5 text-xs sm:text-sm border-b border-slate-100 pb-3">
+                                <div className="flex items-start gap-1 font-bold text-slate-900 leading-snug">
+                                  <span className="shrink-0">{qNumber}।</span>
+                                  <span>{q.question}</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-2 gap-y-1 pl-4 text-[11px] sm:text-xs text-slate-800 font-sans">
+                                  {q.options.map((opt, optIdx) => (
+                                    <div key={optIdx} className="flex items-baseline gap-1">
+                                      <span className="font-bold text-slate-600">{optLetters[optIdx]}</span>
+                                      <span>{opt}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Answer Key Footer */}
+                      <div className="mt-8 pt-4 border-t-2 border-slate-300 font-sans text-xs">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-bold uppercase tracking-wider text-slate-600">অভিভাবক সমাধান নির্দেশিকা (উত্তরমালা):</span>
+                          <span className="text-[11px] text-slate-400">প্রিন্ট করার সময় প্রয়োজনে আলাদা পাতা হিসেবে ব্যবহারযোগ্য</span>
+                        </div>
+                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 text-[11px]">
+                          {activePaperQuestions.map((q, i) => (
+                            <div key={q.id} className="p-1.5 bg-slate-50 border border-slate-200 rounded flex items-center justify-between">
+                              <span className="font-bold text-slate-600">{i + 1} :</span>
+                              <span className="font-bold text-emerald-800 truncate max-w-[70px]">{q.correctAnswer}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bottom Action Footer */}
+                    {previewPaperData ? (
+                      <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
+                        <span className="text-xs text-slate-500 font-sans">
+                          * সংরক্ষিত কাস্টম পরীক্ষার পূর্ণাঙ্গ প্রশ্নপত্র। এটি সরাসরি প্রিন্ট করে শিক্ষার্থীকে দেওয়া যাবে।
+                        </span>
+                        <div className="flex items-center gap-2.5">
+                          <Button
+                            size="sm"
+                            onClick={() => window.print()}
+                            className="rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs gap-1.5 cursor-pointer"
+                          >
+                            <Printer size={15} />
+                            প্রিন্ট / PDF
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setShowPreviewModal(false);
+                              setPreviewPaperData(null);
+                            }}
+                            className="rounded-xl border-slate-300 font-bold text-xs cursor-pointer"
+                          >
+                            বন্ধ করুন
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                        <span className="text-xs text-slate-500 text-center sm:text-left">
+                          প্রশ্নপত্র সন্তোষজনক হলে সরাসরি সন্তানকে পাঠান অথবা লিংক তৈরি করে মেসেজে দিন।
+                        </span>
+                        <div className="flex items-center gap-2.5">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleGenerateLink}
+                            className="rounded-xl border-slate-300 font-bold text-xs"
+                          >
+                            <Link2 size={16} className="text-emerald-600" />
+                            লিংক তৈরি করুন
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={handleSendToStudent}
+                            className="rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-md shadow-indigo-200"
+                          >
+                            <Send size={16} />
+                            সরাসরি সন্তানকে পাঠান
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ROOT LEVEL MODAL: GENERATE LINK MODAL (ACCESSIBLE FROM REVIEW AND ALL TABS) */}
+      <AnimatePresence>
+        {shareLinkModalData && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShareLinkModalData(null)}
+              className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-[170]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="fixed inset-4 sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-w-lg sm:w-full bg-white rounded-3xl shadow-2xl z-[171] overflow-hidden p-6 sm:p-7 space-y-5 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <Link2 size={22} />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-slate-900 text-base">ইউনিক এক্সাম লিংক তৈরি হয়েছে</h3>
+                    <p className="text-xs text-slate-500">{shareLinkModalData.subject} • {shareLinkModalData.questionCount}টি প্রশ্ন</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShareLinkModalData(null)}
+                  className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-400 cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Clock size={15} className="text-indigo-600" />
+                    পরীক্ষার সময়সীমা (Duration) নির্ধারণ করুন:
+                  </label>
+                  <span className="text-xs font-black text-indigo-700 bg-white px-2 py-0.5 rounded-lg border border-indigo-200">
+                    {shareLinkModalData.duration} মিনিট
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[10, 15, 20, 25, 30, 45, 60].map((mins) => (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => handleUpdateModalDuration(mins)}
+                      className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        shareLinkModalData.duration === mins
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                      }`}
+                    >
+                      {mins} মিনিট
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  * সন্তান যখন লিংকে প্রবেশ করবে তখন এই সময়সীমা অনুযায়ী টাইমার সক্রিয় হবে।
+                </p>
+              </div>
+
+              {shareLinkModalData.pin && (
+                <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200 flex items-center justify-between">
+                  <div>
+                    <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">সহজ ৬-সংখ্যার পরীক্ষার পিন (Exam PIN):</span>
+                    <span className="text-2xl font-black text-amber-950 tracking-widest">{shareLinkModalData.pin}</span>
+                    <span className="text-[10px] text-amber-700 block mt-0.5">সন্তান লিংকে না গিয়ে এই পিন লিখেও পরীক্ষা শুরু করতে পারবে</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(shareLinkModalData.pin || '');
+                      setIsLinkCopied(true);
+                      setTimeout(() => setIsLinkCopied(false), 2500);
+                    }}
+                    className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold cursor-pointer transition-all shadow-xs"
+                  >
+                    পিন কপি
+                  </button>
+                </div>
+              )}
+
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">ছোট ও নিরাপদ পরীক্ষার ইউনিক লিংক:</span>
+                <div className="flex items-center gap-2 bg-white p-2 rounded-xl border border-slate-200">
+                  <input
+                    type="text"
+                    readOnly
+                    value={shareLinkModalData.url}
+                    className="w-full text-xs font-mono text-slate-700 bg-transparent border-none focus:outline-none select-all font-semibold"
+                  />
+                  <button
+                    onClick={handleCopyShareLink}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
+                      isLinkCopied 
+                        ? 'bg-emerald-600 text-white' 
+                        : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
+                    }`}
+                  >
+                    {isLinkCopied ? (
+                      <>
+                        <CheckCheck size={14} />
+                        <span>কপি হয়েছে</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} />
+                        <span>কপি করুন</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">সরাসরি শেয়ার করুন:</span>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <a
+                    href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                      `📝 *দা পাঠশালা - অনলাইন পরীক্ষা*\nবিষয়: ${shareLinkModalData.subject}\nঅধ্যায়: ${shareLinkModalData.chapter}\nসময়সীমা: ${shareLinkModalData.duration} মিনিট | পূর্ণমান: ${shareLinkModalData.totalMarks}\n${shareLinkModalData.pin ? `পিন কোড: ${shareLinkModalData.pin}\n` : ''}\nপরীক্ষা দিতে নিচের লিংকে প্রবেশ করো:\n${shareLinkModalData.url}`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 px-3 bg-[#25D366] hover:bg-[#1EBE5D] text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                  >
+                    <Share2 size={16} />
+                    <span>WhatsApp-এ পাঠান</span>
+                  </a>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleSendToStudent();
+                      setShareLinkModalData(null);
+                    }}
+                    className="w-full py-3 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer"
+                  >
+                    <Send size={16} />
+                    <span>সন্তানের অ্যাকাউন্টে পাঠান</span>
+                  </button>
+                </div>
+
+                <a
+                  href={shareLinkModalData.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <ExternalLink size={15} className="text-slate-600" />
+                  <span>লিংকটি নিজে ওপেন করে প্রিভিউ করুন</span>
+                </a>
+
+                <Button
+                  variant="outline"
+                  onClick={() => setShareLinkModalData(null)}
+                  className="w-full text-xs font-bold rounded-xl cursor-pointer mt-1"
+                >
+                  বন্ধ করুন
+                </Button>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>

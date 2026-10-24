@@ -90,48 +90,44 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
       setStudentName(foundExam.childName);
     }
 
-    // Check if the student has already taken/submitted or parent has reviewed this exam
+    // Check for previous submission if available, but never force-open the finished result
     try {
       const targetId = foundExam.id || examId;
       const queryParams = new URLSearchParams(window.location.search);
       const qId = queryParams.get('id') || queryParams.get('examId');
-      const isRetake = queryParams.get('retake') === 'true' || queryParams.get('retake') === '1';
 
-      if (!isRetake) {
-        // 1. Direct check from published marksheet registry
-        const published = getPublishedMarksheet(targetId) || (qId ? getPublishedMarksheet(qId) : null);
-        if (published && (published.isPublished === true || published.status === 'reviewed' || !!published.parentComment || !!published.parentFeedback)) {
-          setMatchedSubmission(published);
-          if (published.questions && Array.isArray(published.questions) && published.questions.length > 0) {
-            foundExam.questions = published.questions;
-          }
-          if (published.studentName) {
-            setStudentName(published.studentName);
-          }
-          setIsExamStarted(true);
-        } else {
-          // 2. Check dapathshala_parent_assigned_tests
-          const assignedRaw = localStorage.getItem('dapathshala_parent_assigned_tests');
-          if (assignedRaw) {
-            const assignedList = JSON.parse(assignedRaw);
-            const matched = assignedList.find((t: any) => 
-              (t.id && (t.id === targetId || (qId && t.id === qId))) || 
-              (t.examId && (t.examId === targetId || (qId && t.examId === qId))) ||
-              (targetId === 'demo_exam_01' && (t.id === 'test-101' || t.examId === 'demo_exam_01')) ||
-              (targetId === 'test-101' && (t.id === 'demo_exam_01' || t.examId === 'test-101'))
-            );
-
-            if (matched && (matched.status === 'submitted' || matched.status === 'reviewed' || matched.isPublished === true || !!matched.parentComment || !!matched.parentFeedback)) {
-              setMatchedSubmission(matched);
-              if (matched.questions && Array.isArray(matched.questions) && matched.questions.length > 0) {
-                foundExam.questions = matched.questions;
+      const assignedRaw = localStorage.getItem('dapathshala_parent_assigned_tests');
+      if (assignedRaw) {
+        const assignedList = JSON.parse(assignedRaw);
+        const currentTest = assignedList.find((t: any) =>
+          (targetId && (t.id === targetId || t.examId === targetId || t.pin === targetId)) || 
+          (qId && (t.id === qId || t.examId === qId || t.pin === qId))
+        );
+        if (currentTest) {
+          // If the test has all questions saved in questionsList or questions, ensure they are loaded
+          const fullQ = currentTest.questionsList || currentTest.questions;
+          if (Array.isArray(fullQ) && fullQ.length > 0) {
+            const formatted = fullQ.map((q: any, idx: number) => {
+              let correctIdx = 0;
+              if (typeof q.correctAnswer === 'number') {
+                correctIdx = q.correctAnswer;
+              } else if (typeof q.correctAnswer === 'string' && q.options) {
+                const fIdx = q.options.findIndex((opt: string) => opt.trim() === q.correctAnswer.trim());
+                correctIdx = fIdx >= 0 ? fIdx : 0;
               }
-              if (matched.studentName) {
-                setStudentName(matched.studentName);
-              }
-              // Launch LiveExamEngine to render the evaluated result or submitted state
-              setIsExamStarted(true);
-            }
+              return {
+                id: q.id || `q_${idx + 1}`,
+                text: q.question || q.text || `প্রশ্ন ${idx + 1}`,
+                options: q.options || ['ক', 'খ', 'গ', 'ঘ'],
+                correctAnswer: correctIdx,
+                explanation: q.explanation || ''
+              };
+            });
+            foundExam.questions = formatted;
+            foundExam.totalMarks = formatted.length;
+          }
+          if (currentTest.status === 'submitted' || currentTest.status === 'reviewed' || currentTest.isPublished === true) {
+            setMatchedSubmission(currentTest);
           }
         }
       }
@@ -139,40 +135,6 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
       console.warn('Error checking existing exam submission state:', e);
     }
   }, [examId]);
-
-  // Real-time listener for marksheet published while on StartExamScreen
-  useEffect(() => {
-    const unsubscribe = subscribeToPublishedMarksheet((marksheet) => {
-      if (!marksheet) return;
-      const targetId = examData?.id || examId;
-      const qParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-      const qId = qParams?.get('id') || qParams?.get('examId');
-      const isRetake = qParams?.get('retake') === 'true' || qParams?.get('retake') === '1';
-      if (isRetake) return;
-
-      const isMatch = 
-        (targetId && (marksheet.id === targetId || marksheet.examId === targetId)) ||
-        (qId && (marksheet.id === qId || marksheet.examId === qId)) ||
-        (targetId === 'demo_exam_01' && (marksheet.id === 'test-101' || marksheet.examId === 'demo_exam_01')) ||
-        (targetId === 'test-101' && (marksheet.id === 'demo_exam_01' || marksheet.examId === 'test-101')) ||
-        marksheet.isPublished === true;
-
-      if (isMatch) {
-        setMatchedSubmission(marksheet);
-        if (marksheet.questions && marksheet.questions.length > 0) {
-          setExamData(prev => prev ? { ...prev, questions: marksheet.questions } : prev);
-        }
-        if (marksheet.studentName) {
-          setStudentName(marksheet.studentName);
-        }
-        setIsExamStarted(true);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [examData?.id, examId]);
 
   if (!examData) {
     return (
@@ -186,6 +148,7 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
   }
 
   // If exam has started, render LiveExamEngine
+  // If exam has started, render LiveExamEngine with questions
   if (isExamStarted) {
     const activeExamObject: any = {
       id: examData.id,
@@ -194,7 +157,7 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
       duration: selectedDuration,
       date: new Date().toISOString(),
       totalMarks: examData.totalMarks || examData.questions.length,
-      isPublished: matchedSubmission?.isPublished === true || matchedSubmission?.status === 'reviewed' || !!matchedSubmission?.parentComment || !!matchedSubmission?.parentFeedback
+      isPublished: false
     };
 
     return (
@@ -203,7 +166,7 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
         questions={examData.questions}
         studentName={studentName || examData.childName || 'আরাফাত রহমান'}
         childId="child_1"
-        initialSubmission={matchedSubmission}
+        initialSubmission={undefined}
         onClose={() => {
           setIsExamStarted(false);
           if (onExit) onExit();

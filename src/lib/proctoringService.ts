@@ -329,16 +329,53 @@ export const submitExamScript = async (
   // 1. Persist to localStorage assigned tests
   try {
     const raw = localStorage.getItem(STORAGE_TESTS_KEY);
-    const existing: ExamSubmissionPayload[] = raw ? JSON.parse(raw) : [];
-    const index = existing.findIndex(t => t.id === payload.id || t.id === payload.examId);
-    let updated: ExamSubmissionPayload[];
+    const existing: any[] = raw ? JSON.parse(raw) : [];
+    const index = existing.findIndex(t => 
+      (t.id && (t.id === payload.id || t.id === payload.examId)) ||
+      (t.examId && (t.examId === payload.id || t.examId === payload.examId)) ||
+      ((payload as any).pin && t.pin === (payload as any).pin)
+    );
+    let updated: any[];
     if (index >= 0) {
+      const prevTest = existing[index];
+      const prevQ = prevTest.questionsList || prevTest.questions || [];
+      const payloadQ = payload.questions || [];
+      // Use whichever questions array has more questions, or fallback to the non-empty one
+      const mergedQuestions = (payloadQ.length >= prevQ.length && payloadQ.length > 0)
+        ? payloadQ
+        : (prevQ.length > 0 ? prevQ : payloadQ);
+
       updated = [...existing];
-      updated[index] = { ...existing[index], ...payload };
+      updated[index] = {
+        ...prevTest,
+        ...payload,
+        questions: mergedQuestions,
+        questionsList: prevTest.questionsList || mergedQuestions,
+        totalMarks: mergedQuestions.length > 0 ? mergedQuestions.length : (payload.totalMarks || prevTest.totalMarks || 15)
+      };
     } else {
       updated = [payload, ...existing];
     }
     localStorage.setItem(STORAGE_TESTS_KEY, JSON.stringify(updated));
+
+    // Also update dapathshala_live_exams storage so both remain synchronized
+    try {
+      const rawLive = localStorage.getItem('dapathshala_live_exams');
+      if (rawLive) {
+        const liveExams = JSON.parse(rawLive);
+        const lKey = payload.id || payload.examId;
+        if (liveExams[lKey]) {
+          liveExams[lKey] = {
+            ...liveExams[lKey],
+            status: 'submitted',
+            answers: payload.answers,
+            handwrittenImages: payload.handwrittenImages,
+            submittedAt: payload.submittedAt
+          };
+          localStorage.setItem('dapathshala_live_exams', JSON.stringify(liveExams));
+        }
+      }
+    } catch {}
   } catch (err) {
     console.warn('Failed to save exam submission locally:', err);
   }

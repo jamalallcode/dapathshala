@@ -57,19 +57,10 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [answers, setAnswers] = useState<Record<string, number>>(() => initialSubmission?.answers || {});
   const [timeLeft, setTimeLeft] = useState(exam.duration * 60);
 
-  const isInitialReviewedOrSubmitted = !!(
-    initialSubmission && (
-      initialSubmission.status === 'reviewed' || 
-      initialSubmission.status === 'submitted' || 
-      initialSubmission.isPublished === true ||
-      initialSubmission.parentComment ||
-      initialSubmission.parentFeedback
-    )
-  );
-
-  const [isFinished, setIsFinished] = useState(isInitialReviewedOrSubmitted);
+  const isExplicitReview = !!(initialSubmission?.isReviewOnly);
+  const [isFinished, setIsFinished] = useState(isExplicitReview);
   const [result, setResult] = useState<ExamResult | null>(() => {
-    if (!initialSubmission) return null;
+    if (!isExplicitReview) return null;
     const qList = (initialSubmission.questions && Array.isArray(initialSubmission.questions) && initialSubmission.questions.length > 0)
       ? initialSubmission.questions
       : activeQuestions;
@@ -116,7 +107,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [handwrittenImages, setHandwrittenImages] = useState<string[]>(() => initialSubmission?.handwrittenImages || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionComplete, setSubmissionComplete] = useState(isInitialReviewedOrSubmitted);
+  const [submissionComplete, setSubmissionComplete] = useState(isExplicitReview);
   const [timeExpiredPrompt, setTimeExpiredPrompt] = useState(false);
   const [showFinalMarksheetModal, setShowFinalMarksheetModal] = useState(false);
   const [existingSubmission, setExistingSubmission] = useState<any>(() => initialSubmission || null);
@@ -124,19 +115,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const hasEnteredFullscreenRef = useRef<boolean>(false);
   const autoAdvanceTimerRef = useRef<any>(null);
 
-  // Check if student already submitted or parent reviewed this test
+  // Load existing submission data only if in explicit review mode
   useEffect(() => {
+    if (!isExplicitReview) return;
     try {
       const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-      const isRetake = urlParams?.get('retake') === 'true' || urlParams?.get('retake') === '1';
-      if (isRetake) return;
-
       const urlId = (urlParams?.get('id') || urlParams?.get('examId') || '').trim();
 
-      // 1. Direct check in published marksheet registry
       let found = getPublishedMarksheet(exam.id) || (urlId ? getPublishedMarksheet(urlId) : null);
-
-      // 2. If not found, check dapathshala_parent_assigned_tests
       if (!found) {
         const raw = localStorage.getItem('dapathshala_parent_assigned_tests');
         if (raw) {
@@ -145,14 +131,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             t.id === exam.id || 
             t.examId === exam.id ||
             (urlId && (t.id === urlId || t.examId === urlId)) ||
-            (exam.id === 'demo_exam_01' && (t.id === 'test-101' || t.examId === 'demo_exam_01')) ||
-            (exam.id === 'test-101' && (t.id === 'demo_exam_01' || t.examId === 'test-101')) ||
             ((exam as any).pin && t.pin === (exam as any).pin)
           );
         }
       }
 
-      if (found) {
+      if (found && (found.status === 'submitted' || found.status === 'reviewed' || found.isPublished === true)) {
         setExistingSubmission(found);
         if (found.handwrittenImages && Array.isArray(found.handwrittenImages)) {
           setHandwrittenImages(found.handwrittenImages);
@@ -160,57 +144,11 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         if (found.answers) {
           setAnswers(found.answers);
         }
-
-        const qList = (found.questions && Array.isArray(found.questions) && found.questions.length > 0)
-          ? found.questions
-          : activeQuestions;
-
-        let correctCount = 0;
-        if (found.totalScoreObtained !== undefined) {
-          correctCount = Number(found.totalScoreObtained);
-        } else {
-          qList.forEach((q: any) => {
-            if (found.answers && found.answers[q.id] === q.correctAnswer) {
-              correctCount++;
-            }
-          });
-        }
-
-        const totalQ = qList.length;
-        const calculatedScore = totalQ > 0 ? (correctCount / totalQ) * 100 : (found.score || 0);
-
-        if (found.status === 'reviewed' || found.isPublished === true) {
-          setResult({
-            examId: exam.id,
-            score: found.score !== undefined && found.score !== null ? Number(found.score) : calculatedScore,
-            totalQuestions: totalQ,
-            correctAnswers: correctCount,
-            wrongAnswers: Math.max(0, totalQ - correctCount),
-            timeSpent: 0,
-            answers: found.answers || {},
-            suspiciousFlags: found.redFlagsCount || 0
-          });
-          setIsFinished(true);
-          setSubmissionComplete(true);
-        } else if (found.status === 'submitted') {
-          setResult({
-            examId: exam.id,
-            score: calculatedScore,
-            totalQuestions: totalQ,
-            correctAnswers: correctCount,
-            wrongAnswers: Math.max(0, totalQ - correctCount),
-            timeSpent: 0,
-            answers: found.answers || {},
-            suspiciousFlags: found.redFlagsCount || 0
-          });
-          setSubmissionComplete(true);
-          setIsFinished(true);
-        }
       }
     } catch (err) {
       console.warn('Error loading existing exam status:', err);
     }
-  }, [exam.id, activeQuestions]);
+  }, [exam.id, isExplicitReview]);
 
   // Real-time listener for marksheet published by parent (BroadcastChannel + CustomEvent + Storage)
   useEffect(() => {
@@ -225,8 +163,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         (urlId && (updatedTest.id === urlId || updatedTest.examId === urlId)) ||
         (exam.id === 'demo_exam_01' && (updatedTest.id === 'test-101' || updatedTest.examId === 'demo_exam_01')) ||
         (exam.id === 'test-101' && (updatedTest.id === 'demo_exam_01' || updatedTest.examId === 'test-101')) ||
-        ((exam as any).pin && updatedTest.pin === (exam as any).pin) ||
-        updatedTest.isPublished === true;
+        ((exam as any).pin && updatedTest.pin === (exam as any).pin);
 
       if (isMatch) {
         setExistingSubmission(updatedTest);
