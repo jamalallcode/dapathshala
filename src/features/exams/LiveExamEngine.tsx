@@ -80,6 +80,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [existingSubmission, setExistingSubmission] = useState<any>(null);
 
   const hasEnteredFullscreenRef = useRef<boolean>(false);
+  const autoAdvanceTimerRef = useRef<any>(null);
 
   // Check if student already submitted or parent reviewed this test
   useEffect(() => {
@@ -574,11 +575,37 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   };
 
   const handleAnswerSelect = (optionIndex: number) => {
-    if (!activeQuestions[currentQuestionIndex]) return;
+    const q = activeQuestions[currentQuestionIndex];
+    if (!q) return;
+
+    // Clear any pending timer
+    if (autoAdvanceTimerRef.current) {
+      clearTimeout(autoAdvanceTimerRef.current);
+      autoAdvanceTimerRef.current = null;
+    }
+
+    // Immediately record selection
     setAnswers(prev => ({
       ...prev,
-      [activeQuestions[currentQuestionIndex].id]: optionIndex
+      [q.id]: optionIndex
     }));
+
+    // Auto-advance to the next question with a smooth 350ms transition
+    if (currentQuestionIndex < activeQuestions.length - 1) {
+      autoAdvanceTimerRef.current = setTimeout(() => {
+        setCurrentQuestionIndex(prev => {
+          if (prev === currentQuestionIndex) {
+            return prev + 1;
+          }
+          return prev;
+        });
+      }, 350);
+    } else {
+      // If the final question was answered, wait 650ms and open submit modal
+      autoAdvanceTimerRef.current = setTimeout(() => {
+        handleOpenSubmitModal(false);
+      }, 650);
+    }
   };
 
   const currentQuestion = activeQuestions[currentQuestionIndex] || activeQuestions[0];
@@ -1078,7 +1105,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 {currentQuestion.text}
               </h2>
 
-              <div className="grid grid-cols-1 gap-3 sm:gap-4">
+              {/* Options Grid: 2 on Left, 2 on Right for instant visibility without scroll */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 {currentQuestion.options.map((option, idx) => {
                   const isSelected = answers[currentQuestion.id] === idx;
                   return (
@@ -1086,23 +1114,23 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                       type="button"
                       key={idx}
                       onClick={() => handleAnswerSelect(idx)}
-                      className={`group relative flex items-center p-4 sm:p-6 rounded-2xl border-2 text-left transition-all cursor-pointer ${
+                      className={`group relative flex items-center p-3.5 sm:p-4.5 rounded-2xl border-2 text-left transition-all cursor-pointer min-h-[58px] sm:min-h-[64px] ${
                         isSelected 
-                          ? 'border-emerald-500 bg-emerald-50 shadow-lg shadow-emerald-500/10' 
-                          : 'border-white bg-white hover:border-slate-200 hover:shadow-md'
+                          ? 'border-emerald-500 bg-emerald-50/90 shadow-md shadow-emerald-500/10' 
+                          : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-xs'
                       }`}
                     >
-                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-black mr-3 sm:mr-4 transition-colors ${
-                        isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-500 group-hover:bg-slate-200'
+                      <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-black mr-3 transition-colors shrink-0 ${
+                        isSelected ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 group-hover:bg-slate-200'
                       }`}>
                         {String.fromCharCode(65 + idx)}
                       </div>
-                      <span className={`text-base sm:text-lg font-bold ${isSelected ? 'text-emerald-900' : 'text-slate-700'}`}>
+                      <span className={`text-sm sm:text-base font-bold flex-1 leading-snug ${isSelected ? 'text-emerald-950' : 'text-slate-800'}`}>
                         {option}
                       </span>
                       {isSelected && (
-                        <div className="ml-auto text-emerald-600">
-                          <CheckCircle2 size={24} />
+                        <div className="ml-2 text-emerald-600 shrink-0">
+                          <CheckCircle2 size={22} className="stroke-[2.5]" />
                         </div>
                       )}
                     </button>

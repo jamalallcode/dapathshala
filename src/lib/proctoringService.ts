@@ -343,6 +343,31 @@ export const submitExamScript = async (
     console.warn('Failed to save exam submission locally:', err);
   }
 
+  // 1b. Persist notification directly to dapathshala_notifications
+  try {
+    const notifRaw = localStorage.getItem('dapathshala_notifications');
+    const currentNotifs: any[] = notifRaw ? JSON.parse(notifRaw) : [];
+    const notifEntry = {
+      id: 'notif_sub_' + (payload.id || Date.now()),
+      title: 'নতুন খাতা জমা পড়েছে!',
+      message: `${payload.studentName || 'সন্তান'} "${payload.title || payload.subject}" পরীক্ষা সম্পন্ন করেছে এবং খাতা জমা দিয়েছে।`,
+      time: 'আজ, এইমাত্র',
+      read: false,
+      examId: payload.id || payload.examId
+    };
+    const filtered = currentNotifs.filter((n: any) => n.examId !== (payload.id || payload.examId));
+    localStorage.setItem('dapathshala_notifications', JSON.stringify([notifEntry, ...filtered]));
+  } catch {}
+
+  // 1c. Trigger cross-tab storage sync event
+  try {
+    localStorage.setItem('dapathshala_last_submission_sync', JSON.stringify({
+      id: payload.id,
+      timestamp: Date.now(),
+      payload
+    }));
+  } catch {}
+
   // 2. Broadcast via BroadcastChannel
   try {
     if (broadcastChannel) {
@@ -411,8 +436,20 @@ export const subscribeToExamSubmissions = (
     }
   };
 
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === 'dapathshala_last_submission_sync' && event.newValue) {
+      try {
+        const parsed = JSON.parse(event.newValue);
+        if (parsed.payload) {
+          callback(parsed.payload as ExamSubmissionPayload);
+        }
+      } catch {}
+    }
+  };
+
   if (typeof window !== 'undefined') {
     window.addEventListener('dapathshala_exam_submission', handleCustomEvent);
+    window.addEventListener('storage', handleStorage);
   }
 
   return () => {
@@ -421,6 +458,7 @@ export const subscribeToExamSubmissions = (
     }
     if (typeof window !== 'undefined') {
       window.removeEventListener('dapathshala_exam_submission', handleCustomEvent);
+      window.removeEventListener('storage', handleStorage);
     }
   };
 };

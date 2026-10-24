@@ -76,25 +76,26 @@ export const Navigation: React.FC<NavigationProps> = ({
       const saved = localStorage.getItem('dapathshala_notifications');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
       }
     } catch {}
 
-    const wasCleared = localStorage.getItem('dapathshala_parent_tests_cleared');
-    if (wasCleared === 'true') {
-      return [];
-    }
-
-    // Check if test-101 has already been evaluated or deleted in assigned tests
+    // Check if any tests in dapathshala_parent_assigned_tests are in 'submitted' state
     try {
       const savedTests = localStorage.getItem('dapathshala_parent_assigned_tests');
       if (savedTests !== null) {
         const tests = JSON.parse(savedTests);
         if (Array.isArray(tests)) {
-          if (tests.length === 0) return [];
-          const test101 = tests.find((t: any) => t && (t.id === 'test-101' || t.examId === 'test-101'));
-          if (!test101 || test101.status === 'reviewed' || test101.isPublished) {
-            return [];
+          const submittedTests = tests.filter((t: any) => t && t.status === 'submitted' && !t.isPublished);
+          if (submittedTests.length > 0) {
+            return submittedTests.map((t: any) => ({
+              id: 'notif_' + (t.id || t.examId || Date.now()),
+              title: 'নতুন খাতা জমা পড়েছে!',
+              message: `${t.studentName || t.childName || 'সন্তান'} "${t.title || t.subject}" পরীক্ষার খাতা জমা দিয়েছে।`,
+              time: t.submittedAt || 'অপেক্ষমান',
+              read: false,
+              examId: t.id || t.examId
+            }));
           }
         }
       }
@@ -102,6 +103,24 @@ export const Navigation: React.FC<NavigationProps> = ({
 
     return [];
   });
+
+  // Audio notification chime
+  const playAudioChime = () => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.38);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.38);
+    } catch {}
+  };
 
   // Persist notifications across turns and reloads
   useEffect(() => {
@@ -126,16 +145,18 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   useEffect(() => {
     const unsubscribe = subscribeToExamSubmissions((newSub: ExamSubmissionPayload) => {
+      playAudioChime();
+      const examKey = newSub.id || newSub.examId;
       setNotifications(prev => [
         {
           id: 'notif_' + Date.now(),
           title: 'নতুন খাতা জমা পড়েছে!',
-          message: `${newSub.studentName || 'সন্তান'} "${newSub.title || newSub.subject}" পরীক্ষা সম্পন্ন করেছে (স্কোর: ${newSub.score || 0}%)।`,
+          message: `${newSub.studentName || 'সন্তান'} "${newSub.title || newSub.subject}" পরীক্ষা সম্পন্ন করেছে ও খাতা জমা দিয়েছে।`,
           time: 'এইমাত্র',
           read: false,
-          examId: newSub.id || newSub.examId
+          examId: examKey
         },
-        ...prev
+        ...prev.filter(n => n.examId !== examKey)
       ]);
     });
 
