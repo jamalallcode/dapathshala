@@ -3,7 +3,7 @@ import {
   Plus, Trash2, Copy, Check, Eye, FileText, CheckCircle2, 
   Clock, Shield, AlertTriangle, MessageSquare, ChevronRight, Share2,
   TrendingUp, Award, BookOpen, Sparkles, RefreshCw, Edit3, X,
-  Save, AlertCircle, Camera, ExternalLink, HelpCircle, GraduationCap
+  Save, AlertCircle, Camera, ExternalLink, HelpCircle, GraduationCap, ArrowRight
 } from 'lucide-react';
 import { AssignedTest, StudentSubmission, ExamQuestion } from '../../types';
 import { 
@@ -63,8 +63,9 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     explanation: ''
   });
 
-  // Success Link Generation Modal
+  // Success Link Generation Modal & Finalized State
   const [createdTestResult, setCreatedTestResult] = useState<AssignedTest | null>(null);
+  const [isFinalized, setIsFinalized] = useState(false);
 
   // Review & Evaluation Modal
   const [reviewTest, setReviewTest] = useState<AssignedTest | null>(null);
@@ -208,6 +209,8 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       alert('দয়া করে প্রথমে প্রশ্ন তৈরি করুন!');
       return;
     }
+
+    setIsFinalized(true);
 
     const randomPin = Math.floor(100000 + Math.random() * 900000).toString();
     const newTest: AssignedTest = {
@@ -699,10 +702,23 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               <button
                 type="button"
                 onClick={handleFinalizeExam}
-                className="w-full sm:w-auto px-7 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-sm sm:text-base shadow-md shadow-emerald-200/80 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+                className={`w-full sm:w-auto px-7 py-3 rounded-2xl font-bold text-sm sm:text-base shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 ${
+                  isFinalized
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200/80 ring-2 ring-emerald-300'
+                    : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-emerald-200/80'
+                }`}
               >
-                <Check className="w-5 h-5 stroke-[2.5]" />
-                <span>প্রশ্নপত্র চূড়ান্ত করুন ও লিংক পান</span>
+                {isFinalized ? (
+                  <>
+                    <Check className="w-5 h-5 stroke-[3] text-emerald-100" />
+                    <span>✓ চূড়ান্ত সম্পন্ন হয়েছে! লিংক প্রস্তুত</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowRight className="w-5 h-5" />
+                    <span>প্রশ্নপত্র চূড়ান্ত করুন ও লিংক পান</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
