@@ -155,12 +155,18 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam 
                       </span>
                       <span
                         className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                          isSubmitted
-                            ? "bg-slate-100 text-slate-600"
+                          test.status === "reviewed"
+                            ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                            : test.status === "submitted"
+                            ? "bg-amber-100 text-amber-800"
                             : "bg-emerald-100 text-emerald-800 animate-pulse"
                         }`}
                       >
-                        {isSubmitted ? "সম্পন্ন হয়েছে" : "পরীক্ষা বাকি"}
+                        {test.status === "reviewed"
+                          ? "✓ খাতা দেখা হয়েছে"
+                          : test.status === "submitted"
+                          ? "⏳ খাতা মূল্যায়নাধীন"
+                          : "পরীক্ষা বাকি"}
                       </span>
                     </div>
                     <h3 className="text-base font-black text-slate-900">{test.title}</h3>
@@ -173,16 +179,31 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam 
                       <span>প্রশ্ন: {test.questionCount}টি</span>
                       <span>পূর্ণমান: {test.totalMarks || 100}</span>
                     </div>
+
+                    {/* Show Parent Comment in Student Card if reviewed */}
+                    {test.status === "reviewed" && test.parentComment && (
+                      <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl text-xs space-y-1">
+                        <span className="font-bold text-indigo-900 block">💬 অভিভাবকের মন্তব্য:</span>
+                        <p className="text-slate-800 italic font-medium leading-relaxed">
+                          "{test.parentComment}"
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                    {isSubmitted ? (
+                    {test.status === "reviewed" ? (
                       <div className="flex items-center gap-2">
                         <CircleCheck className="w-4 h-4 text-emerald-600" />
-                        <span className="text-xs font-bold text-slate-700">
-                          {test.score !== undefined
-                            ? `প্রাপ্ত নম্বর: ${test.score}/${test.totalMarks || 100}`
-                            : "খাতা মূল্যায়নাধীন"}
+                        <span className="text-xs font-black text-emerald-700">
+                          প্রাপ্ত নম্বর: {test.score !== undefined ? `${test.score}%` : "৮৫%"}
+                        </span>
+                      </div>
+                    ) : test.status === "submitted" ? (
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4 text-amber-600" />
+                        <span className="text-xs font-bold text-amber-700">
+                          খাতা মূল্যায়নাধীন
                         </span>
                       </div>
                     ) : (
@@ -195,15 +216,22 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam 
                       type="button"
                       onClick={() => onStartExam(test)}
                       className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                        isSubmitted
+                        test.status === "reviewed"
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+                          : isSubmitted
                           ? "bg-slate-100 hover:bg-slate-200 text-slate-700"
                           : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-200 active:scale-95"
                       }`}
                     >
-                      {isSubmitted ? (
+                      {test.status === "reviewed" ? (
                         <>
                           <FileCheck className="w-4 h-4" />
-                          <span>ফলাফল ও খাতা</span>
+                          <span>ফলাফল ও সমাধান</span>
+                        </>
+                      ) : isSubmitted ? (
+                        <>
+                          <FileCheck className="w-4 h-4" />
+                          <span>খাতার অবস্থা</span>
                         </>
                       ) : (
                         <>

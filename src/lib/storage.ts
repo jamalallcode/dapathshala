@@ -15,7 +15,7 @@ export const INITIAL_TESTS: AssignedTest[] = [
     durationMinutes: 15,
     pin: "787193",
     createdAt: "২৬ অক্টোবর ২০২৬, সকাল ১০:৩০",
-    status: "submitted",
+    status: "reviewed",
     studentName: "পরীক্ষার্থী",
     score: 85,
     totalMarks: 100,
@@ -175,7 +175,19 @@ export function getStoredTests(): AssignedTest[] {
       localStorage.setItem(TESTS_KEY, JSON.stringify(INITIAL_TESTS));
       return INITIAL_TESTS;
     }
-    return JSON.parse(raw);
+    const list: AssignedTest[] = JSON.parse(raw);
+    let changed = false;
+    const migrated = list.map(t => {
+      if (t.id === 'test-101' && t.status === 'submitted' && t.score !== undefined) {
+        changed = true;
+        return { ...t, status: 'reviewed' as const };
+      }
+      return t;
+    });
+    if (changed) {
+      localStorage.setItem(TESTS_KEY, JSON.stringify(migrated));
+    }
+    return migrated;
   } catch {
     return INITIAL_TESTS;
   }

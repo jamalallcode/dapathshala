@@ -268,8 +268,15 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     setTests(updated);
     saveStoredTests(updated);
 
-    // Save notification for student
+    // Save notification for student and mark parent submission notification as read
     const notifs = getStoredNotifications();
+    const updatedNotifs = notifs.map(n => {
+      if (n.testId === reviewTest.id && (n.forRole === 'parent' || !n.forRole)) {
+        return { ...n, isRead: true };
+      }
+      return n;
+    });
+
     const newNotif = {
       id: `notif-rev-${Date.now()}`,
       title: 'খাতা মূল্যায়ন ও মন্তব্য প্রকাশিত',
@@ -279,17 +286,18 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       isRead: false,
       forRole: 'student' as const
     };
-    saveStoredNotifications([newNotif, ...notifs]);
+    saveStoredNotifications([newNotif, ...updatedNotifs]);
 
     setReviewTest(null);
-    showToast('✓ ফলাফল ও অভিভাবকীয় মন্তব্য সফলভাবে অনুমোদিত হয়েছে!');
+    showToast('✓ খাতা দেখা সম্পন্ন হয়েছে এবং ফলাফল ও মন্তব্য পাঠানো হয়েছে!');
   };
 
   const toBn = (num: number | string) => {
     return num.toString().replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[parseInt(d)]);
   };
 
-  const submittedCount = tests.filter(t => t.status === 'submitted' || t.status === 'reviewed').length;
+  // Only count tests pending evaluation so the badge count decreases upon review
+  const pendingReviewCount = tests.filter(t => t.status === 'submitted').length;
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -346,9 +354,9 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           >
             <FileText className="w-4 h-4" />
             <span>পরীক্ষাসমূহ ও খাতা</span>
-            {submittedCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[11px] font-black">
-                {toBn(submittedCount)}
+            {pendingReviewCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[11px] font-black animate-pulse">
+                {toBn(pendingReviewCount)}
               </span>
             )}
           </button>
@@ -853,10 +861,11 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                           <button
                             type="button"
                             onClick={() => handleOpenReviewModal(test)}
-                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-colors cursor-pointer"
+                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-400 text-emerald-800 text-xs font-bold transition-all shadow-xs cursor-pointer group"
+                            title="খাতা পুনরায় দেখতে বা মূল্যায়ন সম্পাদন করতে ক্লিক করুন"
                           >
-                            <FileText className="w-3.5 h-3.5" />
-                            <span>খাতা দেখুন</span>
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span>খাতা দেখা হয়েছে</span>
                           </button>
                         )}
 

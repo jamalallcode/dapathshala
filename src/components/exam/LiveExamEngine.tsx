@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import confetti from "canvas-confetti";
 import { 
-  ArrowLeft, Clock, CircleAlert, CircleCheck, Check, 
+  ArrowLeft, Clock, CircleAlert, CircleCheck, Check, CheckCircle2,
   FileCheck, Send, ShieldCheck, X, FileText, Camera, 
   AlertTriangle, EyeOff, Maximize, MessageSquare 
 } from "lucide-react";
@@ -292,8 +292,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             <span>{formatTime(timeLeft)}</span>
           </div>
         ) : (
-          <div className="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
-            {test.score !== undefined ? `স্কোর: ${test.score}%` : "মূল্যায়ন সম্পন্ন"}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>{isReviewed ? "খাতা দেখা হয়েছে" : "মূল্যায়ন সম্পন্ন"}</span>
+            {test.score !== undefined && (
+              <span className="ml-1 pl-1.5 border-l border-emerald-300 font-black text-emerald-900">
+                {test.score}%
+              </span>
+            )}
           </div>
         )}
       </div>

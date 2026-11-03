@@ -94,10 +94,15 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   const handleNotificationClick = (notif: AppNotification) => {
     setIsNotifOpen(false);
+    const all = getStoredNotifications();
+    const updated = all.map(n => n.id === notif.id ? { ...n, isRead: true } : n);
+    saveStoredNotifications(updated);
     if (notif.testId && onNavigateToReview) {
       onNavigateToReview(notif.testId);
     }
   };
+
+  const unreadNotifs = notifications.filter(n => !n.isRead);
 
   return (
     <header className="sticky top-0 z-40 bg-[#0c1322] border-b border-slate-800 text-slate-200 w-full select-none shadow-sm">
@@ -209,8 +214,10 @@ export const Navigation: React.FC<NavigationProps> = ({
               aria-label="বিজ্ঞপ্তি"
             >
               <Bell className="w-4 h-4" />
-              {notifications.length > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+              {unreadNotifs.length > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white rounded-full text-[10px] font-black flex items-center justify-center shadow-xs">
+                  {unreadNotifs.length > 9 ? '9+' : unreadNotifs.length}
+                </span>
               )}
             </button>
 
@@ -218,11 +225,18 @@ export const Navigation: React.FC<NavigationProps> = ({
             {isNotifOpen && (
               <div className="fixed sm:absolute inset-x-3 sm:inset-x-auto sm:right-0 top-14 sm:top-full sm:mt-1.5 w-auto sm:w-80 bg-white text-slate-800 rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-100">
                 <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
-                  <span className="font-bold text-slate-900">বিজ্ঞপ্তি তালিকা</span>
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                    <span>বিজ্ঞপ্তি তালিকা</span>
+                    {unreadNotifs.length > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px]">
+                        {unreadNotifs.length}টি নতুন
+                      </span>
+                    )}
+                  </div>
                   {notifications.length > 0 && (
                     <button
                       onClick={handleClearAll}
-                      className="text-slate-500 hover:text-rose-600 font-medium"
+                      className="text-slate-500 hover:text-rose-600 font-medium cursor-pointer"
                     >
                       সব মুছুন
                     </button>

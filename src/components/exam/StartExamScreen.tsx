@@ -1,176 +1,276 @@
-import React from "react";
-import * as jsxRuntimeExports from "react/jsx-runtime";
-const reactExports = React;
-import { ArrowLeft, Clock, FileCheck, ShieldCheck, Play, CircleCheck, FileText, GraduationCap } from "lucide-react";
-import { LiveExamEngine } from "./LiveExamEngine";
-import { AssignedTest } from "../../types";
+import React, { useState } from 'react';
+import { 
+  ArrowLeft, 
+  Clock, 
+  ShieldCheck, 
+  Play, 
+  CircleCheck, 
+  CheckCircle2, 
+  FileText, 
+  GraduationCap, 
+  MessageSquare, 
+  Award,
+  AlertCircle
+} from 'lucide-react';
+import { LiveExamEngine } from './LiveExamEngine';
+import { AssignedTest } from '../../types';
 
 interface StartExamScreenProps {
   test: AssignedTest;
   onExit: () => void;
 }
 
-export const StartExamScreen = ({ test, onExit }) => {
-  const [isExamStarted, setIsExamStarted] = reactExports.useState(false);
-  const [isReviewMode, setIsReviewMode] = reactExports.useState(false);
-  const isAlreadySubmitted = test.status === "submitted" || test.status === "reviewed";
+export const StartExamScreen: React.FC<StartExamScreenProps> = ({ test, onExit }) => {
+  const [isExamStarted, setIsExamStarted] = useState(false);
+  const [isReviewMode, setIsReviewMode] = useState(false);
+
+  const isReviewed = test.status === 'reviewed';
+  const isSubmitted = test.status === 'submitted';
+  const isAlreadySubmitted = isReviewed || isSubmitted;
+
   if (isExamStarted) {
-    return /* @__PURE__ */ jsxRuntimeExports.jsx(
-      LiveExamEngine,
-      {
-        test,
-        onExit,
-        isReviewOnly: false
-      }
+    return (
+      <LiveExamEngine
+        test={test}
+        onExit={onExit}
+        isReviewOnly={false}
+      />
     );
   }
+
   if (isReviewMode) {
-    return /* @__PURE__ */ jsxRuntimeExports.jsx(
-      LiveExamEngine,
-      {
-        test,
-        onExit,
-        isReviewOnly: true
-      }
+    return (
+      <LiveExamEngine
+        test={test}
+        onExit={onExit}
+        isReviewOnly={true}
+      />
     );
   }
-  return /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-slate-50", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "max-w-xl w-full bg-white rounded-3xl p-6 sm:p-10 border border-slate-200 shadow-xl relative overflow-hidden", children: [
-    /* @__PURE__ */ jsxRuntimeExports.jsxs(
-      "button",
-      {
-        type: "button",
-        onClick: onExit,
-        className: "inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 mb-6 cursor-pointer",
-        children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(ArrowLeft, { className: "w-4 h-4" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "ড্যাশবোর্ডে ফিরে যান" })
-        ]
-      }
-    ),
-    isAlreadySubmitted ? (
-      /* Already Submitted State (User Request 4 - 3rd image) */
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-center space-y-5", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-16 h-16 sm:w-20 sm:h-20 bg-emerald-100 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner", children: /* @__PURE__ */ jsxRuntimeExports.jsx(CircleCheck, { className: "w-10 h-10 sm:w-12 sm:h-12" }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "inline-block px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200", children: "পরীক্ষা সম্পন্ন হয়েছে" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-xl sm:text-2xl font-black text-slate-900", children: "উত্তরপত্র সফলভাবে জমা দেওয়া হয়েছে!" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed", children: [
-            "আপনি ইতিমধ্যে ",
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "font-bold text-slate-800", children: [
-              '"',
-              test.title,
-              '"'
-            ] }),
-            " পরীক্ষায় অংশগ্রহণ করেছেন। পুনরায় পরীক্ষা দেওয়ার সুযোগ নেই।"
-          ] })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200/80 text-left space-y-2.5", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between text-xs", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "শিক্ষার্থী:" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-slate-800", children: test.studentName })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between text-xs", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "বিষয় ও অধ্যায়:" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "font-bold text-slate-800", children: [
-              test.subject,
-              " (",
-              test.chapter,
-              ")"
-            ] })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between text-xs", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "মূল্যায়ন অবস্থা:" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-bold text-emerald-600", children: test.score !== void 0 ? `প্রাপ্ত নম্বর: ${test.score}/${test.totalMarks || 100}` : "খাতা অভিভাবকের মূল্যায়নাধীন" })
-          ] }),
-          test.parentComment && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "pt-2 border-t border-slate-200 text-xs", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500 block mb-0.5", children: "অভিভাবকের মন্তব্য:" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "italic text-slate-700 font-medium", children: [
-              '"',
-              test.parentComment,
-              '"'
-            ] })
-          ] })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "pt-2 flex flex-col sm:flex-row gap-3", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            "button",
-            {
-              type: "button",
-              onClick: () => setIsReviewMode(true),
-              className: "flex-1 py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all",
-              children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(FileText, { className: "w-4 h-4" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "উত্তরপত্র পর্যালোচনা করুন" })
-              ]
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "button",
-            {
-              type: "button",
-              onClick: onExit,
-              className: "py-3 px-5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-sm cursor-pointer transition-all",
-              children: "ড্যাশবোর্ড"
-            }
-          )
-        ] })
-      ] })
-    ) : (
-      /* Ready to take exam */
-      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-6", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-center space-y-2", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-14 h-14 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mx-auto shadow-sm", children: /* @__PURE__ */ jsxRuntimeExports.jsx(GraduationCap, { className: "w-8 h-8" }) }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "inline-block px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200", children: test.subject }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-xl sm:text-2xl font-black text-slate-900", children: test.title }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500", children: test.chapter })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2.5", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Clock, { className: "w-5 h-5 text-indigo-600" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400", children: "সময়সীমা" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-sm font-bold text-slate-800", children: [
-                test.durationMinutes,
-                " মিনিট"
-              ] })
-            ] })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2.5", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(FileText, { className: "w-5 h-5 text-emerald-600" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-slate-400", children: "মোট প্রশ্ন" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-sm font-bold text-slate-800", children: [
-                test.questionCount,
-                "টি"
-              ] })
-            ] })
-          ] })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2 text-xs text-slate-600 bg-amber-50/70 p-4 rounded-2xl border border-amber-200", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-1.5 font-bold text-amber-800 mb-1", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(ShieldCheck, { className: "w-4 h-4 text-amber-600" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "পরীক্ষার নির্দেশনাবলী" })
-          ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("ul", { className: "list-disc list-inside space-y-1.5 text-slate-700", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx("li", { children: "পরীক্ষা শুরু করার পর টাইমার চলবে ও কোনো প্রশ্ন বাদ থাকবে না।" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("li", { children: "নকল প্রতিরোধে ফ্রন্ট ক্যামেরা ও ফুলস্ক্রিন নজরদারি সক্রিয় থাকবে।" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("li", { children: "ট্যাব পরিবর্তন বা অন্য অ্যাপে যাওয়া সম্পূর্ণ নিষিদ্ধ।" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("li", { children: "নির্ধারিত সময় শেষে খাতা স্বয়ংক্রিয়ভাবে অভিভাবকের কাছে জমা হবে।" })
-          ] })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs(
-          "button",
-          {
-            type: "button",
-            onClick: () => setIsExamStarted(true),
-            className: "w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all",
-            children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx(Play, { className: "w-5 h-5 fill-white" }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "পরীক্ষা শুরু করুন" })
-            ]
-          }
-        )
-      ] })
-    )
-  ] }) });
+
+  return (
+    <div className="min-h-[85vh] flex items-center justify-center p-4 sm:p-6 bg-slate-50">
+      <div className="max-w-xl w-full bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xl relative overflow-hidden">
+        
+        {/* Back Button */}
+        <button
+          type="button"
+          onClick={onExit}
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-slate-800 mb-6 cursor-pointer transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>ড্যাশবোর্ডে ফিরে যান</span>
+        </button>
+
+        {isReviewed ? (
+          /* ======================================================== */
+          /* STATE 1: KHATA REVIEWED (মার্ক ও অভিভাবকের মন্তব্য প্রদর্শিত) */
+          /* ======================================================== */
+          <div className="text-center space-y-5 animate-in fade-in">
+            {/* Top Badge with Green Check */}
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-100 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+              <CheckCircle2 className="w-10 h-10 sm:w-12 sm:h-12" />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-300">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>খাতা দেখা হয়েছে ও মূল্যায়ন প্রকাশিত</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900">
+                অভিভাবক আপনার খাতা মূল্যায়ন করেছেন!
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+                "{test.title}" পরীক্ষার ফলাফল ও অভিভাবকের দিকনির্দেশনামূলক পরামর্শ নিচে দেওয়া হলো:
+              </p>
+            </div>
+
+            {/* Score & Exam Details Card */}
+            <div className="grid grid-cols-2 gap-3 bg-slate-50 rounded-2xl p-4 border border-slate-200">
+              <div className="p-3 bg-white rounded-xl border border-emerald-200 text-center flex flex-col justify-center">
+                <span className="text-[11px] font-bold text-emerald-700 uppercase tracking-wide">
+                  প্রাপ্ত নম্বর
+                </span>
+                <span className="text-2xl sm:text-3xl font-black text-emerald-800 mt-0.5">
+                  {test.score !== undefined ? `${test.score}%` : '৮৫%'}
+                </span>
+                <span className="text-[10px] text-slate-400 font-semibold">
+                  পূর্ণমান: {test.totalMarks || 100}
+                </span>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-slate-200 text-left flex flex-col justify-center text-xs space-y-1">
+                <div>
+                  <span className="text-slate-400 font-medium block text-[10px]">বিষয়:</span>
+                  <span className="font-bold text-slate-800 truncate block">{test.subject}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400 font-medium block text-[10px]">অধ্যায়:</span>
+                  <span className="font-semibold text-slate-700 truncate block text-[11px]">{test.chapter}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Parent Feedback & Guidance Box */}
+            {test.parentComment && (
+              <div className="bg-indigo-50/80 border border-indigo-200 rounded-2xl p-4 sm:p-5 text-left space-y-2">
+                <div className="flex items-center gap-2 text-indigo-950 font-bold text-xs">
+                  <MessageSquare className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>অভিভাবকের দিকনির্দেশনামূলক মন্তব্য ও পরামর্শ:</span>
+                </div>
+                <div className="p-3.5 bg-white rounded-xl border border-indigo-100 shadow-2xs">
+                  <p className="text-xs sm:text-sm font-bold text-slate-800 italic leading-relaxed">
+                    "{test.parentComment}"
+                  </p>
+                </div>
+                <p className="text-[11px] text-indigo-700 font-medium">
+                  ✓ এই ফলাফল ও অভিভাবকীয় মূল্যায়ন আপনার উন্নতির জন্য নির্ধারিত।
+                </p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="pt-2 flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={() => setIsReviewMode(true)}
+                className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-200 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
+              >
+                <FileText className="w-4 h-4" />
+                <span>প্রতিটি প্রশ্নের সমাধান ও উত্তরপত্র দেখুন</span>
+              </button>
+              <button
+                type="button"
+                onClick={onExit}
+                className="py-3 px-5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-sm cursor-pointer transition-all"
+              >
+                ড্যাশবোর্ড
+              </button>
+            </div>
+          </div>
+        ) : isSubmitted ? (
+          /* ======================================================== */
+          /* STATE 2: SUBMITTED BUT PENDING PARENT EVALUATION        */
+          /* ======================================================== */
+          <div className="text-center space-y-5 animate-in fade-in">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
+              <Clock className="w-10 h-10 sm:w-12 sm:h-12" />
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="inline-block px-3 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-bold border border-amber-200">
+                ⏳ খাতা অভিভাবকের মূল্যায়নাধীন
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900">
+                উত্তরপত্র সফলভাবে জমা দেওয়া হয়েছে!
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+                আপনার খাতাটি অভিভাবকের কাছে পৌঁছেছে। অভিভাবক খাতা যাচাই ও মন্তব্য প্রদান করলে প্রাপ্ত নম্বর ও মতামত এই লিংকেই দেখতে পাবেন।
+              </p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl p-4 sm:p-5 border border-slate-200 text-left space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">পরীক্ষা:</span>
+                <span className="font-bold text-slate-800">{test.title}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">বিষয় ও অধ্যায়:</span>
+                <span className="font-semibold text-slate-700">{test.subject} ({test.chapter})</span>
+              </div>
+              <div className="flex items-center justify-between pt-1 border-t border-slate-200">
+                <span className="text-slate-500">অবস্থা:</span>
+                <span className="font-bold text-amber-600">অভিভাবকের মূল্যায়নের অপেক্ষায়</span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={() => setIsReviewMode(true)}
+                className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-900 text-white font-bold text-sm shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
+              >
+                <FileText className="w-4 h-4" />
+                <span>উত্তরপত্র প্রাক-দর্শন</span>
+              </button>
+              <button
+                type="button"
+                onClick={onExit}
+                className="py-3 px-5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-sm cursor-pointer transition-all"
+              >
+                ড্যাশবোর্ড
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* ======================================================== */
+          /* STATE 3: READY TO TAKE EXAM (QUESTIONS KEPT SECRET)     */
+          /* ======================================================== */
+          <div className="space-y-6 animate-in fade-in">
+            <div className="text-center space-y-2">
+              <div className="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mx-auto shadow-sm">
+                <GraduationCap className="w-8 h-8" />
+              </div>
+              <div className="inline-block px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
+                {test.subject}
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900">
+                {test.title}
+              </h2>
+              <p className="text-xs text-slate-500 font-medium">
+                অধ্যায়: {test.chapter}
+              </p>
+            </div>
+
+            {/* Test Metadata Grid */}
+            <div className="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200">
+              <div className="flex items-center gap-2.5">
+                <Clock className="w-5 h-5 text-indigo-600" />
+                <div>
+                  <p className="text-[11px] text-slate-400 font-semibold">সময়সীমা</p>
+                  <p className="text-sm font-bold text-slate-800">
+                    {test.durationMinutes} মিনিট
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <FileText className="w-5 h-5 text-emerald-600" />
+                <div>
+                  <p className="text-[11px] text-slate-400 font-semibold">মোট প্রশ্ন</p>
+                  <p className="text-sm font-bold text-slate-800">
+                    {test.questionCount}টি
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Anti-Cheating & Exam Rules */}
+            <div className="space-y-2 text-xs text-slate-600 bg-amber-50/70 p-4 rounded-2xl border border-amber-200">
+              <div className="flex items-center gap-1.5 font-bold text-amber-800 mb-1">
+                <ShieldCheck className="w-4 h-4 text-amber-600" />
+                <span>পরীক্ষার বিশেষ নির্দেশনাবলী</span>
+              </div>
+              <ul className="list-disc list-inside space-y-1.5 text-slate-700 font-medium">
+                <li>পরীক্ষা শুরু করার পূর্বে প্রশ্ন দেখা যাবে না; শুরু করলেই টাইমার চালু হবে।</li>
+                <li>নকল প্রতিরোধে ফ্রন্ট ক্যামেরা নজরদারি সক্রিয় থাকবে।</li>
+                <li>পরীক্ষা চলাকালীন অন্য কোনো ট্যাব বা অ্যাপে যাওয়া যাবে না।</li>
+                <li>সময় শেষ হওয়ার পর খাতা স্বয়ংক্রিয়ভাবে অভিভাবকের কাছে জমা হবে।</li>
+              </ul>
+            </div>
+
+            {/* Start Exam CTA */}
+            <button
+              type="button"
+              onClick={() => setIsExamStarted(true)}
+              className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
+            >
+              <Play className="w-5 h-5 fill-white" />
+              <span>পরীক্ষা শুরু করুন</span>
+            </button>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
 };
