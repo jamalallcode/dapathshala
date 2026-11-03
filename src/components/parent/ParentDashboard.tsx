@@ -1046,15 +1046,36 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             </div>
 
             {/* Proctoring & Integrity Summary */}
-            <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs">
-              <div className="flex items-center gap-2">
-                <Camera className="w-4 h-4 text-emerald-600" />
-                <span className="font-bold text-slate-700">ফ্রন্ট ক্যামেরা: সক্রিয় ছিল</span>
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs">
+                <div className="flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-emerald-600" />
+                  <span className="font-bold text-slate-700">ফ্রন্ট ক্যামেরা: সক্রিয় ছিল</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Shield className={`w-4 h-4 ${reviewTest.proctoringFlags && reviewTest.proctoringFlags.length > 0 ? 'text-amber-600' : 'text-emerald-600'}`} />
+                  <span className={`font-bold ${reviewTest.proctoringFlags && reviewTest.proctoringFlags.length > 0 ? 'text-amber-800' : 'text-slate-700'}`}>
+                    নকল সতর্কতা: {reviewTest.proctoringFlags && reviewTest.proctoringFlags.length > 0 ? `${reviewTest.proctoringFlags.length} বার সনাক্ত` : '০ বার (স্বাভাবিক ও সৎ)'}
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Shield className="w-4 h-4 text-emerald-600" />
-                <span className="font-bold text-slate-700">নকল সতর্কতা: ০ বার (স্বাভাবিক)</span>
-              </div>
+
+              {reviewTest.proctoringFlags && reviewTest.proctoringFlags.length > 0 && (
+                <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs space-y-1.5 animate-in fade-in">
+                  <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>ক্যামেরা ও এআই কর্তৃক সনাক্তকৃত সতর্কতার লগ:</span>
+                  </div>
+                  <ul className="space-y-1 pl-1 text-[11px] text-amber-800 font-medium">
+                    {reviewTest.proctoringFlags.map((flag, fIdx) => (
+                      <li key={fIdx} className="flex items-start gap-1.5">
+                        <span className="text-amber-600 font-bold">•</span>
+                        <span>{flag}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             {/* Questions breakdown */}

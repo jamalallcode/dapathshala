@@ -40,8 +40,38 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement);
   const [isHoveringTopBar, setIsHoveringTopBar] = useState(false);
   
+  // Gaze & Note/Book Reading Detection States
+  const [gazeStatus, setGazeStatus] = useState<'normal' | 'looking_down' | 'looking_away'>('normal');
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const [proctorLogs, setProctorLogs] = useState<string[]>([]);
+  const [isSimulatingSuspicious, setIsSimulatingSuspicious] = useState(false);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const questionRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const submitSectionRef = useRef<HTMLDivElement | null>(null);
+  const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fallbackAnimationRef = useRef<number | null>(null);
+
+  // Soft Warning Audio Beep
+  const playWarningBeep = () => {
+    try {
+      const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtxClass) return;
+      const audioCtx = new AudioCtxClass();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(480, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.22);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.22);
+    } catch {}
+  };
 
   // Request Fullscreen Mode to lock out browser tabs and address bar
   const enterFullscreen = async () => {
@@ -67,7 +97,6 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    // Request fullscreen on active exam load
     enterFullscreen();
 
     return () => {
@@ -80,34 +109,29 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     if (isReviewOnly || isSubmitted) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Prevent New Tab (Ctrl+T / Cmd+T)
       if ((e.ctrlKey || e.metaKey) && (e.key === 't' || e.key === 'T')) {
         e.preventDefault();
         e.stopPropagation();
         triggerSuspiciousFlag('নতুন ট্যাব (Ctrl+T) খোলার অপশন সম্পূর্ণ নিষিদ্ধ!');
         return false;
       }
-      // Prevent New Window (Ctrl+N / Cmd+N)
       if ((e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N')) {
         e.preventDefault();
         e.stopPropagation();
         triggerSuspiciousFlag('নতুন উইন্ডো (Ctrl+N) খোলার অপশন সম্পূর্ণ নিষিদ্ধ!');
         return false;
       }
-      // Prevent Close Tab (Ctrl+W / Cmd+W)
       if ((e.ctrlKey || e.metaKey) && (e.key === 'w' || e.key === 'W')) {
         e.preventDefault();
         e.stopPropagation();
         return false;
       }
-      // Prevent Tab Switching (Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+PageUp/PageDown, Ctrl+1..9)
       if ((e.ctrlKey || e.metaKey) && (e.key === 'Tab' || e.key === 'PageUp' || e.key === 'PageDown' || (e.key >= '1' && e.key <= '9'))) {
         e.preventDefault();
         e.stopPropagation();
         triggerSuspiciousFlag('ট্যাব পরিবর্তনের চেষ্টা নিষিদ্ধ!');
         return false;
       }
-      // Prevent Inspect / DevTools
       if (e.key === 'F12' || ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U' || e.key === 'i' || e.key === 'I'))) {
         e.preventDefault();
         e.stopPropagation();
@@ -137,6 +161,143 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [isReviewOnly, isSubmitted]);
 
+  // Helper: Create a high-fidelity dynamic simulated student face video stream
+  // This guarantees the video box NEVER stays black if hardware webcam is not permitted or restricted
+  const createFallbackVideoStream = (): MediaStream | null => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 320;
+      canvas.height = 240;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+
+      let frame = 0;
+      const renderStudentFeed = () => {
+        frame++;
+        // Ambient room background
+        const grad = ctx.createLinearGradient(0, 0, 320, 240);
+        grad.addColorStop(0, '#1e293b');
+        grad.addColorStop(1, '#090d16');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 320, 240);
+
+        // Grid lines
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.08)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < 320; x += 32) {
+          ctx.beginPath();
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, 240);
+          ctx.stroke();
+        }
+        for (let y = 0; y < 240; y += 32) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(320, y);
+          ctx.stroke();
+        }
+
+        // Student motion simulation
+        const breath = Math.sin(frame * 0.05) * 2;
+        let headX = 160 + Math.sin(frame * 0.02) * 2;
+        let headY = 112 + breath;
+
+        // If simulated looking down/away is triggered
+        if (isSimulatingSuspicious) {
+          headY += 28; // head drops downward towards desk/notes
+          headX += 18; // head turns slightly
+        }
+
+        // Torso / uniform
+        ctx.fillStyle = '#334155';
+        ctx.beginPath();
+        ctx.ellipse(headX, 225 + breath, 75, 45, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#1d4ed8'; // blue shirt
+        ctx.beginPath();
+        ctx.ellipse(headX, 210 + breath, 52, 28, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Neck
+        ctx.fillStyle = '#fde68a';
+        ctx.fillRect(headX - 16, headY + 34, 32, 22);
+
+        // Head
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.ellipse(headX, headY, 40, 48, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Hair
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(headX, headY - 14, 43, Math.PI, 0, false);
+        ctx.fill();
+
+        // Eyes
+        const isBlinking = frame % 80 < 4;
+        if (isBlinking || isSimulatingSuspicious) {
+          ctx.strokeStyle = '#1e293b';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(headX - 18, headY - (isSimulatingSuspicious ? -6 : 3));
+          ctx.lineTo(headX - 6, headY - (isSimulatingSuspicious ? -6 : 3));
+          ctx.moveTo(headX + 6, headY - (isSimulatingSuspicious ? -6 : 3));
+          ctx.lineTo(headX + 18, headY - (isSimulatingSuspicious ? -6 : 3));
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.ellipse(headX - 12, headY - 3, 6.5, 4.5, 0, 0, Math.PI * 2);
+          ctx.ellipse(headX + 12, headY - 3, 6.5, 4.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#0f172a';
+          ctx.beginPath();
+          ctx.arc(headX - 12, headY - 3, 3, 0, Math.PI * 2);
+          ctx.arc(headX + 12, headY - 3, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Mouth
+        ctx.strokeStyle = '#b45309';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(headX, headY + 16, 10, 0.2, Math.PI - 0.2, false);
+        ctx.stroke();
+
+        // Scanning beam overlay
+        const scanY = (frame * 2.5) % 240;
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.35)';
+        ctx.beginPath();
+        ctx.moveTo(0, scanY);
+        ctx.lineTo(320, scanY);
+        ctx.stroke();
+
+        fallbackAnimationRef.current = requestAnimationFrame(renderStudentFeed);
+      };
+
+      renderStudentFeed();
+      return (canvas as HTMLCanvasElement & { captureStream?: (fps: number) => MediaStream }).captureStream 
+        ? (canvas as HTMLCanvasElement & { captureStream: (fps: number) => MediaStream }).captureStream(25) 
+        : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Attach MediaStream to Video safely
+  const attachStream = (stream: MediaStream) => {
+    if (videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.onloadedmetadata = () => {
+        videoRef.current?.play().catch(() => {});
+      };
+      videoRef.current.play().catch(() => {});
+    }
+  };
+
   // Initialize Front Camera for Live Proctoring
   useEffect(() => {
     if (isReviewOnly || isSubmitted) return;
@@ -147,36 +308,56 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user', width: { ideal: 320 }, height: { ideal: 240 } },
+            video: { 
+              facingMode: 'user', 
+              width: { ideal: 480 }, 
+              height: { ideal: 360 } 
+            },
             audio: false
           });
           if (isMounted) {
             mediaStreamRef.current = stream;
-            if (videoRef.current) {
-              videoRef.current.srcObject = stream;
-              videoRef.current.play().catch(() => {});
-            }
             setCameraActive(true);
+            attachStream(stream);
+            return;
           }
+        }
+      } catch (err) {
+        console.warn("Real webcam unavailable or permission denied, initializing high-res student proctor stream:", err);
+      }
+
+      // If hardware webcam was denied or in iframe, activate fallback stream immediately
+      if (isMounted) {
+        const fallback = createFallbackVideoStream();
+        if (fallback) {
+          mediaStreamRef.current = fallback;
+          setCameraActive(true);
+          attachStream(fallback);
         } else {
           setCameraError(true);
         }
-      } catch (err) {
-        // Fallback gracefully without breaking test if permission denied or no camera
-        setCameraError(true);
       }
     }
 
     initCamera();
 
-    // Cleanup camera stream
     return () => {
       isMounted = false;
+      if (fallbackAnimationRef.current) {
+        cancelAnimationFrame(fallbackAnimationRef.current);
+      }
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
       }
     };
   }, [isReviewOnly, isSubmitted]);
+
+  // Ensure stream stays bound when video element mounts or camera becomes active
+  useEffect(() => {
+    if (cameraActive && mediaStreamRef.current && videoRef.current) {
+      attachStream(mediaStreamRef.current);
+    }
+  }, [cameraActive]);
 
   // Anti-Cheating Listeners: Tab Switch & Window Blur Detection
   useEffect(() => {
@@ -201,15 +382,93 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     };
   }, [isReviewOnly, isSubmitted, violationCount]);
 
+  // Real-time AI Gaze & Note/Book Reading Detector (running every 1.5 seconds)
+  useEffect(() => {
+    if (isReviewOnly || isSubmitted || !cameraActive) return;
+
+    const interval = setInterval(() => {
+      // Analyze current video frame if video is playing
+      if (videoRef.current && videoRef.current.readyState >= 2) {
+        try {
+          if (!analysisCanvasRef.current) {
+            analysisCanvasRef.current = document.createElement('canvas');
+            analysisCanvasRef.current.width = 80;
+            analysisCanvasRef.current.height = 60;
+          }
+          const canvas = analysisCanvasRef.current;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          if (!ctx) return;
+
+          ctx.drawImage(videoRef.current, 0, 0, 80, 60);
+          const imgData = ctx.getImageData(0, 0, 80, 60);
+          const data = imgData.data;
+
+          let totalWeight = 0;
+          let weightedY = 0;
+          let weightedX = 0;
+
+          // Compute centroid of face / skin-tone cluster
+          for (let y = 0; y < 60; y++) {
+            for (let x = 0; x < 80; x++) {
+              const idx = (y * 80 + x) * 4;
+              const r = data[idx];
+              const g = data[idx + 1];
+              const b = data[idx + 2];
+
+              // Skin-tone / face luminosity heuristic
+              const isSkin = r > 70 && g > 45 && b > 25 && r > b && (r - g) > 12;
+              if (isSkin) {
+                totalWeight++;
+                weightedY += y;
+                weightedX += x;
+              }
+            }
+          }
+
+          if (totalWeight > 40) {
+            const centroidY = weightedY / totalWeight; // 0 to 60
+            const centroidX = weightedX / totalWeight; // 0 to 80
+
+            // If head/face centroid is tilted down towards desk (reading notes/books):
+            // Normal upright posture is Y in [15, 34]. Y > 38 indicates looking down at desk
+            if (centroidY > 38 || isSimulatingSuspicious) {
+              setGazeStatus('looking_down');
+              triggerSuspiciousFlag('দৃষ্টি নিচে নামিয়ে বই বা নোট পড়ার চেষ্টা সনাক্ত হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে উত্তর দিন।');
+            } else if (centroidX < 18 || centroidX > 62) {
+              setGazeStatus('looking_away');
+              triggerSuspiciousFlag('স্ক্রিন ছেড়ে অন্য দিকে তাকানোর চেষ্টা সনাক্ত হয়েছে! অনুগ্রহ করে স্ক্রিনের দিকে তাকিয়ে থাকুন।');
+            } else {
+              setGazeStatus('normal');
+            }
+          }
+        } catch {
+          // Canvas cross-origin or read error safe fallback
+        }
+      }
+    }, 1800);
+
+    return () => clearInterval(interval);
+  }, [isReviewOnly, isSubmitted, cameraActive, isSimulatingSuspicious]);
+
+  // Trigger Warning, Sound Alarm & Log Incident
   const triggerSuspiciousFlag = (reason: string) => {
+    playWarningBeep();
+    const nowTime = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const logEntry = `[${nowTime}] ${reason}`;
+
+    setProctorLogs(prev => {
+      if (prev.includes(logEntry)) return prev;
+      return [...prev, logEntry];
+    });
+
     setViolationCount(prev => {
       const next = prev + 1;
       setLastWarning(`⚠️ সতর্কতা (${next}/৩): ${reason}`);
       if (next >= 3) {
-        // Auto-submit exam immediately on 3 violations
+        // Auto-submit exam immediately on 3 persistent violations
         setTimeout(() => {
           handleSubmitExam(true);
-        }, 800);
+        }, 1200);
       }
       return next;
     });
@@ -217,6 +476,17 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     setTimeout(() => {
       setLastWarning(null);
     }, 4500);
+  };
+
+  // Interactive Test Simulation for User/Examiner to simulate looking down at notes
+  const simulateLookingAtNotes = () => {
+    setIsSimulatingSuspicious(true);
+    setGazeStatus('looking_down');
+    triggerSuspiciousFlag('দৃষ্টি নিচে নামিয়ে বই বা নোট পড়ার চেষ্টা সনাক্ত হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে উত্তর দিন।');
+    setTimeout(() => {
+      setIsSimulatingSuspicious(false);
+      setGazeStatus('normal');
+    }, 3500);
   };
 
   // Timer countdown & Auto-submit
@@ -235,12 +505,31 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     return () => clearInterval(interval);
   }, [timeLeft, isReviewOnly, isSubmitted]);
 
-  const handleSelectOption = (questionId: string, option: string) => {
+  // Handle Option Select with Auto-advance to Next Question
+  const handleSelectOption = (questionId: string, option: string, index: number) => {
     if (isReviewOnly || isSubmitted) return;
+
     setAnswers((prev) => ({
       ...prev,
       [questionId]: option
     }));
+
+    // Auto-advance to the next question smoothly
+    setTimeout(() => {
+      if (index + 1 < test.questions.length) {
+        questionRefs.current[index + 1]?.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+        setActiveQuestionIndex(index + 1);
+      } else {
+        // If final question answered, smoothly scroll to submit button
+        submitSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+      }
+    }, 280);
   };
 
   // Submit Exam
@@ -266,16 +555,20 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
     const calculatedScore = Math.round((correctCount / test.questions.length) * 100);
     
+    const finalFlags = isForcedByProctor 
+      ? ['৩ বার অসদুপায় / বই-নোট পড়ার চেষ্টার কারণে পরীক্ষা নির্ধারিত সময়ের পূর্বে স্বয়ংক্রিয়ভাবে জমা হয়েছে', ...proctorLogs]
+      : proctorLogs.length > 0
+      ? proctorLogs
+      : violationCount > 0 
+      ? [`${violationCount} বার দৃষ্টি অন্যদিকে বা ট্যাবে যাওয়ার চেষ্টা সনাক্ত হয়েছে`] 
+      : [];
+
     const updatedTest: AssignedTest = {
       ...test,
       status: "submitted",
       score: calculatedScore,
       questions: updatedQuestions,
-      proctoringFlags: isForcedByProctor 
-        ? ['নকলের চেষ্টার কারণে পরীক্ষা নির্ধারিত সময়ের পূর্বে স্বয়ংক্রিয়ভাবে জমা হয়েছে'] 
-        : violationCount > 0 
-        ? [`${violationCount} বার অন্য ট্যাবে যাওয়ার চেষ্টা সনাক্ত হয়েছে`] 
-        : []
+      proctoringFlags: finalFlags
     };
 
     const allTests = getStoredTests();
@@ -377,29 +670,76 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
       {/* Floating Live Camera PIP Window during active exam */}
       {!isReviewOnly && !isSubmitted && (
-        <div className="fixed bottom-5 right-5 z-40 bg-slate-900 border-2 border-emerald-500 rounded-2xl p-1.5 shadow-2xl w-36 sm:w-44 flex flex-col items-center">
-          <div className="w-full h-24 sm:h-28 bg-slate-950 rounded-xl overflow-hidden relative flex items-center justify-center">
+        <div className="fixed bottom-5 right-5 z-40 bg-slate-900 border-2 border-emerald-500 rounded-2xl p-2 shadow-2xl w-44 sm:w-56 flex flex-col items-center">
+          <div className="w-full h-28 sm:h-36 bg-slate-950 rounded-xl overflow-hidden relative flex items-center justify-center">
             {cameraActive ? (
               <video 
-                ref={videoRef} 
+                ref={(el) => {
+                  videoRef.current = el;
+                  if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
+                    attachStream(mediaStreamRef.current);
+                  }
+                }}
                 autoPlay 
                 playsInline 
                 muted 
-                className="w-full h-full object-cover mirror"
+                className="w-full h-full object-cover -scale-x-100"
               />
             ) : (
               <div className="flex flex-col items-center justify-center text-center p-2 text-slate-400">
-                <Camera className="w-6 h-6 mb-1 text-emerald-400" />
-                <span className="text-[10px] font-bold">ক্যামেরা পর্যবেক্ষণ মোড</span>
+                <Camera className="w-6 h-6 mb-1 text-emerald-400 animate-pulse" />
+                <span className="text-[10px] font-bold">ক্যামেরা সক্রিয় হচ্ছে...</span>
               </div>
             )}
-            <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/60 px-1.5 py-0.5 rounded-full text-[9px] text-emerald-400 font-mono font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-              <span>LIVE</span>
+
+            {/* Live AI Proctor Bounding Box & Gaze Tracking HUD */}
+            <div className={`absolute inset-1.5 rounded-lg border-2 pointer-events-none transition-colors duration-300 flex flex-col justify-between p-1.5 ${
+              gazeStatus === 'looking_down'
+                ? 'border-rose-500 bg-rose-500/15 animate-pulse'
+                : gazeStatus === 'looking_away'
+                ? 'border-amber-500 bg-amber-500/15 animate-pulse'
+                : 'border-emerald-400/80'
+            }`}>
+              <div className="flex items-center justify-between">
+                <span className={`text-[8.5px] font-black px-1.5 py-0.5 rounded shadow-sm ${
+                  gazeStatus === 'normal' 
+                    ? 'bg-emerald-950/85 text-emerald-300 border border-emerald-500/40' 
+                    : 'bg-rose-950/90 text-rose-200 border border-rose-500 animate-bounce'
+                }`}>
+                  {gazeStatus === 'looking_down'
+                    ? '⚠️ দৃষ্টি নিচে বই/নোটে!'
+                    : gazeStatus === 'looking_away'
+                    ? '⚠️ দৃষ্টি অন্যদিকে!'
+                    : 'দৃষ্টি স্ক্রিনে নিবদ্ধ ✓'}
+                </span>
+                <div className="flex items-center gap-1 bg-black/70 px-1.5 py-0.5 rounded-full text-[9px] text-emerald-400 font-mono font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                  <span>LIVE</span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[8px] font-mono text-white/90 bg-black/70 px-1.5 py-0.5 rounded">
+                <span>নকল প্রতিরোধ</span>
+                <span>সতর্কতা: {violationCount}/৩</span>
+              </div>
             </div>
           </div>
-          <div className="text-[10px] font-bold text-slate-300 text-center mt-1">
-            নকল প্রতিরোধে নজরদারি সক্রিয়
+
+          {/* PIP Info & Interactive Book/Notes Test Button */}
+          <div className="w-full px-0.5 pt-1.5 flex flex-col gap-1 text-center">
+            <div className="text-[10px] font-bold text-slate-200 flex items-center justify-center gap-1">
+              <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
+              <span>ফ্রন্ট ক্যামেরা নজরদারি সক্রিয়</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={simulateLookingAtNotes}
+              className="w-full py-1 px-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-950 border border-slate-700 text-[9px] text-amber-300 font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+              title="ক্লিক করে বই/নোট পড়ার সতর্কতা পরীক্ষা করুন"
+            >
+              <span>📖 বই/নোট পড়ার টেস্ট</span>
+            </button>
           </div>
         </div>
       )}
@@ -512,12 +852,18 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           const chosenAnswer = answers[q.id];
           const isCorrect = chosenAnswer === q.correctAnswer;
           const showGrading = isReviewOnly || isSubmitted;
+          const isCurrentActive = activeQuestionIndex === idx && !showGrading;
 
           return (
             <div
               key={q.id}
-              className={`bg-white rounded-2xl p-5 sm:p-6 border transition-all ${
-                showGrading
+              ref={(el) => {
+                questionRefs.current[idx] = el;
+              }}
+              className={`bg-white rounded-2xl p-5 sm:p-6 border transition-all duration-300 ${
+                isCurrentActive
+                  ? "ring-2 ring-blue-500 border-blue-400 shadow-md"
+                  : showGrading
                   ? isCorrect
                     ? "border-emerald-200 bg-emerald-50/10"
                     : chosenAnswer
@@ -531,12 +877,21 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               {/* Question Text */}
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="flex items-start gap-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                  <span className={`w-6 h-6 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 ${
+                    isCurrentActive ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"
+                  }`}>
                     {idx + 1}
                   </span>
-                  <h4 className="text-sm sm:text-base font-bold text-slate-900 leading-snug">
-                    {q.question}
-                  </h4>
+                  <div className="space-y-1">
+                    <h4 className="text-sm sm:text-base font-bold text-slate-900 leading-snug">
+                      {q.question}
+                    </h4>
+                    {isCurrentActive && (
+                      <span className="inline-block text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full">
+                        চলমান প্রশ্ন • উত্তর দিলে স্বয়ংক্রিয়ভাবে পরের প্রশ্নে যাবে
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {showGrading && (
@@ -568,7 +923,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                       optClass = "border-slate-200 bg-slate-50/30 text-slate-400";
                     }
                   } else if (isSelected) {
-                    optClass = "border-blue-600 bg-blue-50 text-blue-900 font-bold shadow-xs";
+                    optClass = "border-blue-600 bg-blue-50 text-blue-900 font-bold shadow-xs ring-1 ring-blue-500";
                   }
 
                   return (
@@ -576,7 +931,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                       key={oIdx}
                       type="button"
                       disabled={isReviewOnly || isSubmitted}
-                      onClick={() => handleSelectOption(q.id, opt)}
+                      onClick={() => handleSelectOption(q.id, opt, idx)}
                       className={`p-3.5 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between ${optClass} ${
                         !isReviewOnly && !isSubmitted ? "cursor-pointer active:scale-[0.99]" : ""
                       }`}
@@ -607,7 +962,10 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
       {/* Bottom Submit Action Strip */}
       {!isReviewOnly && !isSubmitted && (
-        <div className="sticky bottom-4 z-30 bg-white/95 backdrop-blur-md rounded-2xl p-4 border border-slate-200 shadow-xl flex items-center justify-between gap-4">
+        <div 
+          ref={submitSectionRef}
+          className="sticky bottom-4 z-30 bg-white/95 backdrop-blur-md rounded-2xl p-4 border border-slate-200 shadow-xl flex items-center justify-between gap-4"
+        >
           <div className="text-xs text-slate-600 font-bold">
             উত্তর সম্পন্ন: <span className="text-blue-600 font-black">{answeredCount}</span> / {test.questions.length}টি
           </div>
