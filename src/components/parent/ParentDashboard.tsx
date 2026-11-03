@@ -12,7 +12,8 @@ import {
   getStoredSubmissions, 
   saveStoredSubmission,
   getStoredNotifications,
-  saveStoredNotifications
+  saveStoredNotifications,
+  getShareableTestUrl
 } from '../../lib/storage';
 import { 
   CHAPTER_QUESTION_BANK, 
@@ -236,12 +237,22 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     setCreatedTestResult(newTest);
   };
 
-  // Copy Link Helper
-  const handleCopyLink = (pin: string) => {
-    const link = `${window.location.origin}?pin=${pin}`;
+  // Copy Link Helper with Full Cross-Device Support
+  const handleCopyLink = (testOrPin: AssignedTest | string) => {
+    let link = '';
+    let pin = '';
+    if (typeof testOrPin === 'string') {
+      pin = testOrPin;
+      const matched = tests.find(t => t.pin === pin);
+      link = matched ? getShareableTestUrl(matched) : `${window.location.origin}?pin=${pin}`;
+    } else {
+      pin = testOrPin.pin;
+      link = getShareableTestUrl(testOrPin);
+    }
     navigator.clipboard.writeText(link);
     setCopiedPin(pin);
     setTimeout(() => setCopiedPin(null), 2500);
+    showToast('✓ সম্পূর্ণ পরীক্ষার লিংক কপি হয়েছে! যেকোনো ডিভাইসে সরাসরি পরীক্ষা চালু হবে।');
   };
 
   // Open Review Modal for a submitted test
@@ -840,7 +851,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                         {/* Copy Link Button */}
                         <button
                           type="button"
-                          onClick={() => handleCopyLink(test.pin)}
+                          onClick={() => handleCopyLink(test)}
                           className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
                         >
                           {copiedPin === test.pin ? (
@@ -948,19 +959,22 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
               {/* Shareable Link Box */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  সন্তানকে এই পরীক্ষার লিংকটি পাঠান:
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span>সন্তান বা বন্ধুকে সরাসরি পরীক্ষার লিংকটি পাঠান:</span>
+                  <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    যেকোনো ডিভাইসে সরাসরি ওপেন হবে ✓
+                  </span>
                 </label>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
                     readOnly
-                    value={`${window.location.origin}?pin=${createdTestResult.pin}`}
+                    value={getShareableTestUrl(createdTestResult)}
                     className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 select-all"
                   />
                   <button
                     type="button"
-                    onClick={() => handleCopyLink(createdTestResult.pin)}
+                    onClick={() => handleCopyLink(createdTestResult)}
                     className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors shrink-0 cursor-pointer flex items-center gap-1"
                   >
                     {copiedPin === createdTestResult.pin ? (
@@ -985,8 +999,8 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                   <span>সন্তানের পরীক্ষা অভিজ্ঞতা ও নিরাপত্তা:</span>
                 </div>
                 <p className="text-[11px] leading-relaxed text-blue-800">
-                  • সন্তান লিংকে ঢুকলে শুধুমাত্র সময় ও নিয়মাবলী দেখতে পাবে, কোনো প্রশ্ন আগে দেখতে পাবে না।<br />
-                  • 'পরীক্ষা শুরু করুন' বাটন চাপলেই ফ্রন্ট ক্যামেরা ওপেন হবে ও টাইমার চালু হবে।<br />
+                  • সন্তান বা পরীক্ষার্থী এই লিংকে ঢুকলে সরাসরি পরীক্ষার স্ক্রিন দেখতে পাবে। কোনো হোমপেজে আটকাবে না।<br />
+                  • 'পরীক্ষা শুরু করুন' বাটন চাপলেই ফ্রন্ট ক্যামেরা ওপেন হবে, নতুন ট্যাব লক হবে ও টাইমার চালু হবে।<br />
                   • নির্দিষ্ট সময় পর খাতা স্বয়ংক্রিয়ভাবে অভিভাবকের কাছে জমা হবে।
                 </p>
               </div>
@@ -995,7 +1009,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               <div className="flex items-center gap-3 pt-2">
                 <a
                   href={`https://wa.me/?text=${encodeURIComponent(
-                    `তোমার জন্য একটি নতুন অনলাইন পরীক্ষা নির্ধারণ করা হয়েছে: ${createdTestResult.title}\nলিংক: ${window.location.origin}?pin=${createdTestResult.pin}\nঅথবা ৬-সংখ্যার পিন: ${createdTestResult.pin}`
+                    `তোমার জন্য একটি নতুন অনলাইন পরীক্ষা নির্ধারণ করা হয়েছে: ${createdTestResult.title}\nসরাসরি পরীক্ষা দেওয়ার লিংক:\n${getShareableTestUrl(createdTestResult)}\n\n(অথবা ৬-সংখ্যার পিন: ${createdTestResult.pin})`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"

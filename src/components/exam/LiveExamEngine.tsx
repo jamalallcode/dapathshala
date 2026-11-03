@@ -3,9 +3,15 @@ import confetti from "canvas-confetti";
 import { 
   ArrowLeft, Clock, CircleAlert, CircleCheck, Check, CheckCircle2,
   FileCheck, Send, ShieldCheck, ShieldAlert, X, FileText, Camera, 
-  AlertTriangle, EyeOff, Maximize, MessageSquare 
+  AlertTriangle, EyeOff, Maximize, MessageSquare, Copy 
 } from "lucide-react";
-import { getStoredTests, saveStoredTests, getStoredNotifications, saveStoredNotifications } from "../../lib/storage";
+import { 
+  getStoredTests, 
+  saveStoredTests, 
+  getStoredNotifications, 
+  saveStoredNotifications,
+  getShareableSubmissionUrl 
+} from "../../lib/storage";
 import { AssignedTest } from "../../types";
 
 interface LiveExamEngineProps {
@@ -834,14 +840,55 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           <p className="text-xs sm:text-sm text-emerald-800 max-w-md mx-auto leading-relaxed">
             আপনার উত্তরপত্রটি অভিভাবকের কাছে পৌঁছেছে। অভিভাবক খাতা যাচাই ও দিকনির্দেশনামূলক মন্তব্য দিলে আপনি পূর্ণাঙ্গ ফলাফল ও মার্কস দেখতে পাবেন।
           </p>
-          <div className="pt-2">
+          <div className="pt-3 flex flex-wrap items-center justify-center gap-2">
             <button
               type="button"
               onClick={onExit}
-              className="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-xs cursor-pointer"
+              className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold shadow-xs cursor-pointer transition-colors"
             >
               মূল পাতায় ফিরে যান
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                const updatedTest: AssignedTest = {
+                  ...test,
+                  status: 'submitted',
+                  score: Math.round((test.questions.filter(q => (answers[q.id] || '') === q.correctAnswer).length / test.questions.length) * 100),
+                  questions: test.questions.map(q => ({
+                    ...q,
+                    studentAnswer: answers[q.id] || '',
+                    isCorrect: (answers[q.id] || '') === q.correctAnswer
+                  }))
+                };
+                const url = getShareableSubmissionUrl(updatedTest);
+                navigator.clipboard.writeText(url);
+                alert('✓ খাতা জমার ফলাফল লিংক কপি হয়েছে! এটি অভিভাবককে পাঠিয়ে খাতা দেখতে বলুন।');
+              }}
+              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors"
+            >
+              <Copy className="w-4 h-4" />
+              <span>ফলাফল লিংক কপি</span>
+            </button>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(
+                `আমি "${test.title}" পরীক্ষা সফলভাবে সম্পন্ন করে খাতা জমা দিয়েছি।\nখাতা দেখতে ও মূল্যায়ন করতে এই লিংকে ক্লিক করুন:\n${getShareableSubmissionUrl({
+                  ...test,
+                  status: 'submitted',
+                  score: Math.round((test.questions.filter(q => (answers[q.id] || '') === q.correctAnswer).length / test.questions.length) * 100),
+                  questions: test.questions.map(q => ({
+                    ...q,
+                    studentAnswer: answers[q.id] || '',
+                    isCorrect: (answers[q.id] || '') === q.correctAnswer
+                  }))
+                })}`
+              )}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-xs flex items-center gap-1.5 transition-colors"
+            >
+              <span>হোয়াটসঅ্যাপে অভিভাবককে জানান</span>
+            </a>
           </div>
         </div>
       )}

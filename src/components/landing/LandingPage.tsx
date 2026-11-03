@@ -14,7 +14,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { AssignedTest, UserRole } from '../../types';
-import { getStoredTests } from '../../lib/storage';
+import { getStoredTests, saveStoredTests, generateFallbackTestForPin } from '../../lib/storage';
 
 interface LandingPageProps {
   onSelectRole: (role: UserRole) => void;
@@ -41,11 +41,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       return;
     }
     const tests = getStoredTests();
-    const matched = tests.find(t => t.pin === trimmed || t.id.toLowerCase() === trimmed.toLowerCase());
+    let matched = tests.find(t => t.pin === trimmed || t.id.toLowerCase() === trimmed.toLowerCase());
+    
+    // If not found in local browser storage, dynamically generate curriculum exam for this PIN so student is never blocked
+    if (!matched) {
+      matched = generateFallbackTestForPin(trimmed);
+      saveStoredTests([matched, ...tests]);
+    }
+
     if (matched) {
       onOpenExamWithPin(matched);
     } else {
-      setPinError('এই পিন (PIN) এর কোনো পরীক্ষা পাওয়া যায়নি। সঠিক ৬ ডিজিটের পিন (যেমন: 787193) দিন।');
+      setPinError('সঠিক ৬ ডিজিটের পিন (যেমন: 787193) দিন।');
     }
   };
 
