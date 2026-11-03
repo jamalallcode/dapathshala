@@ -45,9 +45,10 @@ export const Navigation: React.FC<NavigationProps> = ({
   const notifContainerRef = useRef<HTMLDivElement>(null);
 
   // Load notifications and listen for custom events
+  // "যেগুলো একবার দেখা হয়ে যাবে সেগুলো নোটিফিকেশনে আর থাকার দরকার নেই।"
   const loadNotifs = () => {
     const all = getStoredNotifications();
-    const filtered = all.filter(n => n.forRole === currentRole || !n.forRole);
+    const filtered = all.filter(n => (n.forRole === currentRole || !n.forRole) && !n.isRead);
     setNotifications(filtered);
   };
 
@@ -81,9 +82,10 @@ export const Navigation: React.FC<NavigationProps> = ({
   const handleDismissNotification = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     addDismissedNotifId(id);
-    const updated = notifications.filter(n => n.id !== id);
-    setNotifications(updated);
+    const all = getStoredNotifications();
+    const updated = all.filter(n => n.id !== id);
     saveStoredNotifications(updated);
+    setNotifications(updated.filter(n => (n.forRole === currentRole || !n.forRole) && !n.isRead));
   };
 
   const handleClearAll = (e: React.MouseEvent) => {
@@ -94,15 +96,17 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   const handleNotificationClick = (notif: AppNotification) => {
     setIsNotifOpen(false);
+    // Remove immediately once viewed so it no longer stays in notifications
     const all = getStoredNotifications();
-    const updated = all.map(n => n.id === notif.id ? { ...n, isRead: true } : n);
+    const updated = all.filter(n => n.id !== notif.id);
     saveStoredNotifications(updated);
+    setNotifications(updated.filter(n => (n.forRole === currentRole || !n.forRole) && !n.isRead));
     if (notif.testId && onNavigateToReview) {
       onNavigateToReview(notif.testId);
     }
   };
 
-  const unreadNotifs = notifications.filter(n => !n.isRead);
+  const unreadNotifs = notifications;
 
   return (
     <header className="sticky top-0 z-40 bg-[#0c1322] border-b border-slate-800 text-slate-200 w-full select-none shadow-sm">

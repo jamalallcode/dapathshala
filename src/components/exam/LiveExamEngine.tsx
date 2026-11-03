@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import confetti from "canvas-confetti";
 import { 
   ArrowLeft, Clock, CircleAlert, CircleCheck, Check, CheckCircle2,
-  FileCheck, Send, ShieldCheck, X, FileText, Camera, 
+  FileCheck, Send, ShieldCheck, ShieldAlert, X, FileText, Camera, 
   AlertTriangle, EyeOff, Maximize, MessageSquare 
 } from "lucide-react";
 import { getStoredTests, saveStoredTests, getStoredNotifications, saveStoredNotifications } from "../../lib/storage";
@@ -32,14 +32,110 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [timeLeft, setTimeLeft] = useState(test.durationMinutes * 60);
   const [isSubmitted, setIsSubmitted] = useState(isReviewOnly || test.status === 'submitted' || test.status === 'reviewed');
   
-  // Anti-Cheating & Camera State
+  // Anti-Cheating, Fullscreen & Camera State
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(false);
   const [violationCount, setViolationCount] = useState(0);
   const [lastWarning, setLastWarning] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement);
+  const [isHoveringTopBar, setIsHoveringTopBar] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+
+  // Request Fullscreen Mode to lock out browser tabs and address bar
+  const enterFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (err) {
+      console.warn("Fullscreen request error:", err);
+    }
+  };
+
+  // Fullscreen enforcement listener
+  useEffect(() => {
+    if (isReviewOnly || isSubmitted) return;
+
+    const handleFullscreenChange = () => {
+      const active = !!document.fullscreenElement;
+      setIsFullscreen(active);
+      if (!active) {
+        triggerSuspiciousFlag('ফুলস্ক্রিন থেকে বের হওয়া বা নতুন ট্যাব খোলার চেষ্টা সনাক্ত হয়েছে!');
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    // Request fullscreen on active exam load
+    enterFullscreen();
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, [isReviewOnly, isSubmitted]);
+
+  // Block keyboard shortcuts for new tabs (Ctrl+T, Cmd+T, Ctrl+N, Ctrl+Tab, etc.)
+  useEffect(() => {
+    if (isReviewOnly || isSubmitted) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Prevent New Tab (Ctrl+T / Cmd+T)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 't' || e.key === 'T')) {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerSuspiciousFlag('নতুন ট্যাব (Ctrl+T) খোলার অপশন সম্পূর্ণ নিষিদ্ধ!');
+        return false;
+      }
+      // Prevent New Window (Ctrl+N / Cmd+N)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerSuspiciousFlag('নতুন উইন্ডো (Ctrl+N) খোলার অপশন সম্পূর্ণ নিষিদ্ধ!');
+        return false;
+      }
+      // Prevent Close Tab (Ctrl+W / Cmd+W)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'w' || e.key === 'W')) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+      // Prevent Tab Switching (Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+PageUp/PageDown, Ctrl+1..9)
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'Tab' || e.key === 'PageUp' || e.key === 'PageDown' || (e.key >= '1' && e.key <= '9'))) {
+        e.preventDefault();
+        e.stopPropagation();
+        triggerSuspiciousFlag('ট্যাব পরিবর্তনের চেষ্টা নিষিদ্ধ!');
+        return false;
+      }
+      // Prevent Inspect / DevTools
+      if (e.key === 'F12' || ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U' || e.key === 'i' || e.key === 'I'))) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, { capture: true });
+    };
+  }, [isReviewOnly, isSubmitted]);
+
+  // Detect cursor approaching top tab area
+  useEffect(() => {
+    if (isReviewOnly || isSubmitted) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (e.clientY <= 3) {
+        setIsHoveringTopBar(true);
+      } else if (e.clientY > 35) {
+        setIsHoveringTopBar(false);
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [isReviewOnly, isSubmitted]);
 
   // Initialize Front Camera for Live Proctoring
   useEffect(() => {
@@ -120,7 +216,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
     setTimeout(() => {
       setLastWarning(null);
-    }, 4000);
+    }, 4500);
   };
 
   // Timer countdown & Auto-submit
@@ -227,6 +323,50 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       onContextMenu={(e) => e.preventDefault()}
     >
       
+      {/* 1. Fullscreen Lockdown Shield Overlay when not in Fullscreen Mode */}
+      {!isFullscreen && !isReviewOnly && !isSubmitted && (
+        <div className="fixed inset-0 z-[100] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-slate-900 border-2 border-rose-500 rounded-3xl p-6 sm:p-8 text-center text-white space-y-5 shadow-2xl animate-in zoom-in-95">
+            <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/40">
+              <ShieldAlert className="w-10 h-10" />
+            </div>
+            <div className="space-y-2">
+              <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 text-xs font-bold border border-rose-500/40">
+                🔒 কঠোর অ্যান্টি-চিটিং নিরাপত্তা
+              </span>
+              <h3 className="text-xl font-black">
+                নতুন ট্যাব ও উইন্ডো খোলা সম্পূর্ণ নিষিদ্ধ
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                পরীক্ষা চলাকালে কোনো নতুন ট্যাব, ব্রাউজার উইন্ডো বা অন্য অ্যাপ্লিকেশন খোলার অপশন বন্ধ রাখা হয়েছে। পরীক্ষাটি শুধুমাত্র সম্পূর্ণ পর্দা (Fullscreen) মোডে দেওয়ার অনুমতি রয়েছে।
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700 text-xs text-amber-300 font-semibold space-y-1 text-left">
+              <p>• ফুলস্ক্রিন ছাড়া কোনো প্রশ্ন দেখতে বা উত্তর দিতে পারবেন না।</p>
+              <p>• নতুন ট্যাব খোলার চেষ্টা সনাক্ত হলে পরীক্ষা স্বয়ংক্রিয়ভাবে বাতিল হয়ে যাবে।</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={enterFullscreen}
+              className="w-full py-3.5 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+            >
+              <Maximize className="w-4.5 h-4.5" />
+              <span>ফুলস্ক্রিন চালু করে পরীক্ষায় প্রবেশ করুন</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Top-bar Hover Warning */}
+      {isHoveringTopBar && !isReviewOnly && !isSubmitted && (
+        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 bg-rose-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xl border border-rose-400 animate-pulse flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>ট্যাব বার বা ব্রাউজারের বাইরে মাউস নেওয়া সম্পূর্ণ নিষিদ্ধ! পরীক্ষা ফুলস্ক্রিনে রাখুন।</span>
+        </div>
+      )}
+
       {/* Realtime Anti-Cheating Floating Warning */}
       {lastWarning && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-rose-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 text-xs sm:text-sm font-black border border-rose-400 animate-bounce">
@@ -276,20 +416,41 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         </button>
 
         <div className="text-center">
-          <h2 className="text-sm sm:text-base font-black text-slate-900 truncate max-w-xs sm:max-w-md">
-            {test.title}
-          </h2>
+          <div className="flex items-center justify-center gap-2">
+            <h2 className="text-sm sm:text-base font-black text-slate-900 truncate max-w-xs sm:max-w-md">
+              {test.title}
+            </h2>
+            {!isReviewOnly && !isSubmitted && (
+              <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold">
+                <ShieldCheck className="w-3 h-3 text-purple-600" />
+                <span>নতুন ট্যাব লক ও ফুলস্ক্রিন সক্রিয়</span>
+              </span>
+            )}
+          </div>
           <p className="text-[11px] text-slate-500 font-medium">
-            {isReviewOnly || isSubmitted ? "উত্তরপত্র ও খাতা পর্যালোচনা" : "লাইভ পরীক্ষা চলমান (ফ্রন্ট ক্যামেরা নজরদারি)"}
+            {isReviewOnly || isSubmitted ? "উত্তরপত্র ও খাতা পর্যালোচনা" : "লাইভ পরীক্ষা চলমান (ফ্রন্ট ক্যামেরা নজরদারি ও ফুলস্ক্রিন সুরক্ষা)"}
           </p>
         </div>
 
         {!isReviewOnly && !isSubmitted ? (
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-sm font-black border ${
-            timeLeft < 180 ? "bg-rose-50 text-rose-600 border-rose-200 animate-pulse" : "bg-blue-50 text-blue-700 border-blue-200"
-          }`}>
-            <Clock className="w-4 h-4" />
-            <span>{formatTime(timeLeft)}</span>
+          <div className="flex items-center gap-2">
+            {!isFullscreen && (
+              <button
+                type="button"
+                onClick={enterFullscreen}
+                className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                title="ফুলস্ক্রিন মোড চালু করুন"
+              >
+                <Maximize className="w-3.5 h-3.5" />
+                <span>ফুলস্ক্রিন</span>
+              </button>
+            )}
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-mono text-sm font-black border ${
+              timeLeft < 180 ? "bg-rose-50 text-rose-600 border-rose-200 animate-pulse" : "bg-blue-50 text-blue-700 border-blue-200"
+            }`}>
+              <Clock className="w-4 h-4" />
+              <span>{formatTime(timeLeft)}</span>
+            </div>
           </div>
         ) : (
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold">

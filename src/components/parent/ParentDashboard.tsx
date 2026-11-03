@@ -271,14 +271,9 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     setTests(updated);
     saveStoredTests(updated);
 
-    // Save notification for student and mark parent submission notification as read
+    // Remove parent submission notification for this test completely so it no longer stays in notifications
     const notifs = getStoredNotifications();
-    const updatedNotifs = notifs.map(n => {
-      if (n.testId === reviewTest.id && (n.forRole === 'parent' || !n.forRole)) {
-        return { ...n, isRead: true };
-      }
-      return n;
-    });
+    const updatedNotifs = notifs.filter(n => !(n.testId === reviewTest.id && (n.forRole === 'parent' || !n.forRole)));
 
     const newNotif = {
       id: `notif-rev-${Date.now()}`,

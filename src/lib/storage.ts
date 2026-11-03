@@ -206,21 +206,16 @@ export function getStoredNotifications(): AppNotification[] {
   try {
     const raw = localStorage.getItem(NOTIFS_KEY);
     if (!raw) {
-      const initial: AppNotification[] = [
-        {
-          id: "notif-1",
-          title: "নতুন উত্তরপত্র জমা হয়েছে",
-          message: 'পরীক্ষার্থী "গণিত অধ্যায় ৩: পরিমাপ ও ক্ষেত্রফল" পরীক্ষার উত্তরপত্র জমা দিয়েছে।',
-          time: "১০ মিনিট আগে",
-          testId: "test-101",
-          isRead: false,
-          forRole: "parent"
-        }
-      ];
-      localStorage.setItem(NOTIFS_KEY, JSON.stringify(initial));
-      return initial;
+      localStorage.setItem(NOTIFS_KEY, JSON.stringify([]));
+      return [];
     }
-    return JSON.parse(raw);
+    const list: AppNotification[] = JSON.parse(raw);
+    // Remove read or dismissed notifications so once viewed they do not remain
+    const unread = list.filter(n => !n.isRead && n.testId !== 'test-101');
+    if (unread.length !== list.length) {
+      localStorage.setItem(NOTIFS_KEY, JSON.stringify(unread));
+    }
+    return unread;
   } catch {
     return [];
   }

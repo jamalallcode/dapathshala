@@ -252,8 +252,8 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ test, onExit }
               </div>
               <ul className="list-disc list-inside space-y-1.5 text-slate-700 font-medium">
                 <li>পরীক্ষা শুরু করার পূর্বে প্রশ্ন দেখা যাবে না; শুরু করলেই টাইমার চালু হবে।</li>
-                <li>নকল প্রতিরোধে ফ্রন্ট ক্যামেরা নজরদারি সক্রিয় থাকবে।</li>
-                <li>পরীক্ষা চলাকালীন অন্য কোনো ট্যাব বা অ্যাপে যাওয়া যাবে না।</li>
+                <li>নকল প্রতিরোধে ফ্রন্ট ক্যামেরা নজরদারি ও ফুলস্ক্রিন সুরক্ষা সক্রিয় থাকবে।</li>
+                <li>পরীক্ষা চলাকালীন নতুন কোনো ট্যাব বা অ্যাপে যাওয়া সম্পূর্ণ নিষিদ্ধ ও লক থাকবে।</li>
                 <li>সময় শেষ হওয়ার পর খাতা স্বয়ংক্রিয়ভাবে অভিভাবকের কাছে জমা হবে।</li>
               </ul>
             </div>
@@ -261,11 +261,20 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ test, onExit }
             {/* Start Exam CTA */}
             <button
               type="button"
-              onClick={() => setIsExamStarted(true)}
+              onClick={async () => {
+                try {
+                  if (document.documentElement.requestFullscreen) {
+                    await document.documentElement.requestFullscreen();
+                  }
+                } catch (err) {
+                  console.warn("Fullscreen error", err);
+                }
+                setIsExamStarted(true);
+              }}
               className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
             >
               <Play className="w-5 h-5 fill-white" />
-              <span>পরীক্ষা শুরু করুন</span>
+              <span>ফুলস্ক্রিনে পরীক্ষা শুরু করুন</span>
             </button>
           </div>
         )}
