@@ -46,7 +46,7 @@ interface LiveExamEngineProps {
 export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({ 
   exam, 
   questions, 
-  studentName = 'আরাফাত রহমান', 
+  studentName = 'পরীক্ষার্থী', 
   childId = 'child_1', 
   onClose, 
   onFinish,
@@ -269,7 +269,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         questions: activeQuestions,
         duration: exam.duration,
         totalMarks: exam.totalMarks || totalQuestions,
-        studentName: studentName || 'আরাফাত রহমান',
+        studentName: studentName || 'পরীক্ষার্থী',
         childId: childId || 'child_1',
         answers,
         handwrittenImages,
@@ -286,6 +286,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
     setResult(examResult);
     setIsFinished(true);
+    try {
+      localStorage.setItem(`exam_submitted_${exam.id}`, 'true');
+      if ((exam as any).pin) {
+        localStorage.setItem(`exam_submitted_${(exam as any).pin}`, 'true');
+      }
+    } catch {}
     localStorage.removeItem(`exam_progress_${exam.id}`);
 
     // Exit fullscreen if still active
@@ -364,7 +370,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       questions: activeQuestions,
       duration: exam.duration,
       totalMarks: exam.totalMarks || totalQuestions,
-      studentName: studentName || 'আরাফাত রহমান',
+      studentName: studentName || 'পরীক্ষার্থী',
       childId: childId || 'child_1',
       answers,
       handwrittenImages,
@@ -379,6 +385,10 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
     try {
       hasSubmittedRef.current = true;
+      localStorage.setItem(`exam_submitted_${exam.id}`, 'true');
+      if ((exam as any).pin) {
+        localStorage.setItem(`exam_submitted_${(exam as any).pin}`, 'true');
+      }
       await submitExamScript(payload);
     } catch (err) {
       console.warn('Submit script error:', err);
@@ -411,7 +421,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     recordProctoringViolation({
       examId: exam.id,
       examTitle: exam.title,
-      studentName: studentName || 'আরাফাত রহমান',
+      studentName: studentName || 'পরীক্ষার্থী',
       childId: childId || 'child_1',
       violationType,
       violationDetails: reason,
@@ -966,17 +976,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button 
-                  size="lg" 
-                  className="flex-1 rounded-2xl gap-2 py-5 bg-emerald-600 hover:bg-emerald-700 text-white font-black cursor-pointer shadow-md shadow-emerald-200" 
-                  onClick={handleRetakeExam}
-                >
-                  <RotateCcw size={20} />
-                  পুনরায় পরীক্ষা দিন
-                </Button>
-                <Button 
                   variant="outline" 
                   size="lg" 
-                  className="flex-1 rounded-2xl gap-2 py-5 bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-bold cursor-pointer" 
+                  className="flex-1 rounded-2xl gap-2 py-5 bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-bold cursor-pointer shadow-xs" 
                   onClick={() => setShowFinalMarksheetModal(true)}
                 >
                   <Award size={20} />
@@ -998,7 +1000,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               id: exam.id,
               title: exam.title,
               subject: exam.subject,
-              childName: studentName || existingSubmission?.studentName || 'আরাফাত রহমান',
+              childName: studentName || existingSubmission?.studentName || 'পরীক্ষার্থী',
               score: Math.round(result.score),
               totalScoreObtained: existingSubmission?.totalScoreObtained !== undefined ? existingSubmission.totalScoreObtained : result.correctAnswers,
               totalPossible: existingSubmission?.totalPossible || result.totalQuestions,

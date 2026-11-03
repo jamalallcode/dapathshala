@@ -212,25 +212,18 @@ export const ParentDashboard: React.FC = () => {
 
   // Mock Children
   const children = [
-    { id: 'child_1', name: 'আরাফাত রহমান', grade: '৮ম শ্রেণী', roll: '০৪', avatar: 'https://picsum.photos/seed/child1/100' },
-    { id: 'child_2', name: 'সুমাইয়া বিনতে', grade: '৫ম শ্রেণী', roll: '১২', avatar: 'https://picsum.photos/seed/child2/100' }
+    { id: 'child_1', name: 'পরীক্ষার্থী', grade: '৮ম শ্রেণী', roll: '০৪', avatar: 'https://picsum.photos/seed/child1/100' }
   ];
 
   const currentChild = children.find(c => c.id === activeChild) || children[0];
 
   const stats = [
-    { label: 'আজকের পড়ার সময়', value: '৩.৫ ঘণ্টা', icon: <Clock className="text-blue-600" />, trend: '+১২%' },
-    { label: 'কুইজ স্কোর (গড়)', value: '৮৫%', icon: <Target className="text-emerald-600" />, trend: '+৫%' },
-    { label: 'অর্জিত পয়েন্ট', value: '১২৫০ XP', icon: <TrendingUp className="text-amber-600" />, trend: '+১৫০' },
+    { label: 'আজকের পড়ার সময়', value: '০ ঘণ্টা', icon: <Clock className="text-blue-600" />, trend: '০%' },
+    { label: 'কুইজ স্কোর (গড়)', value: '০%', icon: <Target className="text-emerald-600" />, trend: '০%' },
+    { label: 'অর্জিত পয়েন্ট', value: '০ XP', icon: <TrendingUp className="text-amber-600" />, trend: '০' },
   ];
 
-  const recentActivities = [
-    { id: 1, task: 'সালোকসংশ্লেষণ কুইজ সম্পন্ন করেছে (স্কোর: ৯/১০)', time: '১০ মিনিট আগে', status: 'success' },
-    { id: 2, task: 'গণিত অধ্যায় ৫ সমাধান ও রিভিশন সম্পন্ন', time: '১ ঘণ্টা আগে', status: 'success' },
-    { id: 3, task: 'ইংরেজি গ্রামার রাইট ফর্ম অফ ভার্বস স্টাডি', time: '২ ঘণ্টা আগে', status: 'pending' },
-  ];
-
-
+  const recentActivities: any[] = [];
 
   // Default assigned tests with initial submitted test matching screenshots
   const DEFAULT_ASSIGNED_TESTS: any[] = [
@@ -244,20 +237,14 @@ export const ParentDashboard: React.FC = () => {
       duration: 10,
       totalMarks: 5,
       childId: 'child_1',
-      studentName: 'আরাফাত রহমান',
-      status: 'submitted',
-      isSubmitted: true,
-      isViewed: false,
-      submittedAt: 'আজ, এইমাত্র',
-      score: 5,
+      studentName: 'পরীক্ষার্থী',
+      status: 'pending',
+      isSubmitted: false,
+      isViewed: true,
+      submittedAt: undefined,
+      score: null,
       evaluationMode: 'ai',
-      answers: {
-        'q_1': 0,
-        'q_2': 0,
-        'q_3': 0,
-        'q_4': 0,
-        'q_5': 0
-      },
+      answers: {},
       questions: [
         {
           id: 'q_1',
@@ -316,11 +303,12 @@ export const ParentDashboard: React.FC = () => {
       duration: 30,
       totalMarks: 5,
       childId: 'child_1',
-      studentName: 'আরাফাত রহমান',
-      status: 'submitted',
+      studentName: 'পরীক্ষার্থী',
+      status: 'reviewed',
       isSubmitted: true,
-      isViewed: false, // Initially false so button is bright; once viewed, turns dim/muted!
-      submittedAt: 'আজ, সন্ধ্যা ৭:০৫',
+      isPublished: true,
+      isViewed: true,
+      submittedAt: 'গতকাল',
       score: 4,
       evaluationMode: 'ai',
       answers: {

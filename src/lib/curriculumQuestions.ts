@@ -776,3 +776,19 @@ export const getQuestionsForChapter = (
 
   return results;
 };
+
+export const getAlternativeQuestion = (
+  subject: string, 
+  chapter: string, 
+  excludeTexts: string[] = []
+): { id: string; question: string; options: string[]; correctAnswer: string; marks: number; explanation: string } => {
+  // Grab pool of 15 questions
+  const pool = getQuestionsForChapter(subject, chapter, 15);
+  // Find one not in excludeTexts
+  const candidate = pool.find(q => !excludeTexts.includes(q.question)) || pool[Math.floor(Math.random() * pool.length)];
+  return {
+    ...candidate,
+    id: 'pq_alt_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6)
+  };
+};
+

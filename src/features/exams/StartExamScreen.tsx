@@ -153,7 +153,67 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
     );
   }
 
-  // If exam has started, render LiveExamEngine
+  // Check if this exam has already been submitted or completed
+  const targetId = examData?.id || examId;
+  const isLocallyMarkedSubmitted = Boolean(
+    (targetId && localStorage.getItem(`exam_submitted_${targetId}`)) ||
+    (examData?.pin && localStorage.getItem(`exam_submitted_${examData.pin}`)) ||
+    (matchedSubmission && (
+      matchedSubmission.status === 'submitted' || 
+      matchedSubmission.status === 'reviewed' || 
+      matchedSubmission.isSubmitted === true || 
+      matchedSubmission.isPublished === true
+    ))
+  );
+
+  // If already submitted, immediately render the completed submission/waiting screen (Image 3)
+  if (isLocallyMarkedSubmitted) {
+    const activeExamObject: any = {
+      id: examData.id,
+      pin: examData.pin,
+      title: matchedSubmission?.title || examData.title,
+      subject: matchedSubmission?.subject || examData.subject,
+      chapter: (examData as any).chapter || matchedSubmission?.chapter || 'কাস্টম মূল্যায়ন',
+      duration: matchedSubmission?.duration || selectedDuration,
+      date: matchedSubmission?.submittedAt || new Date().toISOString(),
+      totalMarks: matchedSubmission?.totalMarks || examData.totalMarks || examData.questions.length,
+      isPublished: Boolean(matchedSubmission?.isPublished || matchedSubmission?.status === 'reviewed')
+    };
+
+    return (
+      <LiveExamEngine
+        exam={activeExamObject}
+        questions={examData.questions}
+        studentName={studentName || matchedSubmission?.studentName || examData.childName || 'পরীক্ষার্থী'}
+        childId="child_1"
+        initialSubmission={{
+          id: examData.id,
+          examId: examData.id,
+          pin: examData.pin,
+          title: matchedSubmission?.title || examData.title,
+          subject: matchedSubmission?.subject || examData.subject,
+          chapter: (examData as any).chapter || matchedSubmission?.chapter || 'কাস্টম মূল্যায়ন',
+          duration: matchedSubmission?.duration || selectedDuration,
+          questions: examData.questions,
+          answers: matchedSubmission?.answers || {},
+          handwrittenImages: matchedSubmission?.handwrittenImages || [],
+          status: (matchedSubmission?.status as any) || 'submitted',
+          submittedAt: matchedSubmission?.submittedAt || 'আজ, এইমাত্র',
+          isPublished: Boolean(matchedSubmission?.isPublished || matchedSubmission?.status === 'reviewed'),
+          isReviewOnly: true,
+          ...(matchedSubmission || {})
+        }}
+        onClose={() => {
+          if (onExit) onExit();
+          else window.location.href = window.location.origin;
+        }}
+        onFinish={(res) => {
+          setExamFinishedResult(res);
+        }}
+      />
+    );
+  }
+
   // If exam has started, render LiveExamEngine with questions
   if (isExamStarted) {
     const activeExamObject: any = {
@@ -172,7 +232,7 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ examId, onExit
       <LiveExamEngine
         exam={activeExamObject}
         questions={examData.questions}
-        studentName={studentName || examData.childName || 'আরাফাত রহমান'}
+        studentName={studentName || examData.childName || 'পরীক্ষার্থী'}
         childId="child_1"
         initialSubmission={undefined}
         onClose={() => {

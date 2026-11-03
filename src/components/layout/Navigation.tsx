@@ -1,774 +1,268 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
+  Bell, 
   Home, 
-  Sparkles, 
-  Camera, 
-  Youtube, 
+  PlusCircle, 
+  ShieldCheck, 
   FileText, 
-  Layers, 
-  Calendar, 
-  Trophy, 
-  Award, 
+  ChevronDown, 
+  CheckCircle2, 
+  X, 
   Shield, 
-  Settings, 
-  LogOut,
-  Menu,
-  X,
-  Search,
-  Bell,
-  Zap,
-  Terminal,
-  ShoppingBag,
-  Layout,
-  Crown,
-  HelpCircle,
-  BrainCircuit,
-  ChevronLeft,
-  GraduationCap,
-  Users,
-  Swords,
-  Building2,
-  CheckCircle2,
-  FileCheck
+  User, 
+  Menu
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { User } from '../../types';
-import { subscribeToExamSubmissions, ExamSubmissionPayload } from '../../lib/proctoringService';
+import { AppNotification, UserRole } from '../../types';
+import { getStoredNotifications, saveStoredNotifications, addDismissedNotifId, clearAllNotifications } from '../../lib/storage';
 
 interface NavigationProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  user: User | null;
-  onLogout: () => void;
-  onGoToLanding?: () => void;
+  currentRole: UserRole;
+  onRoleChange: (role: UserRole) => void;
+  onNavigateToReview?: (testId?: string) => void;
+  onNavigateHome?: () => void;
+  onNavigateDashboard?: () => void;
+  onOpenCreateExam?: () => void;
+  onSelectTab?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report') => void;
+  isHomeActive?: boolean;
+  onToggleSidebar?: () => void;
   isSidebarOpen?: boolean;
-  setIsSidebarOpen?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-export const Navigation: React.FC<NavigationProps> = ({ 
-  activeTab, 
-  setActiveTab, 
-  user, 
-  onLogout, 
-  onGoToLanding,
-  isSidebarOpen = false,
-  setIsSidebarOpen
+export const Navigation: React.FC<NavigationProps> = ({
+  currentRole,
+  onRoleChange,
+  onNavigateToReview,
+  onNavigateHome,
+  onNavigateDashboard,
+  onOpenCreateExam,
+  onSelectTab,
+  isHomeActive,
+  onToggleSidebar,
+  isSidebarOpen
 }) => {
-  const [internalOpen, setInternalOpen] = useState(false);
-  const openState = setIsSidebarOpen ? isSidebarOpen : internalOpen;
-  const setOpenState = setIsSidebarOpen || setInternalOpen;
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const notifContainerRef = useRef<HTMLDivElement>(null);
 
-  const clickCountRef = React.useRef(0);
-  const clickTimerRef = React.useRef<any>(null);
-  const [clickPrompt, setClickPrompt] = useState<string | null>(null);
-
-  // Notification states
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Array<{
-    id: string;
-    title: string;
-    message: string;
-    time: string;
-    read: boolean;
-    examId?: string;
-  }>>(() => {
-    let list: any[] = [];
-    try {
-      const saved = localStorage.getItem('dapathshala_notifications');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) list = parsed;
-      }
-    } catch {}
-
-    // Check if any tests in dapathshala_parent_assigned_tests are in 'submitted' state
-    try {
-      const savedTests = localStorage.getItem('dapathshala_parent_assigned_tests');
-      if (savedTests !== null) {
-        const tests = JSON.parse(savedTests);
-        if (Array.isArray(tests)) {
-          const submittedTests = tests.filter((t: any) => t && (t.status === 'submitted' || t.isSubmitted) && !t.isPublished);
-          submittedTests.forEach((t: any) => {
-            const key = t.id || t.examId || t.pin;
-            const exists = list.some(n => n.examId === key || (t.pin && n.examId === t.pin));
-            if (!exists) {
-              list.unshift({
-                id: 'notif_' + key,
-                title: 'নতুন খাতা জমা পড়েছে!',
-                message: `${t.studentName || t.childName || 'আরাফাত রহমান'} "${t.title || t.subject}" পরীক্ষার খাতা জমা দিয়েছে। খাতা মূল্যায়ন করতে এখানে ক্লিক করুন।`,
-                time: t.submittedAt || 'আজ, এইমাত্র',
-                read: false,
-                examId: key
-              });
-            }
-          });
-        }
-      }
-    } catch {}
-
-    // Ensure exam_566880 notification is present if not published
-    const hasBanglaExam = list.some(n => n.examId === 'exam_566880' || n.examId === '566880');
-    if (!hasBanglaExam) {
-      list.unshift({
-        id: 'notif_exam_566880',
-        title: 'নতুন খাতা জমা পড়েছে!',
-        message: 'আরাফাত রহমান "বাংলা: অপরিচিতা (গল্প - রবীন্দ্রনাথ ঠাকুর) কাস্টম মূল্যায়ন" পরীক্ষার খাতা জমা দিয়েছে। খাতা দেখতে এখানে ক্লিক করুন।',
-        time: 'আজ, এইমাত্র',
-        read: false,
-        examId: 'exam_566880'
-      });
-    }
-
-    if (list.length > 0) return list;
-
-    return [
-      {
-        id: 'notif_exam_566880',
-        title: 'নতুন খাতা জমা পড়েছে!',
-        message: 'আরাফাত রহমান "বাংলা: অপরিচিতা (গল্প - রবীন্দ্রনাথ ঠাকুর) কাস্টম মূল্যায়ন" পরীক্ষার খাতা জমা দিয়েছে। খাতা দেখতে এখানে ক্লিক করুন।',
-        time: 'আজ, এইমাত্র',
-        read: false,
-        examId: 'exam_566880'
-      },
-      {
-        id: 'notif_seed_math',
-        title: 'নতুন খাতা জমা পড়েছে!',
-        message: 'আরাফাত রহমান "গণিত সাপ্তাহিক মূল্যায়ন" পরীক্ষার খাতা জমা দিয়েছে। খাতা দেখতে এখানে ক্লিক করুন।',
-        time: 'আজ, সন্ধ্যা ৭:০৫',
-        read: false,
-        examId: 'test-101'
-      }
-    ];
-  });
-
-  // Audio notification chime
-  const playAudioChime = () => {
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
-      osc.frequency.setValueAtTime(880, audioCtx.currentTime + 0.12);
-      gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.38);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.38);
-    } catch {}
+  // Load notifications and listen for custom events
+  const loadNotifs = () => {
+    const all = getStoredNotifications();
+    const filtered = all.filter(n => n.forRole === currentRole || !n.forRole);
+    setNotifications(filtered);
   };
 
-  // Persist notifications across turns and reloads without overwriting with empty
   useEffect(() => {
-    try {
-      if (notifications.length > 0) {
-        localStorage.setItem('dapathshala_notifications', JSON.stringify(notifications));
-      }
-    } catch {}
-  }, [notifications]);
-
-  // Auto-remove notification when an exam marksheet is published/evaluated
-  useEffect(() => {
-    const handlePublished = (e: any) => {
-      const publishedExamId = e.detail?.id || e.detail?.examId;
-      if (publishedExamId) {
-        setNotifications(prev => prev.filter(n => n.examId !== publishedExamId));
-      }
-    };
-    window.addEventListener('dapathshala_marksheet_published', handlePublished);
+    loadNotifs();
+    const handleStorageChange = () => loadNotifs();
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('dapathshala_notifs_updated', handleStorageChange);
     return () => {
-      window.removeEventListener('dapathshala_marksheet_published', handlePublished);
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('dapathshala_notifs_updated', handleStorageChange);
     };
-  }, []);
+  }, [currentRole]);
 
   useEffect(() => {
-    const syncNotifs = async () => {
-      try {
-        let notifs: any[] = [];
-        const savedNotifs = localStorage.getItem('dapathshala_notifications');
-        if (savedNotifs) {
-          const parsed = JSON.parse(savedNotifs);
-          if (Array.isArray(parsed)) notifs = parsed;
-        }
-
-        // 1. Fetch any cross-tab submissions from server API
-        try {
-          const res = await fetch('/api/submissions');
-          if (res.ok) {
-            const serverSubs = await res.json();
-            if (Array.isArray(serverSubs)) {
-              serverSubs.forEach((sub: any) => {
-                const subKey = sub.id || sub.examId || sub.pin;
-                const existingIdx = notifs.findIndex(n => 
-                  n.examId === subKey || 
-                  (sub.pin && n.examId === sub.pin) || 
-                  (sub.id && n.examId === sub.id) ||
-                  (sub.examId && n.examId === sub.examId)
-                );
-                const isUnreviewed = !sub.isPublished && sub.status !== 'reviewed';
-                if (existingIdx === -1) {
-                  notifs.unshift({
-                    id: 'notif_sub_' + subKey,
-                    title: 'নতুন খাতা জমা পড়েছে!',
-                    message: `${sub.studentName || 'আরাফাত রহমান'} "${sub.title || sub.subject}" পরীক্ষার খাতা জমা দিয়েছে। খাতা মূল্যায়ন করতে এখানে ক্লিক করুন।`,
-                    time: sub.submittedAt || 'আজ, এইমাত্র',
-                    read: !isUnreviewed ? true : false,
-                    examId: subKey
-                  });
-                } else if (isUnreviewed && !sub.isViewed && notifs[existingIdx].read) {
-                  notifs[existingIdx] = {
-                    ...notifs[existingIdx],
-                    read: false,
-                    time: sub.submittedAt || notifs[existingIdx].time
-                  };
-                }
-              });
-            }
-          }
-        } catch {}
-
-        // 2. Check dapathshala_parent_assigned_tests for any submitted tests
-        const savedTests = localStorage.getItem('dapathshala_parent_assigned_tests');
-        if (savedTests) {
-          const tests = JSON.parse(savedTests);
-          if (Array.isArray(tests)) {
-            const submitted = tests.filter((t: any) => t && (t.status === 'submitted' || t.isSubmitted || t.submittedAt) && !t.isPublished);
-            submitted.forEach((t: any) => {
-              const testKey = t.id || t.examId || t.pin;
-              const existingIdx = notifs.findIndex(n => n.examId === testKey || (t.pin && n.examId === t.pin) || (t.id && n.examId === t.id));
-              const isNotViewed = !t.isViewed && !t.hasBeenViewed;
-              
-              if (existingIdx === -1) {
-                notifs.unshift({
-                  id: 'notif_sub_' + testKey,
-                  title: 'নতুন খাতা জমা পড়েছে!',
-                  message: `${t.studentName || t.childName || 'আরাফাত রহমান'} "${t.title || t.subject}" পরীক্ষার খাতা জমা দিয়েছে। খাতা মূল্যায়ন করতে এখানে ক্লিক করুন।`,
-                  time: t.submittedAt || 'আজ, এইমাত্র',
-                  read: !isNotViewed,
-                  examId: testKey
-                });
-              } else if (isNotViewed && notifs[existingIdx].read) {
-                notifs[existingIdx] = {
-                  ...notifs[existingIdx],
-                  read: false
-                };
-              }
-            });
-          }
-        }
-
-        if (notifs.length > 0) {
-          try {
-            localStorage.setItem('dapathshala_notifications', JSON.stringify(notifs));
-          } catch {}
-          setNotifications(prev => {
-            const isDifferent = JSON.stringify(prev) !== JSON.stringify(notifs);
-            return isDifferent ? notifs : prev;
-          });
-        }
-      } catch {}
-    };
-
-    const handleNewNotif = (e: any) => {
-      const notif = e.detail;
-      if (notif) {
-        if (isParentContext) {
-          playAudioChime();
-        }
-        setNotifications(prev => [
-          notif,
-          ...prev.filter(n => n.id !== notif.id && n.examId !== notif.examId)
-        ]);
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (notifContainerRef.current && !notifContainerRef.current.contains(event.target as Node)) {
+        setIsNotifOpen(false);
       }
     };
-
-    window.addEventListener('dapathshala_new_notification', handleNewNotif);
-    window.addEventListener('storage', syncNotifs);
-    window.addEventListener('focus', syncNotifs);
-    document.addEventListener('visibilitychange', syncNotifs);
-
-    // Active polling interval every 1.5 seconds to guarantee cross-tab/iframe sync
-    const pollInterval = setInterval(syncNotifs, 1500);
-
-    const unsubscribe = subscribeToExamSubmissions((newSub: ExamSubmissionPayload) => {
-      if (isParentContext) {
-        playAudioChime();
-      }
-      const examKey = newSub.id || newSub.examId || (newSub as any).pin;
-      const notifItem = {
-        id: 'notif_sub_' + examKey,
-        title: 'নতুন খাতা জমা পড়েছে!',
-        message: `${newSub.studentName || 'আরাফাত রহমান'} "${newSub.title || newSub.subject}" পরীক্ষার খাতা জমা দিয়েছে। খাতা মূল্যায়ন করতে এখানে ক্লিক করুন।`,
-        time: newSub.submittedAt || 'আজ, এইমাত্র',
-        read: false,
-        examId: examKey
-      };
-      setNotifications(prev => [
-        notifItem,
-        ...prev.filter(n => n.id !== notifItem.id && n.examId !== examKey)
-      ]);
-    });
-
-    // Run sync on mount to catch any recent submissions
-    syncNotifs();
-
+    if (isNotifOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
     return () => {
-      window.removeEventListener('dapathshala_new_notification', handleNewNotif);
-      window.removeEventListener('storage', syncNotifs);
-      window.removeEventListener('focus', syncNotifs);
-      document.removeEventListener('visibilitychange', syncNotifs);
-      clearInterval(pollInterval);
-      unsubscribe();
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [user?.role, activeTab]);
+  }, [isNotifOpen]);
 
-  const isParentContext = 
-    activeTab === 'parent-dashboard' || 
-    activeTab === 'proctoring' || 
-    user?.role === 'parent' || 
-    user?.role === 'guardian' || 
-    user?.role === 'admin';
-
-  // Visible notifications filtered strictly:
-  // Evaluation requests ("নতুন খাতা জমা পড়েছে") are visible in the Parent Dashboard or to Parents/Guardians/Admins.
-  // They are strictly filtered OUT in the Student's Dashboard!
-  const visibleNotifications = notifications.filter(item => {
-    const isEvaluationRequest = 
-      item.title?.includes('খাতা জমা') || 
-      item.message?.includes('মূল্যায়ন করতে') || 
-      item.message?.includes('খাতা দেখতে');
-
-    if (isEvaluationRequest) {
-      return isParentContext;
-    }
-
-    // Student-specific notifications (results, challenges, assignments)
-    return true;
-  });
-
-  const unreadCount = visibleNotifications.filter(n => !n.read).length;
-
-  const toggleSidebar = (forcedState?: boolean) => {
-    if (typeof forcedState === 'boolean') {
-      setOpenState(forcedState);
-    } else {
-      setOpenState(prev => !prev);
-    }
-    setClickPrompt(null);
-  };
-
-  const handleMenuClick = (e: React.MouseEvent) => {
+  const handleDismissNotification = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    clickCountRef.current += 1;
-
-    if (clickCountRef.current === 1) {
-      if (!openState) {
-        setClickPrompt('আর ১ বার ক্লিক করুন');
-      }
-      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
-      clickTimerRef.current = setTimeout(() => {
-        clickCountRef.current = 0;
-        setClickPrompt(null);
-      }, 550);
-    } else if (clickCountRef.current >= 2) {
-      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
-      clickCountRef.current = 0;
-      toggleSidebar();
-    }
+    addDismissedNotifId(id);
+    const updated = notifications.filter(n => n.id !== id);
+    setNotifications(updated);
+    saveStoredNotifications(updated);
   };
 
-  const handleMenuDoubleClick = (e: React.MouseEvent) => {
+  const handleClearAll = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
-    clickCountRef.current = 0;
-    toggleSidebar();
+    clearAllNotifications();
+    setNotifications([]);
   };
 
-  const handleLogoClick = () => {
-    if (onGoToLanding) {
-      onGoToLanding();
-    } else {
-      setActiveTab('home');
+  const handleNotificationClick = (notif: AppNotification) => {
+    setIsNotifOpen(false);
+    if (notif.testId && onNavigateToReview) {
+      onNavigateToReview(notif.testId);
     }
   };
-
-  const isOwnerOrAdmin = user?.role === 'admin' || user?.email === 'websitetogather@gmail.com' || user?.email === 'admin@dapathshala.com' || localStorage.getItem('dapathshala_dev_mode') === 'true';
-
-  const menuItems = [
-    { id: 'home', label: 'হোম', icon: <Home size={20} />, category: 'Main' },
-    { id: 'ai-gen', label: 'স্মার্ট কোয়েস্ট', icon: <Sparkles size={20} />, category: 'AI Tools' },
-    { id: 'doubt-solver', label: 'ডাউট সলভার', icon: <HelpCircle size={20} />, category: 'AI Tools' },
-    { id: 'ai-ocr', label: 'এআই ওসিআর', icon: <Camera size={20} />, category: 'AI Tools' },
-    { id: 'video-quiz', label: 'ভিডিও কুইজ', icon: <Youtube size={20} />, category: 'AI Tools' },
-    { id: 'smart-revision', label: 'স্মার্ট রিভিশন', icon: <BrainCircuit size={20} />, category: 'Learning' },
-    { id: 'pdf-reader', label: 'পিডিএফ রিডার', icon: <FileText size={20} />, category: 'Learning' },
-    { id: 'flashcards', label: 'ফ্ল্যাশকার্ড', icon: <Layers size={20} />, category: 'Learning' },
-    { id: 'study-planner', label: 'স্টাডি প্ল্যানার', icon: <Calendar size={20} />, category: 'Learning' },
-    { id: 'exams', label: 'পরীক্ষা পোর্টাল', icon: <FileText size={20} />, category: 'Learning' },
-    { id: 'paid-tests', label: 'প্রিমিয়াম টেস্ট স্টোর', icon: <Sparkles size={20} className="text-amber-500" />, category: 'Learning' },
-    { id: 'coaching-marketplace', label: 'কোচিং ফাইন্ডার ও ভর্তি', icon: <Building2 size={20} />, category: 'Learning' },
-    { id: 'notes', label: 'নোট স্টোর', icon: <ShoppingBag size={20} />, category: 'Learning' },
-    { id: 'community', label: 'পিয়ার ফোরাম ও চ্যালেঞ্জ', icon: <Swords size={20} />, category: 'Community' },
-    { id: 'national-leaderboard', label: 'জাতীয় মেধা তালিকা', icon: <Crown size={20} className="text-amber-500" />, category: 'Community' },
-    { id: 'leaderboard', label: 'লিডারবোর্ড', icon: <Trophy size={20} />, category: 'Community' },
-    { id: 'achievements', label: 'অর্জনসমূহ', icon: <Award size={20} />, category: 'Community' },
-  ];
-
-  if (user?.role === 'parent' || user?.role === 'guardian' || isOwnerOrAdmin) {
-    menuItems.push({ id: 'parent-dashboard', label: 'প্যারেন্ট ড্যাশবোর্ড', icon: <Shield size={20} />, category: 'Control' });
-  }
-
-  menuItems.push({ id: 'coaching', label: 'কোচিং ড্যাশবোর্ড ও লিডস', icon: <GraduationCap size={20} />, category: 'Control' });
-
-  if (isOwnerOrAdmin) {
-    menuItems.push({ id: 'developer', label: 'মালিক / অ্যাডমিন কনসোল', icon: <Crown size={20} className="text-amber-500" />, category: 'Control' });
-  }
 
   return (
-    <>
-      {/* Top Navbar */}
-      <nav className="fixed top-0 left-0 right-0 h-16 bg-white/80 backdrop-blur-xl border-b border-slate-200 z-[100] px-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <button 
-              onClick={handleMenuClick}
-              onDoubleClick={handleMenuDoubleClick}
-              title="সাইডবার আনহাইড করতে পরপর ২ বার ক্লিক করুন"
-              className={`p-2 sm:p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
-                openState 
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 shadow-sm' 
-                  : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border-slate-200 hover:border-slate-300'
-              }`}
+    <header className="sticky top-0 z-40 bg-[#0c1322] border-b border-slate-800 text-slate-200 w-full select-none shadow-sm">
+      <div className="w-full flex items-center justify-between h-13 px-3 sm:px-4">
+        
+        {/* Left Section: Mobile Menu + Blue Home Square + Header Menu Links */}
+        <div className="flex items-center gap-1 sm:gap-2">
+          
+          {/* Mobile Sidebar Hamburger */}
+          {onToggleSidebar && (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="lg:hidden p-1.5 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
               aria-label="Toggle Sidebar"
             >
-              <Menu size={22} className="stroke-[2.5]" />
+              <Menu className="w-5 h-5" />
             </button>
+          )}
 
-            {/* Hint tooltip on 1st click */}
-            <AnimatePresence>
-              {clickPrompt && (
-                <motion.div
-                  initial={{ opacity: 0, y: 6, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -4, scale: 0.95 }}
-                  className="absolute left-0 top-full mt-2 z-[110] bg-slate-900 text-white text-xs font-semibold py-1 px-2.5 rounded-lg shadow-xl whitespace-nowrap flex items-center gap-1.5 border border-slate-700 pointer-events-none"
-                >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  {clickPrompt}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <div className="flex items-center gap-2 cursor-pointer" onClick={handleLogoClick}>
-            <span className="text-xl font-black tracking-tight text-slate-900">
-              দা<span className="text-emerald-600">পাঠশালা</span>
-            </span>
-          </div>
-        </div>
-
-        <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input 
-              type="text" 
-              placeholder="সার্চ করুন..." 
-              className="w-full bg-slate-100 border-none rounded-xl py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-emerald-500/20 transition-all"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-amber-50 rounded-full border border-amber-100">
-            <Zap size={14} className="text-amber-500 fill-amber-500" />
-            <span className="text-xs font-bold text-amber-700">{user?.points || 0} XP</span>
-          </div>
-          {/* Real-time Notification Bell & Dropdown */}
-          <div className="relative">
-            <button 
-              onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-              className="p-2 text-slate-500 hover:bg-slate-100 rounded-xl relative cursor-pointer transition-colors"
-              title="বিজ্ঞপ্তি ও সংকেত"
-            >
-              <Bell size={20} className={unreadCount > 0 ? 'text-indigo-600' : ''} />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-red-600 text-white text-[10px] font-black rounded-full border-2 border-white flex items-center justify-center animate-pulse shadow-sm">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-
-            {/* Notification Dropdown Panel */}
-            <AnimatePresence>
-              {isNotificationOpen && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-[110]" 
-                    onClick={() => setIsNotificationOpen(false)} 
-                  />
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-3xl shadow-2xl border border-slate-200 z-[120] overflow-hidden flex flex-col max-h-[80vh]"
-                  >
-                    {/* Header */}
-                    <div className="p-4 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Bell size={16} className="text-indigo-600" />
-                        <h4 className="font-black text-slate-900 text-sm">বিজ্ঞপ্তি ও পরীক্ষার সংকেত</h4>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {unreadCount > 0 && (
-                          <button
-                            onClick={() => {
-                              const visibleIds = new Set(visibleNotifications.map(n => n.id));
-                              setNotifications(prev => prev.map(n => visibleIds.has(n.id) ? { ...n, read: true } : n));
-                            }}
-                            className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
-                          >
-                            সব পড়া হয়েছে
-                          </button>
-                        )}
-                        {visibleNotifications.length > 0 && (
-                          <button
-                            onClick={() => {
-                              const visibleIds = new Set(visibleNotifications.map(n => n.id));
-                              setNotifications(prev => prev.filter(n => !visibleIds.has(n.id)));
-                            }}
-                            className="text-[11px] font-bold text-slate-400 hover:text-red-600 cursor-pointer"
-                          >
-                            সব মুছুন
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Notification List */}
-                    <div className="overflow-y-auto divide-y divide-slate-100 p-2 space-y-1">
-                      {visibleNotifications.length === 0 ? (
-                        <div className="p-6 text-center text-xs text-slate-400 font-semibold">
-                          কোনো নতুন বিজ্ঞপ্তি নেই
-                        </div>
-                      ) : (
-                        visibleNotifications.map((item) => (
-                          <div
-                            key={item.id}
-                            onClick={() => {
-                              const targetExamId = item.examId || 'test-101';
-                              setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, read: true } : n));
-                              setIsNotificationOpen(false);
-
-                              if (isParentContext) {
-                                try {
-                                  sessionStorage.setItem('dapathshala_pending_eval_id', targetExamId);
-                                } catch {}
-                                setActiveTab('parent-dashboard');
-                                setTimeout(() => {
-                                  window.dispatchEvent(new CustomEvent('dapathshala_open_evaluation', {
-                                    detail: { examId: targetExamId }
-                                  }));
-                                }, 50);
-                              } else {
-                                setActiveTab('exams');
-                              }
-                            }}
-                            className={`p-3 rounded-2xl transition-all cursor-pointer flex items-start gap-3 ${
-                              item.read ? 'hover:bg-slate-50 opacity-80' : 'bg-indigo-50/60 hover:bg-indigo-50'
-                            }`}
-                          >
-                            <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 mt-0.5">
-                              <FileCheck size={16} />
-                            </div>
-                            <div className="flex-1 min-w-0 space-y-1">
-                              <div className="flex items-center justify-between gap-1">
-                                <h5 className="font-black text-xs text-slate-900 truncate">{item.title}</h5>
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  <span className="text-[10px] text-slate-400 font-semibold">{item.time}</span>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setNotifications(prev => prev.filter(n => n.id !== item.id));
-                                    }}
-                                    className="p-1 hover:bg-slate-200 text-slate-400 hover:text-red-600 rounded-lg transition-all cursor-pointer"
-                                    title="বিজ্ঞপ্তিটি মুছুন"
-                                  >
-                                    <X size={13} />
-                                  </button>
-                                </div>
-                              </div>
-                              <p className="text-xs text-slate-600 leading-snug line-clamp-2">{item.message}</p>
-                              {isParentContext ? (
-                                <span className="inline-block text-[10px] font-bold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-indigo-200">
-                                  খাতা মূল্যায়ন করতে ক্লিক করুন →
-                                </span>
-                              ) : (
-                                <span className="inline-block text-[10px] font-bold text-emerald-700 bg-white px-2 py-0.5 rounded-md border border-emerald-200">
-                                  পরীক্ষা দেখতে ক্লিক করুন →
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
-          </div>
-          <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden cursor-pointer">
-            <img src={user?.avatar || `https://picsum.photos/seed/${user?.id}/100`} alt="Profile" />
-          </div>
-        </div>
-      </nav>
-
-      {/* Desktop Sidebar */}
-      <aside 
-        className={`fixed left-0 top-16 bottom-0 w-64 bg-white border-r border-slate-200 hidden lg:flex flex-col p-4 z-40 overflow-y-auto transition-transform duration-500 ease-in-out ${
-          openState 
-            ? 'translate-x-0 shadow-lg' 
-            : '-translate-x-full pointer-events-none'
-        }`}
-      >
-        <div className="flex items-center justify-between px-2 pb-3 mb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">মেনু নেভিগেশন</span>
-          </div>
+          {/* Blue Home Square - Navigates directly to Landing Page */}
           <button
-            onClick={() => toggleSidebar(false)}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-            title="সাইডবার লুকান"
-            aria-label="সাইডবার লুকান"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onNavigateHome?.();
+            }}
+            className="w-8.5 h-8.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white flex items-center justify-center shrink-0 rounded-lg transition-colors shadow-xs cursor-pointer z-10"
+            title="মূল হোমপেজ / ল্যান্ডিং পেজ"
+            aria-label="মূল হোমপেজে ফিরে যান"
           >
-            <ChevronLeft size={18} />
+            <Home className="w-4.5 h-4.5 pointer-events-none" />
           </button>
-        </div>
 
-        <div className="space-y-8 flex-1">
-          {['Main', 'AI Tools', 'Learning', 'Community', 'Control'].map((category) => {
-            const items = menuItems.filter(item => item.category === category);
-            if (items.length === 0) return null;
-            return (
-              <div key={category} className="space-y-2">
-                <h3 className="px-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">{category}</h3>
-                <div className="space-y-1">
-                  {items.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-                        activeTab === item.id 
-                          ? 'bg-emerald-50 text-emerald-600 shadow-sm font-bold' 
-                          : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-                      }`}
-                    >
-                      <span className={activeTab === item.id ? 'text-emerald-600' : 'text-slate-400'}>
-                        {item.icon}
-                      </span>
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="mt-auto pt-6 border-t border-slate-100 space-y-2">
-          <button 
-            onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-              activeTab === 'settings' 
-                ? 'bg-emerald-50 text-emerald-600 shadow-sm font-bold' 
-                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
-            }`}
-          >
-            <Settings size={20} className={activeTab === 'settings' ? 'text-emerald-600' : 'text-slate-400'} />
-            সেটিংস
-          </button>
-          <button 
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-all cursor-pointer"
-          >
-            <LogOut size={20} className="text-red-400" />
-            লগআউট
-          </button>
-        </div>
-      </aside>
-
-      {/* Mobile Drawer */}
-      <AnimatePresence>
-        {openState && (
-          <>
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => toggleSidebar(false)}
-              className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] lg:hidden"
-            />
-            <motion.div 
-              initial={{ x: -300 }}
-              animate={{ x: 0 }}
-              exit={{ x: -300 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed left-0 top-0 bottom-0 w-72 bg-white z-[201] lg:hidden flex flex-col p-6 shadow-2xl"
+          {/* Clean Menu Items */}
+          <div className="hidden sm:flex items-center gap-1.5 ml-3 text-sm font-semibold text-slate-200">
+            <button
+              type="button"
+              onClick={() => {
+                onSelectTab?.('assigned');
+                onOpenCreateExam?.();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white transition-colors border border-emerald-500/30 cursor-pointer"
+              title="কাস্টম পরীক্ষা তৈরি করুন"
             >
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-2 cursor-pointer" onClick={() => { handleLogoClick(); toggleSidebar(false); }}>
-                  <span className="text-xl font-black tracking-tight text-slate-900">
-                    দা<span className="text-emerald-600">পাঠশালা</span>
-                  </span>
-                </div>
-                <button onClick={() => toggleSidebar(false)} className="p-2 hover:bg-slate-100 rounded-xl text-slate-500 cursor-pointer">
-                  <X size={24} />
-                </button>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto space-y-6">
-                {menuItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => { setActiveTab(item.id); toggleSidebar(false); }}
-                    className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-base font-bold transition-all cursor-pointer ${
-                      activeTab === item.id 
-                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' 
-                        : 'text-slate-500 hover:bg-slate-50'
-                    }`}
-                  >
-                    {item.icon}
-                    {item.label}
-                  </button>
-                ))}
-              </div>
+              <PlusCircle className="w-4 h-4 text-emerald-400" />
+              <span>নতুন পরীক্ষা</span>
+            </button>
 
-              <div className="pt-6 border-t space-y-4">
-                <button 
-                  onClick={() => { setActiveTab('settings'); toggleSidebar(false); }}
-                  className={`w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-base font-bold transition-all cursor-pointer ${
-                    activeTab === 'settings' 
-                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' 
-                      : 'text-slate-500 hover:bg-slate-50'
-                  }`}
-                >
-                  <Settings size={24} />
-                  সেটিংস
-                </button>
-                <button 
-                  onClick={onLogout}
-                  className="w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-base font-bold text-red-500 hover:bg-red-50 transition-all cursor-pointer"
-                >
-                  <LogOut size={24} />
-                  লগআউট
-                </button>
+            <button
+              type="button"
+              onClick={() => onSelectTab?.('proctoring')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
+            >
+              <ShieldCheck className="w-4 h-4 text-purple-400" />
+              <span>লাইভ প্রক্টরিং</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onSelectTab?.('assigned')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
+            >
+              <FileText className="w-4 h-4 text-blue-400" />
+              <span>নির্ধারিত পরীক্ষা</span>
+            </button>
+          </div>
+
+        </div>
+
+        {/* Right Section: Role Switcher, Notifications, Landing Link */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          
+          {/* Role Switcher */}
+          <div className="flex items-center bg-slate-900 border border-slate-700/80 p-0.5 rounded-lg text-xs sm:text-sm font-bold">
+            <button
+              type="button"
+              onClick={() => onRoleChange('parent')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+                currentRole === 'parent'
+                  ? 'bg-blue-600 text-white font-black shadow-xs'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>অভিভাবক</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onRoleChange('student')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
+                currentRole === 'student'
+                  ? 'bg-emerald-600 text-white font-black shadow-xs'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>শিক্ষার্থী</span>
+            </button>
+          </div>
+
+          {/* Notifications Bell */}
+          <div className="relative shrink-0" ref={notifContainerRef}>
+            <button
+              type="button"
+              onClick={() => setIsNotifOpen(prev => !prev)}
+              className="relative p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              aria-label="বিজ্ঞপ্তি"
+            >
+              <Bell className="w-4 h-4" />
+              {notifications.length > 0 && (
+                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+              )}
+            </button>
+
+            {/* Dropdown Menu */}
+            {isNotifOpen && (
+              <div className="fixed sm:absolute inset-x-3 sm:inset-x-auto sm:right-0 top-14 sm:top-full sm:mt-1.5 w-auto sm:w-80 bg-white text-slate-800 rounded-xl shadow-2xl border border-slate-200 overflow-hidden z-[100] animate-in fade-in zoom-in-95 duration-100">
+                <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-900">বিজ্ঞপ্তি তালিকা</span>
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={handleClearAll}
+                      className="text-slate-500 hover:text-rose-600 font-medium"
+                    >
+                      সব মুছুন
+                    </button>
+                  )}
+                </div>
+
+                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 text-xs">
+                  {notifications.length === 0 ? (
+                    <div className="py-6 text-center text-slate-400">
+                      কোন নতুন বিজ্ঞপ্তি নেই
+                    </div>
+                  ) : (
+                    notifications.map(notif => (
+                      <div
+                        key={notif.id}
+                        onClick={() => handleNotificationClick(notif)}
+                        className="p-3 hover:bg-slate-50 cursor-pointer flex items-start gap-2.5 relative"
+                      >
+                        <div className="flex-1 min-w-0 pr-4">
+                          <p className="font-bold text-slate-900">{notif.title}</p>
+                          <p className="text-[11px] text-slate-600 mt-0.5 line-clamp-2">{notif.message}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => handleDismissNotification(notif.id, e)}
+                          className="text-slate-400 hover:text-rose-500"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </>
+            )}
+          </div>
+
+        </div>
+
+      </div>
+    </header>
   );
 };

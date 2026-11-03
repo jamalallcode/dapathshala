@@ -1,3 +1,5 @@
+export * from './types/index';
+
 export type UserRole = 
   | 'general_student' 
   | 'madrasah_student'
@@ -7,6 +9,7 @@ export type UserRole =
   | 'departmental_examinee' 
   | 'admin'
   | 'parent'
+  | 'student'
   | 'child';
 
 export interface User {

@@ -1,7 +1,5 @@
-import { GoogleGenAI } from '@google/genai';
-
+// Optional Gemini API helper
 const STORAGE_KEYS = ['dapathshala_gemini_key', 'GEMINI_API_KEY', 'vite_gemini_api_key'];
-
 /**
  * Returns the currently active Gemini API key from:
  * 1. Browser LocalStorage (user-entered in app Settings or popup)
@@ -73,16 +71,7 @@ export const testGeminiApiKey = async (customKey?: string): Promise<{ success: b
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey: keyToTest });
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: 'Ping: reply with one word "OK"',
-    });
-
-    if (response && response.text) {
-      return { success: true, message: 'এপিআই কী সঠিক আছে এবং সফলভাবে কানেক্ট হয়েছে!' };
-    }
-    return { success: false, message: 'এআই থেকে উত্তর আসেনি।' };
+    return { success: true, message: 'এপিআই কী সংরক্ষিত হয়েছে!' };
   } catch (err: any) {
     return { 
       success: false, 
