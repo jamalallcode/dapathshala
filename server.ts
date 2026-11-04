@@ -37,6 +37,13 @@ function saveJson(filePath: string, data: any) {
 const initialSubmissions = loadJson(SUBMISSIONS_FILE, {});
 let submissionsStore: Record<string, any> = Array.isArray(initialSubmissions) ? {} : initialSubmissions;
 let testsStore: Record<string, any> = loadJson(TESTS_FILE, {});
+// Remove legacy automatic demo tests if present
+delete testsStore['787193'];
+delete testsStore['542918'];
+delete testsStore['918374'];
+delete testsStore['test-101'];
+delete testsStore['test-102'];
+delete testsStore['test-103'];
 
 // API: Save Test
 app.post('/api/tests', (req, res) => {

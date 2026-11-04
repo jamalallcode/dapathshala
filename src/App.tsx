@@ -162,16 +162,13 @@ export function App() {
           }
         }
 
-        // Fallback: If still not found, construct fallback test so student is never blocked
-        if (!matched && pin) {
-          matched = generateFallbackTestForPin(pin);
-          saveStoredTests([matched, ...tests]);
-        }
-
         if (matched) {
           setCurrentRole('student');
           setActiveTest(matched);
           setActiveView('exam');
+        } else {
+          // If PIN is not found, don't generate automatic fake tests
+          setActiveView('landing');
         }
       }
     };

@@ -52,16 +52,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       }
     }
 
-    // If still not found, dynamically generate curriculum exam for this PIN so student is never blocked
-    if (!matched) {
-      matched = generateFallbackTestForPin(trimmed);
-      saveStoredTests([matched, ...tests]);
-    }
-
     if (matched) {
       onOpenExamWithPin(matched);
     } else {
-      setPinError('সঠিক ৬ ডিজিটের পিন (যেমন: 787193) দিন।');
+      setPinError('এই পিনের কোনো পরীক্ষা পাওয়া যায়নি। সঠিক পিন দিন অথবা অভিভাবক প্যানেল থেকে নতুন পরীক্ষা তৈরি করুন।');
     }
   };
 

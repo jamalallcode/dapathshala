@@ -10,6 +10,7 @@ import { AssignedTest, StudentSubmission, ExamQuestion } from '../../types';
 import { 
   getStoredTests, 
   saveStoredTests, 
+  clearAllStoredTests, 
   getStoredSubmissions, 
   saveStoredSubmission,
   getStoredNotifications,
@@ -52,8 +53,19 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [durationMinutes, setDurationMinutes] = useState(15);
   const [proctoringEnabled, setProctoringEnabled] = useState(true);
 
-  // Generated Questions state for customization before finalizing
-  const [generatedQuestions, setGeneratedQuestions] = useState<ExamQuestion[]>([]);
+  // Custom exam title input
+  const [examTitleInput, setExamTitleInput] = useState('');
+
+  // Questions state for manual authoring - starts with 1 blank template waiting for parent to write!
+  const [generatedQuestions, setGeneratedQuestions] = useState<ExamQuestion[]>([
+    {
+      id: 'manual_q_1',
+      question: '',
+      options: ['', '', '', ''],
+      correctAnswer: '',
+      explanation: ''
+    }
+  ]);
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{
     question: string;
@@ -127,111 +139,134 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     setSelectedChapter(chaps[0]);
   };
 
-  // Generate Questions via AI / Bank
-  const handleGenerateQuestions = () => {
-    const questions = getQuestionsForChapter(selectedSubject, selectedChapter, questionCount);
-    const mapped: ExamQuestion[] = questions.map((q, idx) => ({
-      id: q.id || `q_${Date.now()}_${idx}`,
-      question: q.question,
-      options: [...q.options],
-      correctAnswer: q.correctAnswer,
-      explanation: q.explanation || 'সঠিক উত্তর নির্বাচন করুন।'
-    }));
-    setGeneratedQuestions(mapped);
-    showToast('✨ এআই পাঠ্যবই অনুযায়ী প্রশ্নপত্র সফলভাবে প্রস্তুত করেছে!');
-  };
-
-  // Initialize with questions on first load if empty
-  useEffect(() => {
-    if (generatedQuestions.length === 0) {
-      handleGenerateQuestions();
-    }
-  }, []);
-
-  // Skip / Replace a single question
-  const handleSkipQuestion = (index: number) => {
-    const existingTexts = generatedQuestions.map(q => q.question);
-    const replacement = getAlternativeQuestion(selectedSubject, selectedChapter, existingTexts);
-    
-    const updated = [...generatedQuestions];
-    updated[index] = {
-      id: replacement.id,
-      question: replacement.question,
-      options: [...replacement.options],
-      correctAnswer: replacement.correctAnswer,
-      explanation: replacement.explanation
+  // Add a new blank question for manual writing
+  const handleAddQuestion = () => {
+    const nextNum = generatedQuestions.length + 1;
+    const newQ: ExamQuestion = {
+      id: `manual_q_${Date.now()}_${nextNum}`,
+      question: '',
+      options: ['', '', '', ''],
+      correctAnswer: '',
+      explanation: ''
     };
-    setGeneratedQuestions(updated);
-    showToast(`🔄 প্রশ্ন ${index + 1} স্কিপ করে নতুন প্রশ্ন প্রতিস্থাপন করা হয়েছে!`);
+    setGeneratedQuestions(prev => [...prev, newQ]);
+    showToast(`✓ প্রশ্ন নম্বর ${toBn(nextNum)} যোগ করা হয়েছে। বিবরণ লিখুন।`);
   };
 
-  // Start editing a question
-  const handleStartEdit = (q: ExamQuestion) => {
-    setEditingQuestionId(q.id);
-    setEditForm({
-      question: q.question,
-      options: [...q.options],
-      correctAnswer: q.correctAnswer,
-      explanation: q.explanation
+  // Update question text
+  const handleUpdateQuestionText = (index: number, text: string) => {
+    setGeneratedQuestions(prev => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], question: text };
+      return copy;
     });
   };
 
-  // Save edited question
-  const handleSaveEdit = (id: string) => {
-    const updated = generatedQuestions.map(q => {
-      if (q.id === id) {
-        return {
-          ...q,
-          question: editForm.question.trim(),
-          options: editForm.options.map(opt => opt.trim()),
-          correctAnswer: editForm.correctAnswer.trim(),
-          explanation: editForm.explanation.trim()
-        };
+  // Update question explanation
+  const handleUpdateQuestionExplanation = (index: number, text: string) => {
+    setGeneratedQuestions(prev => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], explanation: text };
+      return copy;
+    });
+  };
+
+  // Update option text
+  const handleUpdateOption = (qIdx: number, optIdx: number, val: string) => {
+    setGeneratedQuestions(prev => {
+      const copy = [...prev];
+      const q = copy[qIdx];
+      const prevOpt = q.options[optIdx];
+      const newOptions = [...q.options];
+      newOptions[optIdx] = val;
+      let newCorrect = q.correctAnswer;
+      if (newCorrect === prevOpt && prevOpt !== '') {
+        newCorrect = val;
       }
-      return q;
+      copy[qIdx] = { ...q, options: newOptions, correctAnswer: newCorrect };
+      return copy;
     });
-    setGeneratedQuestions(updated);
-    setEditingQuestionId(null);
-    showToast('✓ প্রশ্ন সফলভাবে আপডেট করা হয়েছে!');
+  };
+
+  // Select which option is correct answer
+  const handleSetCorrectAnswer = (qIdx: number, optVal: string) => {
+    if (!optVal.trim()) {
+      showToast('⚠️ আগে অপশনের লেখা লিখুন, তারপর সঠিক উত্তর চিহ্নিত করুন।');
+      return;
+    }
+    setGeneratedQuestions(prev => {
+      const copy = [...prev];
+      copy[qIdx] = { ...copy[qIdx], correctAnswer: optVal };
+      return copy;
+    });
+    showToast(`✓ প্রশ্ন ${toBn(qIdx + 1)} এর সঠিক উত্তর নির্ধারণ করা হয়েছে।`);
   };
 
   // Delete a question
   const handleDeleteQuestion = (index: number) => {
     if (generatedQuestions.length <= 1) {
-      alert('পরীক্ষায় অন্তত ১টি প্রশ্ন থাকতে হবে!');
+      showToast('⚠️ পরীক্ষায় অন্তত ১টি প্রশ্ন থাকতে হবে!');
       return;
     }
-    const updated = generatedQuestions.filter((_, i) => i !== index);
-    setGeneratedQuestions(updated);
+    setGeneratedQuestions(prev => prev.filter((_, i) => i !== index));
     showToast('প্রশ্ন মুছে ফেলা হয়েছে।');
   };
 
-  // Add a new question manually
-  const handleAddQuestion = () => {
-    const newQ: ExamQuestion = {
-      id: `manual_q_${Date.now()}`,
-      question: 'নতুন প্রশ্নের বিবরণ লিখুন...',
-      options: ['অপশন ১', 'অপশন ২', 'অপশন ৩', 'অপশন ৪'],
-      correctAnswer: 'অপশন ১',
-      explanation: 'ব্যাখ্যা লিখুন...'
-    };
-    setGeneratedQuestions([...generatedQuestions, newQ]);
-    handleStartEdit(newQ);
+  // Optional: Load suggestions from textbook ONLY if parent explicitly requests
+  const handleLoadCurriculumSuggestion = () => {
+    const questions = getQuestionsForChapter(selectedSubject, selectedChapter, questionCount);
+    const mapped: ExamQuestion[] = questions.map((q, idx) => ({
+      id: q.id || `bank_q_${Date.now()}_${idx}`,
+      question: q.question,
+      options: [...q.options],
+      correctAnswer: q.correctAnswer,
+      explanation: q.explanation || ''
+    }));
+    setGeneratedQuestions(mapped);
+    showToast('✨ পাঠ্যবইয়ের প্রশ্নব্যাংক থেকে আইডিয়া লোড হয়েছে। নিজের মতো এডিট করতে পারেন।');
+  };
+
+  // Clear all previous / demo tests completely
+  const handleClearAllTests = () => {
+    if (window.confirm('আপনি কি নিশ্চিত যে সকল ডামি ও পূর্ববর্তী পরীক্ষা মুছে সম্পূর্ণ ফ্রেশ শুরু করতে চান?')) {
+      clearAllStoredTests();
+      setTests([]);
+      showToast('🗑️ সকল ডামি ও পূর্বের পরীক্ষা মুছে ফ্রেশ ড্যাশবোর্ড করা হয়েছে।');
+    }
   };
 
   // Finalize Exam & Generate Link + PIN
   const handleFinalizeExam = () => {
     if (generatedQuestions.length === 0) {
-      alert('দয়া করে প্রথমে প্রশ্ন তৈরি করুন!');
+      alert('দয়া করে অন্তত ১টি প্রশ্ন লিখুন!');
       return;
+    }
+
+    // Strict validation so all manual questions are properly filled
+    for (let i = 0; i < generatedQuestions.length; i++) {
+      const q = generatedQuestions[i];
+      if (!q.question.trim()) {
+        alert(`দয়া করে প্রশ্ন নম্বর ${toBn(i + 1)} এর শিরোনাম বা বিবরণ লিখুন।`);
+        return;
+      }
+      const filledOptions = q.options.filter(o => o.trim() !== '');
+      if (filledOptions.length < 2) {
+        alert(`প্রশ্ন নম্বর ${toBn(i + 1)} এ অন্তত ২টি অপশন লিখুন।`);
+        return;
+      }
+      if (!q.correctAnswer.trim()) {
+        alert(`প্রশ্ন নম্বর ${toBn(i + 1)} এর সঠিক উত্তর নির্বাচন করুন (অপশনের পাশে 'সঠিক উত্তর' বোতামে চাপ দিন)।`);
+        return;
+      }
     }
 
     setIsFinalized(true);
 
     const randomPin = Math.floor(100000 + Math.random() * 900000).toString();
+    const finalTitle = examTitleInput.trim() || `${selectedClass} - ${selectedSubject}: ${selectedChapter} পরীক্ষা`;
     const newTest: AssignedTest = {
       id: `test-${Date.now()}`,
-      title: `${selectedClass} - ${selectedSubject}: ${selectedChapter} মূল্যায়ন`,
+      title: finalTitle,
       subject: selectedSubject,
       chapter: selectedChapter,
       questionCount: generatedQuestions.length,
@@ -450,19 +485,26 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       </div>
 
       {/* ======================================================== */}
-      {/* VIEW 1: AI EXAM BUILDER & QUESTION CUSTOMIZER            */}
+      {/* VIEW 1: MANUAL EXAM BUILDER & QUESTION AUTHORING         */}
       {/* ======================================================== */}
       {activeViewMode === 'builder' && (
         <div className="space-y-6">
           
-          {/* Section A: Selection & Parameters Card */}
+          {/* Section A: Exam Basic Information */}
           <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-xs">
             <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-blue-600" />
-                <h2 className="text-base sm:text-lg font-black text-slate-900">
-                  সন্তানের জন্য বিষয় ও অধ্যায় নির্বাচন করুন
-                </h2>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
+                  <Edit3 className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h2 className="text-base sm:text-lg font-black text-slate-900">
+                    অভিভাবকের কাস্টম পরীক্ষা প্রণয়ন
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium">
+                    নিজে হাতে প্রশ্ন ও অপশন লিখুন এবং সঠিক উত্তর চিহ্নিত করে পরীক্ষা প্রস্তুত করুন।
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
@@ -472,6 +514,20 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>ফিরে যান</span>
               </button>
+            </div>
+
+            {/* Custom Exam Title */}
+            <div className="mb-4">
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                পরীক্ষার নাম / শিরোনাম:
+              </label>
+              <input
+                type="text"
+                value={examTitleInput}
+                onChange={(e) => setExamTitleInput(e.target.value)}
+                placeholder={`যেমন: ${selectedClass} - ${selectedSubject}: ১ম মডেল টেস্ট`}
+                className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
+              />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -511,7 +567,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               {/* Chapter Selection */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  পাঠ্যবইয়ের অধ্যায়:
+                  অধ্যায় / টপিক:
                 </label>
                 <select
                   value={selectedChapter}
@@ -524,46 +580,31 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 </select>
               </div>
 
-              {/* Question Count & Time */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    প্রশ্ন সংখ্যা:
-                  </label>
-                  <select
-                    value={questionCount}
-                    onChange={(e) => setQuestionCount(Number(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value={5}>৫টি</option>
-                    <option value={10}>১০টি</option>
-                    <option value={15}>১৫টি</option>
-                    <option value={20}>২০টি</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                    সময়:
-                  </label>
-                  <select
-                    value={durationMinutes}
-                    onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value={10}>১০ মিনিট</option>
-                    <option value={15}>১৫ মিনিট</option>
-                    <option value={20}>২০ মিনিট</option>
-                    <option value={30}>৩০ মিনিট</option>
-                  </select>
-                </div>
+              {/* Duration in Minutes */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                  পরীক্ষার সময়:
+                </label>
+                <select
+                  value={durationMinutes}
+                  onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value={5}>৫ মিনিট</option>
+                  <option value={10}>১০ মিনিট</option>
+                  <option value={15}>১৫ মিনিট</option>
+                  <option value={20}>২০ মিনিট</option>
+                  <option value={30}>৩০ মিনিট</option>
+                  <option value={45}>৪৫ মিনিট</option>
+                  <option value={60}>৬০ মিনিট</option>
+                </select>
               </div>
 
             </div>
 
-            {/* Proctoring Toggle & Action */}
+            {/* Anti-Cheating Proctoring Toggle & Info Banner */}
             <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={proctoringEnabled}
@@ -576,226 +617,196 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 </span>
               </label>
 
-              <button
-                type="button"
-                onClick={handleGenerateQuestions}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Sparkles className="w-4 h-4 text-amber-300" />
-                <span>এআই দিয়ে প্রশ্ন রিলোড করুন</span>
-              </button>
+              <div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200">
+                <span>✍️ কোনো প্রশ্ন অটোমেটিক তৈরি হবে না</span>
+              </div>
             </div>
           </div>
 
-          {/* Section B: Live Question Paper Preview & Customizer */}
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-xs space-y-5">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
+          {/* Section B: Manual Question Authoring Studio */}
+          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
               <div>
                 <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
-                  <span>📝 প্রস্তুতকৃত প্রশ্নপত্র ({toBn(generatedQuestions.length)}টি প্রশ্ন)</span>
+                  <span>✍️ পরীক্ষার প্রশ্নসমূহ (মোট: {toBn(generatedQuestions.length)}টি প্রশ্ন)</span>
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">
-                  পছন্দ না হলে পাশে থাকা 'স্কিপ' বাটনে নতুন প্রশ্ন আনুন অথবা নিজের মতো 'এডিট' করুন
+                  নিচে প্রতিটি প্রশ্ন লিখুন, ৪টি অপশন দিন এবং সঠিক উত্তরের বোতামে ক্লিক করুন
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={handleAddQuestion}
-                className="px-3.5 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>+ ম্যানুয়ালি প্রশ্ন যোগ করুন</span>
-              </button>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={handleAddQuestion}
+                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>+ নতুন প্রশ্ন যোগ করুন</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLoadCurriculumSuggestion}
+                  className="px-3 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-600 hover:text-slate-900 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                  title="পাঠ্যবইয়ের প্রশ্নব্যাংক থেকে আইডিয়া দেখতে চাইলে ক্লিক করুন"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span className="hidden md:inline">বইয়ের আইডিয়া দেখুন</span>
+                </button>
+              </div>
             </div>
 
-            {/* Question Cards List */}
-            <div className="space-y-4">
-              {generatedQuestions.map((q, index) => {
-                const isEditing = editingQuestionId === q.id;
-
+            {/* Questions List */}
+            <div className="space-y-5">
+              {generatedQuestions.map((q, qIndex) => {
                 return (
                   <div 
-                    key={q.id}
-                    className="p-4 sm:p-5 rounded-2xl bg-slate-50/80 border border-slate-200 hover:border-slate-300 transition-colors"
+                    key={q.id || `q_${qIndex}`}
+                    className="p-5 sm:p-6 rounded-2xl bg-slate-50/90 border border-slate-200 shadow-2xs space-y-4 hover:border-slate-300 transition-colors"
                   >
-                    {isEditing ? (
-                      /* Inline Question Editor */
-                      <div className="space-y-3 bg-white p-4 rounded-xl border border-blue-300">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 mb-1">
-                            প্রশ্ন {index + 1} এর শিরোনাম:
-                          </label>
-                          <input
-                            type="text"
-                            value={editForm.question}
-                            onChange={(e) => setEditForm({ ...editForm, question: e.target.value })}
-                            className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-xs sm:text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
+                    {/* Question Header & Title Input */}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-7 h-7 rounded-xl bg-blue-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-2xs">
+                          {toBn(qIndex + 1)}
+                        </span>
+                        <span className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                          প্রশ্ন নম্বর {toBn(qIndex + 1)}
+                        </span>
+                      </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {editForm.options.map((opt, optIdx) => (
-                            <div key={optIdx}>
-                              <label className="block text-[11px] font-bold text-slate-600 mb-0.5">
-                                অপশন {optIdx + 1}:
-                              </label>
+                      {/* Delete Button */}
+                      {generatedQuestions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteQuestion(qIndex)}
+                          className="text-xs font-bold text-rose-500 hover:text-rose-700 hover:bg-rose-50 px-2.5 py-1 rounded-lg border border-transparent hover:border-rose-200 transition-colors flex items-center gap-1 cursor-pointer"
+                          title="এই প্রশ্নটি মুছে ফেলুন"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>মুছুন</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Question Text Area */}
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">
+                        প্রশ্নের বিবরণ বা প্রশ্ন লিখুন:
+                      </label>
+                      <input
+                        type="text"
+                        value={q.question}
+                        onChange={(e) => handleUpdateQuestionText(qIndex, e.target.value)}
+                        placeholder={`যেমন: ${qIndex === 0 ? 'বাংলাদেশের জাতীয় কবি কে?' : 'এখানে আপনার প্রশ্নটি লিখুন...'}`}
+                        className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    {/* 4 Options Inputs with 1-Click Correct Answer Selection */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs font-bold text-slate-700">
+                          ৪টি অপশন লিখুন এবং সঠিক উত্তরটির পাশের বোতামে চাপ দিন:
+                        </label>
+                        {q.correctAnswer ? (
+                          <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 border border-emerald-300">
+                            <Check className="w-3 h-3 text-emerald-600" />
+                            <span>সঠিক উত্তর: <strong>{q.correctAnswer}</strong></span>
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                            ⚠️ সঠিক উত্তর নির্বাচন করা হয়নি
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {q.options.map((opt, optIndex) => {
+                          const isCorrect = opt !== '' && opt === q.correctAnswer;
+                          const optLetters = ['ক', 'খ', 'গ', 'ঘ'];
+
+                          return (
+                            <div 
+                              key={optIndex}
+                              className={`p-2.5 rounded-xl border transition-all ${
+                                isCorrect 
+                                  ? 'bg-emerald-50/80 border-emerald-400 ring-2 ring-emerald-200' 
+                                  : 'bg-white border-slate-200 hover:border-slate-300'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <span className="text-xs font-black text-slate-600">
+                                  অপশন ({optLetters[optIndex]}):
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetCorrectAnswer(qIndex, opt)}
+                                  className={`text-[11px] font-bold px-2 py-0.5 rounded-md transition-colors cursor-pointer flex items-center gap-1 ${
+                                    isCorrect 
+                                      ? 'bg-emerald-600 text-white shadow-2xs' 
+                                      : 'bg-slate-100 hover:bg-emerald-100 text-slate-600 hover:text-emerald-800'
+                                  }`}
+                                >
+                                  {isCorrect ? (
+                                    <>
+                                      <Check className="w-3 h-3 text-white" />
+                                      <span>✓ এটিই সঠিক উত্তর</span>
+                                    </>
+                                  ) : (
+                                    <span>সঠিক উত্তর হিসেবে চিহ্নিত করুন</span>
+                                  )}
+                                </button>
+                              </div>
+
                               <input
                                 type="text"
                                 value={opt}
-                                onChange={(e) => {
-                                  const updatedOpts = [...editForm.options];
-                                  updatedOpts[optIdx] = e.target.value;
-                                  setEditForm({ ...editForm, options: updatedOpts });
-                                }}
-                                className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                onChange={(e) => handleUpdateOption(qIndex, optIndex, e.target.value)}
+                                placeholder={`অপশন ${optLetters[optIndex]} এর উত্তর লিখুন...`}
+                                className="w-full bg-slate-50/80 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
                               />
                             </div>
-                          ))}
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-[11px] font-bold text-emerald-700 mb-0.5">
-                              সঠিক উত্তর নির্বাচন করুন:
-                            </label>
-                            <select
-                              value={editForm.correctAnswer}
-                              onChange={(e) => setEditForm({ ...editForm, correctAnswer: e.target.value })}
-                              className="w-full bg-emerald-50 border border-emerald-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-emerald-900 focus:outline-none"
-                            >
-                              {editForm.options.map((opt, oIdx) => (
-                                <option key={oIdx} value={opt}>{opt}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-[11px] font-bold text-slate-600 mb-0.5">
-                              ব্যাখ্যা / সূত্র:
-                            </label>
-                            <input
-                              type="text"
-                              value={editForm.explanation}
-                              onChange={(e) => setEditForm({ ...editForm, explanation: e.target.value })}
-                              className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                          <button
-                            type="button"
-                            onClick={() => setEditingQuestionId(null)}
-                            className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600 text-xs font-bold hover:bg-slate-100"
-                          >
-                            বাতিল
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleSaveEdit(q.id)}
-                            className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1 shadow-xs"
-                          >
-                            <Save className="w-3.5 h-3.5" />
-                            <span>সংরক্ষণ করুন</span>
-                          </button>
-                        </div>
+                          );
+                        })}
                       </div>
-                    ) : (
-                      /* Normal Question View with Actions */
-                      <div>
-                        <div className="flex items-start justify-between gap-3 mb-2.5">
-                          <div className="flex items-start gap-2.5">
-                            <span className="w-6 h-6 rounded-lg bg-blue-100 text-blue-800 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                              {toBn(index + 1)}
-                            </span>
-                            <h4 className="text-sm sm:text-base font-bold text-slate-900 leading-snug">
-                              {q.question}
-                            </h4>
-                          </div>
+                    </div>
 
-                          {/* Quick Controls: Skip, Edit, Delete */}
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {/* Skip / Replace Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleSkipQuestion(index)}
-                              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-xs font-bold transition-colors cursor-pointer"
-                              title="এই প্রশ্নটি পছন্দ না হলে অন্য একটি প্রশ্ন আনুন"
-                            >
-                              <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
-                              <span className="hidden sm:inline">স্কিপ / অন্য প্রশ্ন</span>
-                              <span className="sm:hidden">স্কিপ</span>
-                            </button>
+                    {/* Explanation / Solution (Optional) */}
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                        ব্যাখ্যা বা সমাধান সূত্র (ঐচ্ছিক):
+                      </label>
+                      <input
+                        type="text"
+                        value={q.explanation}
+                        onChange={(e) => handleUpdateQuestionExplanation(qIndex, e.target.value)}
+                        placeholder="পরীক্ষা শেষে শিক্ষার্থীকে দেখানোর জন্য সঠিক উত্তরের সংক্ষিপ্ত কারণ লিখুন..."
+                        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
 
-                            {/* Edit Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleStartEdit(q)}
-                              className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
-                              title="প্রশ্ন এডিট করুন"
-                            >
-                              <Edit3 className="w-4 h-4" />
-                            </button>
-
-                            {/* Delete Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteQuestion(index)}
-                              className="p-1.5 rounded-lg hover:bg-rose-100 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
-                              title="প্রশ্ন মুছে ফেলুন"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Options Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 ml-8 text-xs sm:text-sm">
-                          {q.options.map((opt, oIdx) => {
-                            const isCorrect = opt === q.correctAnswer;
-                            return (
-                              <div
-                                key={oIdx}
-                                className={`px-3 py-2 rounded-xl border flex items-center justify-between ${
-                                  isCorrect
-                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold'
-                                    : 'bg-white border-slate-200 text-slate-700'
-                                }`}
-                              >
-                                <span>{opt}</span>
-                                {isCorrect && (
-                                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                                    ✓ সঠিক উত্তর
-                                  </span>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-
-                        {q.explanation && (
-                          <div className="mt-2.5 ml-8 text-xs text-slate-500 font-medium">
-                            <span className="font-bold text-slate-700">ব্যাখ্যা:</span> {q.explanation}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 );
               })}
             </div>
 
-            {/* Final Action Bar */}
+            {/* Bottom Actions Bar */}
             <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-xs text-slate-500 font-medium">
-                প্রশ্নপত্র প্রস্তুত? নিচের বাটনে চাপলে পরীক্ষার লিংক ও ৬-সংখ্যার পিন তৈরি হবে।
-              </div>
+              <button
+                type="button"
+                onClick={handleAddQuestion}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl border-2 border-dashed border-blue-300 hover:border-blue-500 bg-blue-50/50 hover:bg-blue-50 text-blue-700 font-bold text-xs sm:text-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ আরও একটি প্রশ্ন যোগ করুন</span>
+              </button>
 
               <button
                 type="button"
                 onClick={handleFinalizeExam}
-                className={`w-full sm:w-auto px-7 py-3 rounded-2xl font-bold text-sm sm:text-base shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 ${
+                className={`w-full sm:w-auto px-8 py-3 rounded-2xl font-bold text-sm sm:text-base shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 ${
                   isFinalized
                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200/80 ring-2 ring-emerald-300'
                     : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-emerald-200/80'
@@ -804,12 +815,12 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 {isFinalized ? (
                   <>
                     <Check className="w-5 h-5 stroke-[3] text-emerald-100" />
-                    <span>✓ চূড়ান্ত সম্পন্ন হয়েছে! লিংক প্রস্তুত</span>
+                    <span>✓ প্রশ্নপত্র সংরক্ষিত! লিংক প্রস্তুত</span>
                   </>
                 ) : (
                   <>
                     <ArrowRight className="w-5 h-5" />
-                    <span>প্রশ্নপত্র চূড়ান্ত করুন ও লিংক পান</span>
+                    <span>প্রশ্নপত্র চূড়ান্ত করুন ও ৬-সংখ্যার পিন লিংক পান</span>
                   </>
                 )}
               </button>
@@ -824,43 +835,58 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* ======================================================== */}
       {activeViewMode === 'tests' && (
         <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-xs space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
             <div>
               <h2 className="text-base sm:text-lg font-black text-slate-900">
                 অভিভাবকের নির্ধারিত পরীক্ষাসমূহ ও খাতা
               </h2>
               <p className="text-xs text-slate-500 font-medium">
-                সন্তানের জমা দেওয়া উত্তরপত্র মূল্যায়ন করুন এবং দিকনির্দেশনামূলক মন্তব্য দিন
+                সন্তানের জন্য আপনার তৈরি করা পরীক্ষাসমূহ এবং জমা দেওয়া উত্তরপত্র
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setActiveViewMode('builder')}
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>+ নতুন পরীক্ষা বানান</span>
-            </button>
+            <div className="flex items-center gap-2">
+              {tests.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClearAllTests}
+                  className="px-3.5 py-2 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="সকল ডামি ও পূর্ববর্তী পরীক্ষা মুছে সম্পূর্ণ ফ্রেশ ড্যাশবোর্ড করুন"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>সকল পরীক্ষা মুছুন</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setActiveViewMode('builder')}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ নতুন পরীক্ষা তৈরি করুন</span>
+              </button>
+            </div>
           </div>
 
           {tests.length === 0 ? (
-            <div className="py-12 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3">
-                <FileText className="w-7 h-7" />
+            <div className="py-14 text-center bg-slate-50/70 rounded-3xl border border-dashed border-slate-300 p-6">
+              <div className="w-16 h-16 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center mx-auto mb-3 shadow-2xs">
+                <FileText className="w-8 h-8" />
               </div>
-              <h3 className="text-base font-bold text-slate-800 mb-1">
+              <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">
                 এখনও কোনো পরীক্ষা তৈরি করা হয়নি
               </h3>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto mb-4 font-medium">
-                আপনার সন্তানের জন্য নতুন প্রশ্নপত্র তৈরি করতে 'নতুন প্রশ্ন তৈরি' ট্যাবে ক্লিক করুন।
+              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mb-5 font-medium leading-relaxed">
+                আপনার নির্দেশ অনুযায়ী কোনো অটোমেটিক বা ডামি পরীক্ষা রাখা হয়নি। সন্তানের জন্য নিজের হাতে প্রশ্ন লিখে নতুন পরীক্ষা তৈরি করতে নিচের বাটনে ক্লিক করুন।
               </p>
               <button
                 type="button"
                 onClick={() => setActiveViewMode('builder')}
-                className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer"
+                className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold shadow-md cursor-pointer inline-flex items-center gap-2 transition-transform active:scale-95"
               >
-                + এখনই প্রশ্ন তৈরি করুন
+                <Plus className="w-4 h-4" />
+                <span>+ নিজে প্রশ্ন লিখে নতুন পরীক্ষা তৈরি করুন</span>
               </button>
             </div>
           ) : (
