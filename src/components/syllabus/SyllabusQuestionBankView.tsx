@@ -935,7 +935,7 @@ export const SyllabusQuestionBankView: React.FC<SyllabusQuestionBankViewProps> =
                 <button
                   type="button"
                   onClick={() => handleLaunchPracticeExam('প্রশ্নব্যাংক দ্রুত অনুশীলন টেস্ট', filteredQuestions)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs sm:text-sm font-bold shadow-xs transition-colors cursor-pointer whitespace-nowrap shrink-0"
                   title="এই ফিল্টারের প্রশ্নগুলো থেকে টেস্ট দিন"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />

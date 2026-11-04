@@ -11,7 +11,8 @@ import {
   Camera, 
   Share2, 
   HelpCircle,
-  AlertCircle
+  AlertCircle,
+  Menu
 } from 'lucide-react';
 import { AssignedTest, UserRole } from '../../types';
 import { getStoredTests, saveStoredTests, generateFallbackTestForPin, fetchTestFromServer } from '../../lib/storage';
@@ -70,45 +71,58 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* 1. CLEAN TOP NAVBAR (Minimalist & High Contrast)         */}
       {/* ======================================================== */}
       <header className="sticky top-0 z-40 bg-[#0c1322] border-b border-slate-800 text-white shadow-sm">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2">
           
           {/* Logo & Platform Name */}
-          <div className="flex items-center gap-3">
-            <div className="w-8.5 h-8.5 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-xs">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {onToggleSidebar && (
+              <button
+                type="button"
+                onClick={onToggleSidebar}
+                className="lg:hidden p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition-colors shrink-0"
+                aria-label="Toggle Sidebar"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
+
+            <div className="w-8.5 h-8.5 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
               <GraduationCap className="w-5 h-5" />
             </div>
-            <div>
-              <span className="font-black text-lg tracking-tight text-white block leading-tight">
+            <div className="truncate min-w-0">
+              <span className="font-black text-lg tracking-tight text-white block leading-tight truncate">
                 দাপাঠশালা
               </span>
-              <span className="text-[11px] text-slate-400 font-semibold hidden sm:block">
+              <span className="text-[11px] text-slate-400 font-semibold hidden sm:block truncate">
                 জাতীয় শিক্ষাক্রম ভিত্তিক মূল্যায়ন প্ল্যাটফর্ম
               </span>
             </div>
           </div>
 
           {/* Quick Info & Action */}
-          <div className="flex items-center gap-2 sm:gap-3 text-xs font-bold">
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          <div className="flex items-center gap-1.5 sm:gap-3 text-xs font-bold shrink-0">
+            <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 whitespace-nowrap">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
               <span>এআই প্রশ্ন ও লাইভ প্রক্টরিং</span>
             </div>
             {onOpenSyllabusBank && (
               <button
                 type="button"
                 onClick={onOpenSyllabusBank}
-                className="px-3.5 py-1.5 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                className="px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 hover:text-white text-xs font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0"
                 title="এনসিটিবি কারিকুলাম ও ২০২৫ বোর্ড প্রশ্নব্যাংক"
               >
-                সিলেবাস ও প্রশ্নব্যাংক
+                <span className="hidden sm:inline">সিলেবাস ও প্রশ্নব্যাংক</span>
+                <span className="sm:hidden">সিলেবাস</span>
               </button>
             )}
             <button
               type="button"
               onClick={() => onSelectRole('parent')}
-              className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+              className="px-2.5 sm:px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer whitespace-nowrap shrink-0"
             >
-              অভিভাবক পোর্টাল
+              <span className="hidden sm:inline">অভিভাবক পোর্টাল</span>
+              <span className="sm:hidden">অভিভাবক</span>
             </button>
           </div>
 
