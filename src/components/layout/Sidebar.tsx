@@ -12,8 +12,7 @@ import {
   ChevronRight, 
   X,
   GraduationCap,
-  BookMarked,
-  Home
+  BookMarked
 } from 'lucide-react';
 import { UserRole, AssignedTest } from '../../types';
 
@@ -122,25 +121,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* ======================================================== */}
         <div className="flex-1 overflow-y-auto py-3 space-y-1 text-sm font-semibold">
           
-          {/* Menu 0: মূল ওয়েবসাইট / ল্যান্ডিং পেজ */}
-          <div>
-            <button
-              type="button"
-              onClick={() => handleLinkClick(onNavigateHome)}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
-                activeView === 'landing'
-                  ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
-                  : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
-              }`}
-              title="মূল ওয়েবসাইট / ল্যান্ডিং পেজ"
-            >
-              <div className="flex items-center gap-2.5 truncate min-w-0">
-                <Home className="w-4.5 h-4.5 text-blue-400 shrink-0" />
-                <span className="truncate">মূল ওয়েবসাইট (হোমপেজ)</span>
-              </div>
-            </button>
-          </div>
-
           {/* Menu 1: ড্যাশবোর্ড হোম */}
           <div>
             <button
@@ -163,12 +143,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
-          {/* Menu 2: পরীক্ষাসমূহ (Exams) */}
+          {/* Menu 2: পরীক্ষাসমূহ ও খাতা (Exams) */}
           <div>
             <button
               type="button"
               onClick={() => {
-                toggleSubmenu('exams');
                 handleLinkClick(() => {
                   onRoleChange('parent');
                   onNavigateDashboard();
@@ -183,45 +162,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <div className="flex items-center gap-2.5 truncate min-w-0">
                 <BookOpen className="w-4.5 h-4.5 text-blue-400 shrink-0" />
-                <span className="truncate">পরীক্ষাসমূহ</span>
-              </div>
-              <div className="shrink-0 pl-1">
-                {openSubmenu === 'exams' ? (
-                  <ChevronDown className="w-4 h-4 text-slate-400" />
-                ) : (
-                  <ChevronRight className="w-4 h-4 text-slate-500" />
-                )}
+                <span className="truncate">পরীক্ষাসমূহ ও খাতা</span>
               </div>
             </button>
-
-            {/* Submenu */}
-            {openSubmenu === 'exams' && (
-              <div className="bg-[#080d17] py-1 border-y border-slate-800/60 pl-8 pr-3 space-y-1">
-                <button
-                  type="button"
-                  onClick={() => handleLinkClick(() => {
-                    onRoleChange('parent');
-                    onNavigateDashboard();
-                    onSelectParentTab('assigned');
-                  })}
-                  className="w-full text-left py-1.5 px-2.5 rounded hover:bg-slate-800 text-slate-300 hover:text-white text-xs sm:text-sm font-semibold block truncate"
-                >
-                  নির্ধারিত পরীক্ষা
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleLinkClick(() => {
-                    onRoleChange('parent');
-                    onNavigateDashboard();
-                    onSelectParentTab('assigned');
-                    onOpenCreateExam();
-                  })}
-                  className="w-full text-left py-1.5 px-2.5 rounded hover:bg-slate-800 text-emerald-400 font-bold text-xs sm:text-sm block truncate"
-                >
-                  + নতুন পরীক্ষা তৈরি
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Menu 3: খাতা মূল্যায়ন (Grading & Review) */}

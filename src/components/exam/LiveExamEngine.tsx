@@ -10,7 +10,8 @@ import {
   saveStoredTests, 
   getStoredNotifications, 
   saveStoredNotifications,
-  getShareableSubmissionUrl 
+  getShareableSubmissionUrl,
+  syncSubmissionToServer
 } from "../../lib/storage";
 import { AssignedTest } from "../../types";
 
@@ -41,6 +42,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   // Anti-Cheating, Fullscreen & Camera State
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(false);
+  const [isCameraMinimized, setIsCameraMinimized] = useState(false);
   const [violationCount, setViolationCount] = useState(0);
   const [lastWarning, setLastWarning] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement);
@@ -580,6 +582,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     const allTests = getStoredTests();
     const updatedList = allTests.map((t) => t.id === test.id ? updatedTest : t);
     saveStoredTests(updatedList);
+    syncSubmissionToServer(updatedTest);
 
     // Notification for Parent
     const notifs = getStoredNotifications();
@@ -618,7 +621,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
   return (
     <div 
-      className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 select-none"
+      className="w-full max-w-4xl mx-auto px-4 sm:px-6 pt-6 pb-32 sm:pb-24 space-y-6 select-none"
       onContextMenu={(e) => e.preventDefault()}
     >
       
@@ -674,79 +677,106 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         </div>
       )}
 
-      {/* Floating Live Camera PIP Window during active exam */}
+      {/* Floating Live Camera PIP Window during active exam - Moved to top-right on mobile so it NEVER blocks the submit button */}
       {!isReviewOnly && !isSubmitted && (
-        <div className="fixed bottom-5 right-5 z-40 bg-slate-900 border-2 border-emerald-500 rounded-2xl p-2 shadow-2xl w-44 sm:w-56 flex flex-col items-center">
-          <div className="w-full h-28 sm:h-36 bg-slate-950 rounded-xl overflow-hidden relative flex items-center justify-center">
-            {cameraActive ? (
-              <video 
-                ref={(el) => {
-                  videoRef.current = el;
-                  if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
-                    attachStream(mediaStreamRef.current);
-                  }
-                }}
-                autoPlay 
-                playsInline 
-                muted 
-                className="w-full h-full object-cover -scale-x-100"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center text-center p-2 text-slate-400">
-                <Camera className="w-6 h-6 mb-1 text-emerald-400 animate-pulse" />
-                <span className="text-[10px] font-bold">ক্যামেরা সক্রিয় হচ্ছে...</span>
-              </div>
-            )}
-
-            {/* Live AI Proctor Bounding Box & Gaze Tracking HUD */}
-            <div className={`absolute inset-1.5 rounded-lg border-2 pointer-events-none transition-colors duration-300 flex flex-col justify-between p-1.5 ${
-              gazeStatus === 'looking_down'
-                ? 'border-rose-500 bg-rose-500/15 animate-pulse'
-                : gazeStatus === 'looking_away'
-                ? 'border-amber-500 bg-amber-500/15 animate-pulse'
-                : 'border-emerald-400/80'
-            }`}>
-              <div className="flex items-center justify-between">
-                <span className={`text-[8.5px] font-black px-1.5 py-0.5 rounded shadow-sm ${
-                  gazeStatus === 'normal' 
-                    ? 'bg-emerald-950/85 text-emerald-300 border border-emerald-500/40' 
-                    : 'bg-rose-950/90 text-rose-200 border border-rose-500 animate-bounce'
-                }`}>
-                  {gazeStatus === 'looking_down'
-                    ? '⚠️ দৃষ্টি নিচে বই/নোটে!'
-                    : gazeStatus === 'looking_away'
-                    ? '⚠️ দৃষ্টি অন্যদিকে!'
-                    : 'দৃষ্টি স্ক্রিনে নিবদ্ধ ✓'}
-                </span>
-                <div className="flex items-center gap-1 bg-black/70 px-1.5 py-0.5 rounded-full text-[9px] text-emerald-400 font-mono font-bold">
+        <div className="fixed top-16 right-3 sm:top-auto sm:bottom-5 sm:right-5 z-40 transition-all duration-300">
+          {isCameraMinimized ? (
+            <button
+              type="button"
+              onClick={() => setIsCameraMinimized(false)}
+              className="bg-slate-900/95 text-emerald-300 border-2 border-emerald-500/80 px-3 py-2 rounded-2xl shadow-2xl flex items-center gap-2 text-xs font-bold cursor-pointer hover:bg-slate-800 transition-all backdrop-blur-xs"
+              title="ক্যামেরা বড় করুন"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <Camera className="w-4 h-4 text-emerald-400" />
+              <span>লাইভ প্রক্টরিং সক্রিয়</span>
+              <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">বড় করুন ⤢</span>
+            </button>
+          ) : (
+            <div className="bg-slate-900 border-2 border-emerald-500 rounded-2xl p-2 shadow-2xl w-40 sm:w-56 flex flex-col items-center">
+              {/* Header with Minimize Button */}
+              <div className="w-full flex items-center justify-between pb-1 px-1 border-b border-slate-800 mb-1.5">
+                <div className="flex items-center gap-1.5 text-[9.5px] font-bold text-emerald-400">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-                  <span>LIVE</span>
+                  <span>ফ্রন্ট ক্যামেরা প্রক্টরিং</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCameraMinimized(true)}
+                  className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[9px] font-bold cursor-pointer border border-slate-700 transition-colors"
+                  title="ক্যামেরা ছোট করুন"
+                >
+                  মিনিমাইজ −
+                </button>
+              </div>
+
+              <div className="w-full h-24 sm:h-36 bg-slate-950 rounded-xl overflow-hidden relative flex items-center justify-center">
+                {cameraActive ? (
+                  <video 
+                    ref={(el) => {
+                      videoRef.current = el;
+                      if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
+                        attachStream(mediaStreamRef.current);
+                      }
+                    }}
+                    autoPlay 
+                    playsInline 
+                    muted 
+                    className="w-full h-full object-cover -scale-x-100"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center p-2 text-slate-400">
+                    <Camera className="w-6 h-6 mb-1 text-emerald-400 animate-pulse" />
+                    <span className="text-[10px] font-bold">ক্যামেরা সক্রিয় হচ্ছে...</span>
+                  </div>
+                )}
+
+                {/* Live AI Proctor Bounding Box & Gaze Tracking HUD */}
+                <div className={`absolute inset-1.5 rounded-lg border-2 pointer-events-none transition-colors duration-300 flex flex-col justify-between p-1.5 ${
+                  gazeStatus === 'looking_down'
+                    ? 'border-rose-500 bg-rose-500/15 animate-pulse'
+                    : gazeStatus === 'looking_away'
+                    ? 'border-amber-500 bg-amber-500/15 animate-pulse'
+                    : 'border-emerald-400/80'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[8px] sm:text-[8.5px] font-black px-1 sm:px-1.5 py-0.5 rounded shadow-sm ${
+                      gazeStatus === 'normal' 
+                        ? 'bg-emerald-950/85 text-emerald-300 border border-emerald-500/40' 
+                        : 'bg-rose-950/90 text-rose-200 border border-rose-500 animate-bounce'
+                    }`}>
+                      {gazeStatus === 'looking_down'
+                        ? '⚠️ দৃষ্টি বই/নোটে!'
+                        : gazeStatus === 'looking_away'
+                        ? '⚠️ দৃষ্টি অন্যদিকে!'
+                        : 'দৃষ্টি স্ক্রিনে ✓'}
+                    </span>
+                    <div className="flex items-center gap-1 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded-full text-[8px] sm:text-[9px] text-emerald-400 font-mono font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                      <span>LIVE</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-mono text-white/90 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded">
+                    <span>নকল প্রতিরোধ</span>
+                    <span>সতর্কতা: {violationCount}/৩</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-[8px] font-mono text-white/90 bg-black/70 px-1.5 py-0.5 rounded">
-                <span>নকল প্রতিরোধ</span>
-                <span>সতর্কতা: {violationCount}/৩</span>
+              {/* PIP Info & Interactive Book/Notes Test Button */}
+              <div className="w-full px-0.5 pt-1.5 flex flex-col gap-1 text-center">
+                <button
+                  type="button"
+                  onClick={simulateLookingAtNotes}
+                  className="w-full py-1 px-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-950 border border-slate-700 text-[8.5px] sm:text-[9px] text-amber-300 font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                  title="ক্লিক করে বই/নোট পড়ার সতর্কতা পরীক্ষা করুন"
+                >
+                  <span>📖 বই/নোট পড়ার টেস্ট</span>
+                </button>
               </div>
             </div>
-          </div>
-
-          {/* PIP Info & Interactive Book/Notes Test Button */}
-          <div className="w-full px-0.5 pt-1.5 flex flex-col gap-1 text-center">
-            <div className="text-[10px] font-bold text-slate-200 flex items-center justify-center gap-1">
-              <ShieldCheck className="w-3 h-3 text-emerald-400 shrink-0" />
-              <span>ফ্রন্ট ক্যামেরা নজরদারি সক্রিয়</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={simulateLookingAtNotes}
-              className="w-full py-1 px-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-950 border border-slate-700 text-[9px] text-amber-300 font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
-              title="ক্লিক করে বই/নোট পড়ার সতর্কতা পরীক্ষা করুন"
-            >
-              <span>📖 বই/নোট পড়ার টেস্ট</span>
-            </button>
-          </div>
+          )}
         </div>
       )}
 
@@ -1007,20 +1037,20 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         })}
       </div>
 
-      {/* Bottom Submit Action Strip */}
+      {/* Bottom Submit Action Strip - High z-index, clean padding, completely unobstructed */}
       {!isReviewOnly && !isSubmitted && (
         <div 
           ref={submitSectionRef}
-          className="sticky bottom-4 z-30 bg-white/95 backdrop-blur-md rounded-2xl p-4 border border-slate-200 shadow-xl flex items-center justify-between gap-4"
+          className="sticky bottom-3 z-50 bg-white/98 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 border border-slate-200 shadow-2xl flex items-center justify-between gap-3 mt-4"
         >
-          <div className="text-xs text-slate-600 font-bold">
+          <div className="text-xs sm:text-sm text-slate-700 font-bold">
             উত্তর সম্পন্ন: <span className="text-blue-600 font-black">{answeredCount}</span> / {test.questions.length}টি
           </div>
 
           <button
             type="button"
             onClick={() => handleSubmitExam(false)}
-            className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-xs sm:text-sm shadow-md flex items-center gap-2 cursor-pointer transition-all active:scale-95"
+            className="px-5 sm:px-7 py-2.5 sm:py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black text-xs sm:text-sm shadow-lg shadow-emerald-600/30 flex items-center gap-2 cursor-pointer transition-all active:scale-95"
           >
             <Send className="w-4 h-4" />
             <span>খাতা জমা দিন</span>

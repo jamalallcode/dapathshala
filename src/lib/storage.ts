@@ -198,6 +198,10 @@ export function saveStoredTests(tests: AssignedTest[]): void {
   try {
     localStorage.setItem(TESTS_KEY, JSON.stringify(tests));
     window.dispatchEvent(new Event("dapathshala_tests_updated"));
+    // Sync to backend API in background for cross-device support
+    tests.forEach(t => {
+      syncTestToServer(t);
+    });
   } catch (e) {
     console.error("Error saving tests", e);
   }
@@ -355,13 +359,68 @@ export function decodeTestFromUrl(encodedStr: string): AssignedTest | null {
 }
 
 /**
- * Generates the full shareable URL containing the PIN and encoded exam payload.
- * When anyone opens this link on ANY device, mobile or desktop, the exam opens immediately!
+ * Generates an ultra-short, clean shareable URL containing only the 6-digit PIN.
+ * e.g. https://domain.com/?pin=997080
+ * Fits on a single line on WhatsApp and mobile SMS!
  */
 export function getShareableTestUrl(test: AssignedTest): string {
   const origin = window.location.origin;
-  const encoded = encodeTestForUrl(test);
-  return `${origin}?pin=${test.pin}&exam=${encoded}`;
+  return `${origin}?pin=${test.pin}`;
+}
+
+/**
+ * Backend synchronization helpers for cross-device persistence
+ */
+export async function syncTestToServer(test: AssignedTest): Promise<boolean> {
+  try {
+    const res = await fetch('/api/tests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(test)
+    });
+    return res.ok;
+  } catch (err) {
+    return false;
+  }
+}
+
+export async function fetchTestFromServer(pinOrId: string): Promise<AssignedTest | null> {
+  try {
+    const res = await fetch(`/api/tests/${pinOrId}`);
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch test from server:', err);
+  }
+  return null;
+}
+
+export async function syncSubmissionToServer(submission: any): Promise<boolean> {
+  try {
+    const res = await fetch('/api/submissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(submission)
+    });
+    return res.ok;
+  } catch (err) {
+    return false;
+  }
+}
+
+export async function fetchSubmissionFromServer(pinOrId: string): Promise<any | null> {
+  try {
+    const res = await fetch(`/api/submissions/${pinOrId}`);
+    if (res.ok) {
+      const data = await res.json();
+      return data;
+    }
+  } catch (err) {
+    console.warn('Failed to fetch submission from server:', err);
+  }
+  return null;
 }
 
 /**
@@ -446,12 +505,11 @@ export function decodeSubmissionFromUrl(encodedStr: string): AssignedTest | null
 }
 
 /**
- * Generates the shareable submission URL that the child sends to the parent.
+ * Generates the clean shareable submission URL that the child sends to the parent.
  */
 export function getShareableSubmissionUrl(test: AssignedTest): string {
   const origin = window.location.origin;
-  const encoded = encodeSubmissionForUrl(test);
-  return `${origin}?reviewId=${test.id}&subData=${encoded}`;
+  return `${origin}?reviewPin=${test.pin}`;
 }
 
 /**

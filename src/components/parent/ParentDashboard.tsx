@@ -3,7 +3,8 @@ import {
   Plus, Trash2, Copy, Check, Eye, FileText, CheckCircle2, 
   Clock, Shield, AlertTriangle, MessageSquare, ChevronRight, Share2,
   TrendingUp, Award, BookOpen, Sparkles, RefreshCw, Edit3, X,
-  Save, AlertCircle, Camera, ExternalLink, HelpCircle, GraduationCap, ArrowRight
+  Save, AlertCircle, Camera, ExternalLink, HelpCircle, GraduationCap, ArrowRight, ArrowLeft,
+  RotateCcw, MessageCircle
 } from 'lucide-react';
 import { AssignedTest, StudentSubmission, ExamQuestion } from '../../types';
 import { 
@@ -35,9 +36,11 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   onOpenTest,
   onOpenReview,
   onNavigateHome,
+  showCreateModalExternal,
+  onCloseCreateModalExternal
 }) => {
   const [tests, setTests] = useState<AssignedTest[]>([]);
-  const [activeViewMode, setActiveViewMode] = useState<'builder' | 'tests'>('builder');
+  const [activeViewMode, setActiveViewMode] = useState<'builder' | 'tests'>('tests');
   const [copiedPin, setCopiedPin] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -73,6 +76,11 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [parentComment, setParentComment] = useState('');
   const [approvedScore, setApprovedScore] = useState<number>(0);
 
+  // Controlling Action Modals (Delete, Share, Retake)
+  const [testToDelete, setTestToDelete] = useState<AssignedTest | null>(null);
+  const [shareModalTest, setShareModalTest] = useState<AssignedTest | null>(null);
+  const [retakeModalTest, setRetakeModalTest] = useState<AssignedTest | null>(null);
+
   // Load tests on mount and listen to updates
   const loadTests = () => {
     const list = getStoredTests();
@@ -89,6 +97,13 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       window.removeEventListener('dapathshala_notifs_updated', handleStorage);
     };
   }, []);
+
+  useEffect(() => {
+    if (showCreateModalExternal) {
+      setActiveViewMode('builder');
+      onCloseCreateModalExternal?.();
+    }
+  }, [showCreateModalExternal, onCloseCreateModalExternal]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -301,6 +316,78 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     showToast('✓ খাতা দেখা সম্পন্ন হয়েছে এবং ফলাফল ও মন্তব্য পাঠানো হয়েছে!');
   };
 
+  // Delete Test completely from state, localStorage, and server
+  const handleConfirmDeleteTest = async () => {
+    if (!testToDelete) return;
+    const { id, pin } = testToDelete;
+
+    // Remove from state
+    const updated = tests.filter(t => t.id !== id && t.pin !== pin);
+    setTests(updated);
+    saveStoredTests(updated);
+
+    // Clean up notifications for this test
+    const notifs = getStoredNotifications().filter(
+      n => n.testId !== id && !n.message.includes(pin)
+    );
+    saveStoredNotifications(notifs);
+    window.dispatchEvent(new Event('dapathshala_notifs_updated'));
+
+    // Send DELETE to server API
+    try {
+      await fetch(`/api/tests/${pin}`, { method: 'DELETE' });
+    } catch (e) {
+      console.error('Failed to delete on server:', e);
+    }
+
+    setTestToDelete(null);
+    showToast('✓ পরীক্ষাটি তালিকা থেকে সফলভাবে মুছে ফেলা হয়েছে।');
+  };
+
+  // Retake / Reset Test for Student
+  const handleConfirmRetakeTest = async () => {
+    if (!retakeModalTest) return;
+    const targetId = retakeModalTest.id;
+
+    const updated = tests.map(t => {
+      if (t.id === targetId) {
+        return {
+          ...t,
+          status: 'pending' as const,
+          score: undefined,
+          parentComment: undefined,
+          proctoringFlags: [],
+          questions: t.questions.map(q => ({
+            ...q,
+            studentAnswer: undefined,
+            isCorrect: undefined
+          }))
+        };
+      }
+      return t;
+    });
+
+    setTests(updated);
+    saveStoredTests(updated);
+
+    // Sync to server so student gets clean test state
+    const refreshed = updated.find(t => t.id === targetId);
+    if (refreshed) {
+      try {
+        await fetch('/api/tests', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(refreshed)
+        });
+      } catch (e) {
+        console.error('Failed to sync retake to server:', e);
+      }
+    }
+
+    setRetakeModalTest(null);
+    showToast('🔄 পরীক্ষাটি পুনরায় দেওয়ার জন্য পেন্ডিং করা হয়েছে! সন্তান আবার পরীক্ষা দিতে পারবে।');
+  };
+
   const toBn = (num: number | string) => {
     return num.toString().replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[parseInt(d)]);
   };
@@ -337,39 +424,29 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           </div>
         </div>
 
-        {/* View Navigation Tabs */}
-        <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200 text-xs sm:text-sm font-bold w-full sm:w-auto">
-          <button
-            type="button"
-            onClick={() => setActiveViewMode('builder')}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl transition-all cursor-pointer ${
-              activeViewMode === 'builder'
-                ? 'bg-blue-600 text-white shadow-xs font-black'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-amber-300" />
-            <span>নতুন প্রশ্ন তৈরি</span>
-          </button>
-
+        {/* Header Right Status / Back Button */}
+        {activeViewMode === 'builder' ? (
           <button
             type="button"
             onClick={() => setActiveViewMode('tests')}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 rounded-xl transition-all cursor-pointer ${
-              activeViewMode === 'tests'
-                ? 'bg-blue-600 text-white shadow-xs font-black'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold transition-all cursor-pointer border border-slate-200 shadow-2xs"
           >
-            <FileText className="w-4 h-4" />
-            <span>পরীক্ষাসমূহ ও খাতা</span>
-            {pendingReviewCount > 0 && (
-              <span className="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[11px] font-black animate-pulse">
-                {toBn(pendingReviewCount)}
-              </span>
-            )}
+            <ArrowLeft className="w-4 h-4" />
+            <span>← পরীক্ষাসমূহ ও খাতায় ফিরে যান</span>
           </button>
-        </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs sm:text-sm font-bold">
+              <FileText className="w-4 h-4 text-blue-600" />
+              <span>নির্ধারিত পরীক্ষা: {toBn(tests.length)}টি</span>
+              {pendingReviewCount > 0 && (
+                <span className="ml-1 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[11px] font-black animate-pulse">
+                  {toBn(pendingReviewCount)}টি খাতা মূল্যায়নের বাকি
+                </span>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ======================================================== */}
@@ -380,11 +457,21 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           
           {/* Section A: Selection & Parameters Card */}
           <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-xs">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-              <Sparkles className="w-5 h-5 text-blue-600" />
-              <h2 className="text-base sm:text-lg font-black text-slate-900">
-                সন্তানের জন্য বিষয় ও অধ্যায় নির্বাচন করুন
-              </h2>
+            <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-blue-600" />
+                <h2 className="text-base sm:text-lg font-black text-slate-900">
+                  সন্তানের জন্য বিষয় ও অধ্যায় নির্বাচন করুন
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveViewMode('tests')}
+                className="text-xs font-bold text-slate-600 hover:text-slate-900 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>ফিরে যান</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -788,121 +875,165 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                     key={test.id}
                     className={`p-4 sm:p-5 rounded-2xl border transition-all ${
                       isSubmitted
-                        ? 'bg-amber-50/50 border-amber-300 shadow-xs'
+                        ? 'bg-amber-50/40 border-amber-300 shadow-xs'
                         : isReviewed
-                        ? 'bg-emerald-50/30 border-emerald-200'
-                        : 'bg-slate-50 border-slate-200'
+                        ? 'bg-emerald-50/20 border-emerald-200 shadow-2xs'
+                        : 'bg-white border-slate-200/90 shadow-2xs'
                     }`}
                   >
-                    <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                      
-                      {/* Left: Test Details & Status Badge */}
-                      <div className="space-y-1.5 flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-blue-100 text-blue-800">
-                            {test.subject}
+                    {/* ======================================================== */}
+                    {/* SECTION 1: EXAM INFORMATION & METADATA (Full Width)      */}
+                    {/* ======================================================== */}
+                    <div className="space-y-2">
+                      {/* Top Badges Row: Subject, PIN, and Status Pill - All aligned left */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-lg bg-blue-100 text-blue-800 border border-blue-200">
+                          {test.subject}
+                        </span>
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
+                          পিন: <span className="font-mono font-bold text-blue-600">{test.pin}</span>
+                        </span>
+
+                        {/* Status Pills shifted to left alongside Subject and PIN */}
+                        {isSubmitted && (
+                          <span className="text-xs font-black px-2.5 py-1 rounded-full bg-amber-500 text-white animate-pulse inline-flex items-center gap-1 shadow-2xs">
+                            <span>🔔</span> নতুন খাতা জমা পড়েছে!
                           </span>
-                          <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-200 text-slate-700">
-                            পিন: {test.pin}
+                        )}
+                        {isReviewed && (
+                          <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1.5 shadow-2xs">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            মূল্যায়ন সম্পন্ন ও মন্তব্য প্রেরিত
                           </span>
-
-                          {/* Status Pills */}
-                          {isSubmitted && (
-                            <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-amber-500 text-white animate-pulse">
-                              🔔 নতুন খাতা জমা পড়েছে!
-                            </span>
-                          )}
-                          {isReviewed && (
-                            <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                              ✓ মূল্যায়ন সম্পন্ন ও মন্তব্য প্রেরিত
-                            </span>
-                          )}
-                          {isPending && (
-                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-200 text-slate-600">
-                              ⏳ সন্তানের পরীক্ষার অপেক্ষায়
-                            </span>
-                          )}
-                        </div>
-
-                        <h3 className="text-sm sm:text-base font-black text-slate-900 truncate">
-                          {test.title}
-                        </h3>
-
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium">
-                          <span>অধ্যায়: {test.chapter}</span>
-                          <span>•</span>
-                          <span>মোট প্রশ্ন: {toBn(test.questionCount)}টি</span>
-                          <span>•</span>
-                          <span>সময়: {toBn(test.durationMinutes)} মিনিট</span>
-                          {test.score !== undefined && (
-                            <>
-                              <span>•</span>
-                              <span className="font-bold text-emerald-700">
-                                প্রাপ্ত নম্বর: {toBn(test.score)}%
-                              </span>
-                            </>
-                          )}
-                        </div>
+                        )}
+                        {isPending && (
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200 inline-flex items-center gap-1">
+                            <span>⏳</span> সন্তানের পরীক্ষার অপেক্ষায়
+                          </span>
+                        )}
                       </div>
 
-                      {/* Right: Actions */}
-                      <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
-                        
-                        {/* Copy Link Button */}
+                      {/* Title */}
+                      <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                        {test.title}
+                      </h3>
+
+                      {/* Metadata Row: Spans full card width so it never wraps awkwardly */}
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-600 font-medium pt-0.5">
+                        <span>অধ্যায়: <span className="font-bold text-slate-800">{test.chapter}</span></span>
+                        <span className="text-slate-300">•</span>
+                        <span className="inline-flex items-center gap-1">
+                          মোট প্রশ্ন: <strong className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 tracking-wider font-['Noto_Sans_Bengali']">{toBn(test.questionCount)}টি</strong>
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="inline-flex items-center gap-1">
+                          সময়: <strong className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 tracking-wider font-['Noto_Sans_Bengali']">{toBn(test.durationMinutes)} মিনিট</strong>
+                        </span>
+                        {test.score !== undefined && (
+                          <>
+                            <span className="text-slate-300">•</span>
+                            <span className="inline-flex items-center gap-1 font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200 tracking-wider font-['Noto_Sans_Bengali']">
+                              প্রাপ্ত নম্বর: {toBn(test.score)}%
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ======================================================== */}
+                    {/* SECTION 2: CONTROLLING & ACTION TOOLBAR (All on Left)    */}
+                    {/* ======================================================== */}
+                    <div className="mt-3.5 pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-start gap-2 sm:gap-2.5">
+                      
+                      {/* 1. Copy Link Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleCopyLink(test)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-100 bg-white text-slate-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                        title="পরীক্ষার সরাসরি লিংক কপি করুন"
+                      >
+                        {copiedPin === test.pin ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span className="text-emerald-700 font-bold">লিংক কপি হয়েছে!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-slate-500" />
+                            <span>লিংক কপি</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* 2. Share Option */}
+                      <button
+                        type="button"
+                        onClick={() => setShareModalTest(test)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold transition-all shadow-2xs cursor-pointer group"
+                        title="পরীক্ষার লিংক ও পিন হোয়াটসঅ্যাপ বা অন্যান্য মাধ্যমে শেয়ার করুন"
+                      >
+                        <Share2 className="w-3.5 h-3.5 text-sky-600 group-hover:scale-110 transition-transform" />
+                        <span>শেয়ার</span>
+                      </button>
+
+                      {/* 3. Retake Option (only for submitted / reviewed tests) */}
+                      {(test.status === 'submitted' || test.status === 'reviewed') && (
                         <button
                           type="button"
-                          onClick={() => handleCopyLink(test)}
-                          className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                          onClick={() => setRetakeModalTest(test)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition-all shadow-2xs cursor-pointer group"
+                          title="সন্তানকে আবার এই পরীক্ষাটি দেওয়ার সুযোগ দিন"
                         >
-                          {copiedPin === test.pin ? (
-                            <>
-                              <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              <span className="text-emerald-700">কপি হয়েছে!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="w-3.5 h-3.5 text-slate-500" />
-                              <span>লিংক কপি</span>
-                            </>
-                          )}
+                          <RotateCcw className="w-3.5 h-3.5 text-amber-600 group-hover:-rotate-45 transition-transform" />
+                          <span>পুনঃপরীক্ষা</span>
                         </button>
+                      )}
 
-                        {/* Grading & Review Button */}
-                        {isSubmitted && (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenReviewModal(test)}
-                            className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs font-black shadow-xs transition-colors cursor-pointer"
-                          >
-                            <Edit3 className="w-3.5 h-3.5" />
-                            <span>খাতা মূল্যায়ন করুন</span>
-                          </button>
-                        )}
+                      {/* 4. Delete Option */}
+                      <button
+                        type="button"
+                        onClick={() => setTestToDelete(test)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 hover:text-rose-700 text-xs font-bold transition-all shadow-2xs cursor-pointer group"
+                        title="পরীক্ষাটি তালিকা থেকে মুছে ফেলুন"
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-rose-500 group-hover:scale-110 transition-transform" />
+                        <span>মুছুন</span>
+                      </button>
 
-                        {isReviewed && (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenReviewModal(test)}
-                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-400 text-emerald-800 text-xs font-bold transition-all shadow-xs cursor-pointer group"
-                            title="খাতা পুনরায় দেখতে বা মূল্যায়ন সম্পাদন করতে ক্লিক করুন"
-                          >
-                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                            <span>খাতা দেখা হয়েছে</span>
-                          </button>
-                        )}
+                      {/* 5. Primary Action Button (Grading / Review / View Questions) */}
+                      {isSubmitted && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenReviewModal(test)}
+                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs font-black shadow-xs transition-colors cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>খাতা মূল্যায়ন করুন</span>
+                        </button>
+                      )}
 
-                        {isPending && (
-                          <button
-                            type="button"
-                            onClick={() => onOpenTest(test)}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>প্রশ্নপত্র দেখুন</span>
-                          </button>
-                        )}
+                      {isReviewed && (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenReviewModal(test)}
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-400 text-emerald-800 text-xs font-bold transition-all shadow-xs cursor-pointer group"
+                          title="খাতা পুনরায় দেখতে বা মূল্যায়ন সম্পাদন করতে ক্লিক করুন"
+                        >
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>খাতা দেখা হয়েছে</span>
+                        </button>
+                      )}
 
-                      </div>
+                      {isPending && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenTest(test)}
+                          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-blue-300 bg-blue-50/70 hover:bg-blue-100 text-blue-700 text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>প্রশ্নপত্র দেখুন</span>
+                        </button>
+                      )}
 
                     </div>
                   </div>
@@ -1170,6 +1301,266 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               </div>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 3: DELETE TEST CONFIRMATION                        */}
+      {/* ======================================================== */}
+      {testToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full border border-rose-100 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  পরীক্ষাটি মুছে ফেলতে চান?
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  এই কাজটি পূর্বাবস্থায় ফিরিয়ে আনা যাবে না
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">পরীক্ষার নাম:</span>
+                <span className="font-bold text-slate-800 text-right">{testToDelete.title}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">পরীক্ষার পিন:</span>
+                <span className="font-mono font-bold text-blue-600">{testToDelete.pin}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-rose-700 bg-rose-50 p-3 rounded-xl border border-rose-200 leading-relaxed">
+              সতর্কতা: এটি নিশ্চিত করলে প্রশ্নপত্র এবং এর সাথে সম্পর্কিত খাতা ও মূল্যায়নের সকল রেকর্ড তালিকা থেকে সম্পূর্ণ মুছে যাবে।
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setTestToDelete(null)}
+                className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+              >
+                বাতিল
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteTest}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>হ্যাঁ, মুছে ফেলুন</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 4: SHARE TEST MODAL (WHATSAPP, SHORT URL, PIN)     */}
+      {/* ======================================================== */}
+      {shareModalTest && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-lg w-full border border-slate-200 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center">
+                  <Share2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-900">
+                    পরীক্ষা শেয়ার ও লিংক
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {shareModalTest.subject} • {shareModalTest.chapter}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShareModalTest(null)}
+                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Test Details Card */}
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">পরীক্ষার নাম:</span>
+                <span className="font-bold text-slate-800">{shareModalTest.title}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">মোট প্রশ্ন ও সময়:</span>
+                <span className="font-semibold text-slate-800">
+                  {toBn(shareModalTest.questionCount)}টি প্রশ্ন • {toBn(shareModalTest.durationMinutes)} মিনিট
+                </span>
+              </div>
+              <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                <span className="text-slate-600 font-bold">৬-সংখ্যার পিন (PIN):</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-black text-blue-600 tracking-wider">
+                    {shareModalTest.pin}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(shareModalTest.pin);
+                      showToast('✓ পিন কপি হয়েছে!');
+                    }}
+                    className="p-1 rounded-lg hover:bg-slate-200 text-slate-600 cursor-pointer"
+                    title="পিন কপি করুন"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Short Direct Link */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                <span>সরাসরি পরীক্ষা দেওয়ার লিংক:</span>
+                <span className="text-[11px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  লগইন ছাড়াই সরাসরি ওপেন হবে ✓
+                </span>
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={getShareableTestUrl(shareModalTest)}
+                  className="flex-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-800 select-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleCopyLink(shareModalTest)}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors shrink-0 cursor-pointer flex items-center gap-1"
+                >
+                  {copiedPin === shareModalTest.pin ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>কপি হয়েছে</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>কপি</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* WhatsApp & Native Share Buttons */}
+            <div className="space-y-2 pt-1">
+              <a
+                href={`https://wa.me/?text=${encodeURIComponent(
+                  `দা পাঠশালা: ${shareModalTest.title}\nসময়: ${toBn(shareModalTest.durationMinutes)} মিনিট, মোট প্রশ্ন: ${toBn(shareModalTest.questionCount)}টি।\n\nপরীক্ষায় অংশ নিতে নিচের লিংকে ক্লিক করো:\n${getShareableTestUrl(shareModalTest)}\n\n(অথবা দা পাঠশালা পোর্টালে পিন দাও: ${shareModalTest.pin})`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>হোয়াটসঅ্যাপে সরাসরি পাঠান</span>
+              </a>
+
+              {typeof navigator !== 'undefined' && 'share' in navigator && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.share({
+                        title: shareModalTest.title,
+                        text: `দা পাঠশালা: ${shareModalTest.title} (পিন: ${shareModalTest.pin})\nলিংক: `,
+                        url: getShareableTestUrl(shareModalTest)
+                      });
+                    } catch (e) {
+                      // ignore cancelled
+                    }
+                  }}
+                  className="w-full py-2 px-4 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-slate-600" />
+                  <span>অন্য অ্যাপে শেয়ার করুন</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => setShareModalTest(null)}
+                className="px-5 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+              >
+                সম্পন্ন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 5: RETAKE CONFIRMATION MODAL                       */}
+      {/* ======================================================== */}
+      {retakeModalTest && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full border border-amber-200 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                <RotateCcw className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  পুনঃপরীক্ষা নেওয়ার অনুমতি দিন
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  সন্তান আবার নতুন করে পরীক্ষা দিতে পারবে
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-500 font-medium">পরীক্ষার নাম:</span>
+                <span className="font-bold text-slate-800 text-right">{retakeModalTest.title}</span>
+              </div>
+              {retakeModalTest.score !== undefined && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-medium">পূর্ববর্তী প্রাপ্ত নম্বর:</span>
+                  <span className="font-bold text-amber-700">{toBn(retakeModalTest.score)}%</span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-amber-900 bg-amber-50 p-3 rounded-xl border border-amber-200 leading-relaxed">
+              আপনি কি সন্তানকে পুনরায় এই পরীক্ষা দেওয়ার সুযোগ দিতে চান? এতে খাতার পূর্ববর্তী অবস্থা রিসেট হয়ে আবার পেন্ডিং হবে এবং সন্তান নতুন করে পরীক্ষা শুরু করতে পারবে।
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => setRetakeModalTest(null)}
+                className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+              >
+                বাতিল
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRetakeTest}
+                className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>হ্যাঁ, পুনঃপরীক্ষা দিন</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

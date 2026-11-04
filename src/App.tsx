@@ -12,7 +12,9 @@ import {
   saveStoredTests, 
   decodeTestFromUrl, 
   decodeSubmissionFromUrl, 
-  generateFallbackTestForPin 
+  generateFallbackTestForPin,
+  fetchTestFromServer,
+  fetchSubmissionFromServer 
 } from './lib/storage';
 
 export function App() {
@@ -79,11 +81,12 @@ export function App() {
   const [parentActiveTab, setParentActiveTab] = useState<'overview' | 'assigned' | 'review' | 'proctoring' | 'report'>('assigned');
   const [showCreateModalExternal, setShowCreateModalExternal] = useState(false);
 
-  // Check URL query parameters on load across devices (e.g. ?pin=787193&exam=... or ?pin=359874)
+  // Check URL query parameters on load across devices (e.g. ?pin=997080 or ?reviewPin=997080)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const pin = params.get('pin');
     const testId = params.get('testId');
+    const reviewPin = params.get('reviewPin') || params.get('reviewId');
     const examData = params.get('exam') || params.get('testData') || params.get('data');
     const subData = params.get('subData') || params.get('submission');
     const view = params.get('view');
@@ -93,54 +96,87 @@ export function App() {
       return;
     }
 
-    // 1. If child shared completed submission with parent via URL
-    if (subData) {
-      const decodedSub = decodeSubmissionFromUrl(subData);
-      if (decodedSub) {
-        const tests = getStoredTests();
-        const exists = tests.some(t => t.id === decodedSub.id);
-        const updated = exists ? tests.map(t => t.id === decodedSub.id ? decodedSub : t) : [decodedSub, ...tests];
-        saveStoredTests(updated);
-        setActiveTest(decodedSub);
-        setCurrentRole('parent');
-        setActiveView('dashboard');
-        return;
-      }
-    }
-
-    // 2. If parent shared exam URL with student/friend (contains self-contained exam data)
-    if (examData) {
-      const decodedTest = decodeTestFromUrl(examData);
-      if (decodedTest) {
-        const tests = getStoredTests();
-        const exists = tests.some(t => t.id === decodedTest.id || t.pin === decodedTest.pin);
-        if (!exists) {
-          saveStoredTests([decodedTest, ...tests]);
+    const initFromParams = async () => {
+      // 1. If child shared completed submission with parent via URL
+      if (subData) {
+        const decodedSub = decodeSubmissionFromUrl(subData);
+        if (decodedSub) {
+          const tests = getStoredTests();
+          const exists = tests.some(t => t.id === decodedSub.id);
+          const updated = exists ? tests.map(t => t.id === decodedSub.id ? decodedSub : t) : [decodedSub, ...tests];
+          saveStoredTests(updated);
+          setActiveTest(decodedSub);
+          setCurrentRole('parent');
+          setActiveView('dashboard');
+          return;
         }
-        setCurrentRole('student');
-        setActiveTest(decodedTest);
-        setActiveView('exam');
-        return;
-      }
-    }
-
-    // 3. If standard pin or testId is provided in URL
-    if (pin || testId) {
-      const tests = getStoredTests();
-      let matched = tests.find(t => t.pin === pin || t.id === testId);
-      
-      // If opened on another device where this pin hasn't been saved yet, dynamically construct it:
-      if (!matched && pin) {
-        matched = generateFallbackTestForPin(pin);
-        saveStoredTests([matched, ...tests]);
       }
 
-      if (matched) {
-        setCurrentRole('student');
-        setActiveTest(matched);
-        setActiveView('exam');
+      // 1.2 If parent opens short review link with ?reviewPin=997080
+      if (reviewPin) {
+        const tests = getStoredTests();
+        let matched = tests.find(t => t.pin === reviewPin || t.id === reviewPin);
+        if (!matched) {
+          const serverSub = await fetchSubmissionFromServer(reviewPin);
+          if (serverSub) {
+            matched = serverSub;
+            saveStoredTests([serverSub, ...tests]);
+          }
+        }
+        if (matched) {
+          setCurrentRole('parent');
+          setActiveTest(matched);
+          setActiveView('dashboard');
+          return;
+        }
       }
-    }
+
+      // 2. If parent shared exam URL with student/friend (contains self-contained exam data)
+      if (examData) {
+        const decodedTest = decodeTestFromUrl(examData);
+        if (decodedTest) {
+          const tests = getStoredTests();
+          const exists = tests.some(t => t.id === decodedTest.id || t.pin === decodedTest.pin);
+          if (!exists) {
+            saveStoredTests([decodedTest, ...tests]);
+          }
+          setCurrentRole('student');
+          setActiveTest(decodedTest);
+          setActiveView('exam');
+          return;
+        }
+      }
+
+      // 3. If standard pin or testId is provided in URL (?pin=997080)
+      if (pin || testId) {
+        const queryKey = pin || testId || '';
+        const tests = getStoredTests();
+        let matched = tests.find(t => t.pin === queryKey || t.id === queryKey);
+        
+        // If opened on another device where this test isn't in local storage yet, fetch from server:
+        if (!matched && pin) {
+          const serverTest = await fetchTestFromServer(pin);
+          if (serverTest) {
+            matched = serverTest;
+            saveStoredTests([serverTest, ...tests]);
+          }
+        }
+
+        // Fallback: If still not found, construct fallback test so student is never blocked
+        if (!matched && pin) {
+          matched = generateFallbackTestForPin(pin);
+          saveStoredTests([matched, ...tests]);
+        }
+
+        if (matched) {
+          setCurrentRole('student');
+          setActiveTest(matched);
+          setActiveView('exam');
+        }
+      }
+    };
+
+    initFromParams();
   }, []);
 
   const handleNavigateHome = () => {

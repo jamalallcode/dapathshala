@@ -14,7 +14,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { AssignedTest, UserRole } from '../../types';
-import { getStoredTests, saveStoredTests, generateFallbackTestForPin } from '../../lib/storage';
+import { getStoredTests, saveStoredTests, generateFallbackTestForPin, fetchTestFromServer } from '../../lib/storage';
 
 interface LandingPageProps {
   onSelectRole: (role: UserRole) => void;
@@ -32,7 +32,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
 
-  const handlePinSubmit = (e: React.FormEvent) => {
+  const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinError('');
     const trimmed = pinInput.trim();
@@ -43,7 +43,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     const tests = getStoredTests();
     let matched = tests.find(t => t.pin === trimmed || t.id.toLowerCase() === trimmed.toLowerCase());
     
-    // If not found in local browser storage, dynamically generate curriculum exam for this PIN so student is never blocked
+    // Check server if not in local storage
+    if (!matched) {
+      const serverTest = await fetchTestFromServer(trimmed);
+      if (serverTest) {
+        matched = serverTest;
+        saveStoredTests([serverTest, ...tests]);
+      }
+    }
+
+    // If still not found, dynamically generate curriculum exam for this PIN so student is never blocked
     if (!matched) {
       matched = generateFallbackTestForPin(trimmed);
       saveStoredTests([matched, ...tests]);
