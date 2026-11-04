@@ -1,13 +1,22 @@
 export type UserRole = 'parent' | 'student';
+export type ExamTrack = 'academic' | 'bcs' | 'medical' | 'varsity' | 'engineering';
 
 export interface ExamQuestion {
   id: string;
   question: string;
   options: string[];
   correctAnswer: string;
+  correctAnswerIndex?: number;
   explanation: string;
+  solutions?: string[];
   studentAnswer?: string;
   isCorrect?: boolean;
+  track?: ExamTrack;
+  subject?: string;
+  topic?: string;
+  examSource?: string;
+  year?: number;
+  negativeMarkValue?: number;
 }
 
 export interface AssignedTest {
@@ -29,6 +38,10 @@ export interface AssignedTest {
   proctoringFlags?: string[];
   parentComment?: string;
   questions: ExamQuestion[];
+  track?: ExamTrack;
+  negativeMarking?: number;
+  examSource?: string;
+  year?: number;
 }
 
 export interface StudentSubmission {
@@ -44,6 +57,10 @@ export interface StudentSubmission {
   isPublished: boolean;
   parentComment?: string;
   aiFeedback?: string;
+  negativeMarkDeductions?: number;
+  correctCount?: number;
+  incorrectCount?: number;
+  skippedCount?: number;
 }
 
 export interface AppNotification {
@@ -55,3 +72,19 @@ export interface AppNotification {
   isRead: boolean;
   forRole: 'parent' | 'student';
 }
+
+export interface CompetitiveExamSeed {
+  id: string;
+  title: string;
+  track: ExamTrack;
+  trackLabel: string;
+  badge: string;
+  subject: string;
+  year?: number;
+  questionCount: number;
+  durationMinutes: number;
+  negativeMark: number;
+  description: string;
+  questions: ExamQuestion[];
+}
+

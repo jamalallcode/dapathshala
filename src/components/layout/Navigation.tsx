@@ -10,7 +10,9 @@ import {
   X, 
   Shield, 
   User, 
-  Menu
+  Menu,
+  Award,
+  BookMarked
 } from 'lucide-react';
 import { AppNotification, UserRole } from '../../types';
 import { getStoredNotifications, saveStoredNotifications, addDismissedNotifId, clearAllNotifications } from '../../lib/storage';
@@ -21,9 +23,13 @@ interface NavigationProps {
   onNavigateToReview?: (testId?: string) => void;
   onNavigateHome?: () => void;
   onNavigateDashboard?: () => void;
+  onNavigateCompetitive?: () => void;
+  onNavigateSyllabus?: () => void;
   onOpenCreateExam?: () => void;
   onSelectTab?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report') => void;
   isHomeActive?: boolean;
+  isCompetitiveActive?: boolean;
+  isSyllabusActive?: boolean;
   onToggleSidebar?: () => void;
   isSidebarOpen?: boolean;
 }
@@ -34,9 +40,13 @@ export const Navigation: React.FC<NavigationProps> = ({
   onNavigateToReview,
   onNavigateHome,
   onNavigateDashboard,
+  onNavigateCompetitive,
+  onNavigateSyllabus,
   onOpenCreateExam,
   onSelectTab,
   isHomeActive,
+  isCompetitiveActive,
+  isSyllabusActive,
   onToggleSidebar,
   isSidebarOpen
 }) => {
@@ -173,6 +183,34 @@ export const Navigation: React.FC<NavigationProps> = ({
             >
               <FileText className="w-4 h-4 text-blue-400" />
               <span>নির্ধারিত পরীক্ষা</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onNavigateCompetitive?.()}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                isCompetitiveActive
+                  ? 'bg-blue-600 text-white font-bold'
+                  : 'bg-blue-900/40 hover:bg-blue-800/60 text-blue-300 hover:text-white border border-blue-500/30'
+              }`}
+              title="বিসিএস, মেডিকেল ও বিশ্ববিদ্যালয় ভর্তি পোর্টাল"
+            >
+              <Award className="w-4 h-4 text-amber-300" />
+              <span>🏛️ ভর্তি ও বিসিএস</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onNavigateSyllabus?.()}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                isSyllabusActive
+                  ? 'bg-cyan-600 text-white font-bold'
+                  : 'bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 hover:text-white border border-cyan-500/30'
+              }`}
+              title="এনসিটিবি কারিকুলাম, ২০২৫ সালের বোর্ড প্রশ্ন ও ভর্তি প্রশ্নব্যাংক"
+            >
+              <BookMarked className="w-4 h-4 text-cyan-400" />
+              <span>📚 সিলেবাস ও প্রশ্নব্যাংক</span>
             </button>
           </div>
 

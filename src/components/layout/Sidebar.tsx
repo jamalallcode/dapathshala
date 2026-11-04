@@ -24,9 +24,11 @@ export interface SidebarProps {
   isResizing?: boolean;
   currentRole: UserRole;
   onRoleChange: (role: UserRole) => void;
-  activeView: 'landing' | 'dashboard' | 'exam' | 'review';
+  activeView: 'landing' | 'dashboard' | 'exam' | 'review' | 'competitive' | 'syllabus';
   onNavigateHome: () => void;
   onNavigateDashboard: () => void;
+  onNavigateCompetitive?: () => void;
+  onNavigateSyllabus?: () => void;
   parentTab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report';
   onSelectParentTab: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report') => void;
   onOpenCreateExam: () => void;
@@ -44,6 +46,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeView,
   onNavigateHome,
   onNavigateDashboard,
+  onNavigateCompetitive,
+  onNavigateSyllabus,
   parentTab,
   onSelectParentTab,
   onOpenCreateExam
@@ -167,6 +171,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
+          {/* Menu 2.5: ভর্তি ও বিসিএস পরীক্ষা (Competitive Exams) */}
+          <div>
+            <button
+              type="button"
+              onClick={() => {
+                handleLinkClick(() => {
+                  onNavigateCompetitive?.();
+                });
+              }}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
+                activeView === 'competitive'
+                  ? 'bg-blue-600/40 text-white font-bold border-l-2 border-amber-400'
+                  : 'hover:bg-slate-800/60 text-amber-300/90 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 truncate min-w-0">
+                <GraduationCap className="w-4.5 h-4.5 text-amber-400 shrink-0" />
+                <span className="truncate font-bold">ভর্তি ও বিসিএস পরীক্ষা</span>
+              </div>
+            </button>
+          </div>
+
           {/* Menu 3: খাতা মূল্যায়ন (Grading & Review) */}
           <div>
             <button
@@ -278,16 +304,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               type="button"
               onClick={() => handleLinkClick(() => {
-                onRoleChange('parent');
-                onNavigateDashboard();
-                onSelectParentTab('assigned');
+                if (onNavigateSyllabus) {
+                  onNavigateSyllabus();
+                } else {
+                  onRoleChange('parent');
+                  onNavigateDashboard();
+                  onSelectParentTab('assigned');
+                }
               })}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white"
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
+                activeView === 'syllabus'
+                  ? 'bg-cyan-600/40 text-white font-bold border-l-2 border-cyan-400'
+                  : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
+              }`}
             >
               <div className="flex items-center gap-2.5 truncate min-w-0">
                 <BookMarked className="w-4.5 h-4.5 text-cyan-400 shrink-0" />
                 <span className="truncate">সিলেবাস ও প্রশ্নব্যাংক</span>
               </div>
+              {activeView === 'syllabus' && (
+                <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-xs shadow-cyan-400 shrink-0"></span>
+              )}
             </button>
           </div>
 

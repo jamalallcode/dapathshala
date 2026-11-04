@@ -550,10 +550,19 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }
 
     let correctCount = 0;
+    let incorrectCount = 0;
+    let skippedCount = 0;
+
     const updatedQuestions = test.questions.map((q) => {
       const chosen = answers[q.id] || "";
       const isCorrect = chosen === q.correctAnswer;
-      if (isCorrect) correctCount++;
+      if (!chosen) {
+        skippedCount++;
+      } else if (isCorrect) {
+        correctCount++;
+      } else {
+        incorrectCount++;
+      }
       return {
         ...q,
         studentAnswer: chosen,
@@ -561,7 +570,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       };
     });
 
-    const calculatedScore = Math.round((correctCount / test.questions.length) * 100);
+    const negRate = test.negativeMarking || 0;
+    const negativeDeductions = incorrectCount * negRate;
+    const earnedMarks = Math.max(0, correctCount - negativeDeductions);
+    const calculatedScore = test.negativeMarking
+      ? Math.max(0, Math.round((earnedMarks / test.questions.length) * 100))
+      : Math.round((correctCount / test.questions.length) * 100);
     
     const finalFlags = isForcedByProctor 
       ? ['৩ বার অসদুপায় / বই-নোট পড়ার চেষ্টার কারণে পরীক্ষা নির্ধারিত সময়ের পূর্বে স্বয়ংক্রিয়ভাবে জমা হয়েছে', ...proctorLogs]
@@ -575,6 +589,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       ...test,
       status: "submitted",
       score: calculatedScore,
+      totalMarks: test.questions.length,
       questions: updatedQuestions,
       proctoringFlags: finalFlags
     };
@@ -1025,11 +1040,24 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 })}
               </div>
 
-              {/* Solution / Explanation on Review */}
-              {showGrading && q.explanation && (
-                <div className="mt-3.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed">
-                  <span className="font-bold text-slate-800 block mb-0.5">ব্যাখ্যা ও সমাধান:</span>
-                  {q.explanation}
+              {/* Solution / Explanation on Review (Only shown after exam is submitted or in review) */}
+              {showGrading && (q.explanation || (q.solutions && q.solutions.length > 0)) && (
+                <div className="mt-3.5 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 leading-relaxed space-y-2">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800">
+                    <span>💡 বিস্তারিত সমাধান ও বিকল্প পদ্ধতি</span>
+                  </div>
+                  {q.explanation && (
+                    <p className="text-slate-600">{q.explanation}</p>
+                  )}
+                  {q.solutions && q.solutions.length > 0 && (
+                    <div className="space-y-1.5 pt-1 border-t border-slate-200/80">
+                      {q.solutions.map((sol, sIdx) => (
+                        <div key={sIdx} className="p-2 rounded-lg bg-white border border-slate-200/80 text-[11.5px] font-medium text-slate-800">
+                          {sol}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

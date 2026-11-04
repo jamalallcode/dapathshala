@@ -6,6 +6,8 @@ import { StudentDashboard } from './components/student/StudentDashboard';
 import { StartExamScreen } from './components/exam/StartExamScreen';
 import { LiveExamEngine } from './components/exam/LiveExamEngine';
 import { LandingPage } from './components/landing/LandingPage';
+import { CompetitiveExamPortal } from './components/competitive/CompetitiveExamPortal';
+import { SyllabusQuestionBankView } from './components/syllabus/SyllabusQuestionBankView';
 import { AssignedTest, UserRole } from './types';
 import { 
   getStoredTests, 
@@ -19,7 +21,7 @@ import {
 
 export function App() {
   const [currentRole, setCurrentRole] = useState<UserRole>('parent');
-  const [activeView, setActiveView] = useState<'landing' | 'dashboard' | 'exam' | 'review'>('landing');
+  const [activeView, setActiveView] = useState<'landing' | 'dashboard' | 'exam' | 'review' | 'competitive' | 'syllabus'>('landing');
   const [activeTest, setActiveTest] = useState<AssignedTest | null>(null);
   
   // Resizable Sidebar state (default 208px - slimmer and moved further left)
@@ -256,6 +258,14 @@ export function App() {
     setShowCreateModalExternal(true);
   };
 
+  const handleNavigateCompetitive = () => {
+    setActiveView('competitive');
+  };
+
+  const handleNavigateSyllabus = () => {
+    setActiveView('syllabus');
+  };
+
   const handleSelectParentTabFromSidebar = (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report') => {
     setCurrentRole('parent');
     setActiveView('dashboard');
@@ -286,6 +296,8 @@ export function App() {
           activeView={activeView}
           onNavigateHome={handleNavigateHome}
           onNavigateDashboard={handleNavigateDashboard}
+          onNavigateCompetitive={handleNavigateCompetitive}
+          onNavigateSyllabus={handleNavigateSyllabus}
           parentTab={parentActiveTab}
           onSelectParentTab={handleSelectParentTabFromSidebar}
           onOpenCreateExam={handleOpenCreateExamFromSidebar}
@@ -308,9 +320,13 @@ export function App() {
             onNavigateToReview={handleNavigateToReviewFromNotif}
             onNavigateHome={handleNavigateHome}
             onNavigateDashboard={handleNavigateDashboard}
+            onNavigateCompetitive={handleNavigateCompetitive}
+            onNavigateSyllabus={handleNavigateSyllabus}
             onOpenCreateExam={handleOpenCreateExamFromSidebar}
             onSelectTab={handleSelectParentTabFromSidebar}
             isHomeActive={false}
+            isCompetitiveActive={activeView === 'competitive'}
+            isSyllabusActive={activeView === 'syllabus'}
             onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
             isSidebarOpen={isSidebarOpen}
           />
@@ -323,6 +339,20 @@ export function App() {
               onSelectRole={handleSelectRoleFromLanding}
               onOpenExamWithPin={handleOpenExamWithPinFromLanding}
               onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
+              onOpenCompetitivePortal={handleNavigateCompetitive}
+              onOpenSyllabusBank={handleNavigateSyllabus}
+            />
+          ) : activeView === 'competitive' ? (
+            <CompetitiveExamPortal
+              onStartExam={handleDirectStartExam}
+              onNavigateHome={handleNavigateHome}
+            />
+          ) : activeView === 'syllabus' ? (
+            <SyllabusQuestionBankView
+              onStartExam={handleDirectStartExam}
+              onNavigateDashboard={handleNavigateDashboard}
+              onNavigateHome={handleNavigateHome}
+              onOpenCreateExam={handleOpenCreateExamFromSidebar}
             />
           ) : activeView === 'exam' && activeTest ? (
             <StartExamScreen

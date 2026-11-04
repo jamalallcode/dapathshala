@@ -3,10 +3,41 @@ import { createServer as createViteServer } from 'vite';
 import fs from 'fs';
 import path from 'path';
 
+// Safe process-level error handlers
+process.on('uncaughtException', (err) => {
+  console.warn('Handled uncaught exception:', err?.message || err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.warn('Handled unhandled rejection:', reason);
+});
+
 const app = express();
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+function resolvePort(): number {
+  const portArgIndex = process.argv.indexOf('--port');
+  if (portArgIndex !== -1 && process.argv[portArgIndex + 1]) {
+    const val = parseInt(process.argv[portArgIndex + 1], 10);
+    if (!isNaN(val)) return val;
+  }
+  if (process.env.APP_PORT) {
+    const val = parseInt(process.env.APP_PORT, 10);
+    if (!isNaN(val)) return val;
+  }
+  if (process.env.PORT && process.env.PORT !== '8080') {
+    const val = parseInt(process.env.PORT, 10);
+    if (!isNaN(val)) return val;
+  }
+  return 3000;
+}
+
+const PORT = resolvePort();
 
 app.use(express.json({ limit: '10mb' }));
+
+// Health check endpoint for pre-warming & container health probes
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', uptime: process.uptime() });
+});
 
 // In-memory cache + persistent file storage
 const TESTS_FILE = path.resolve(process.cwd(), '.tests_store.json');
@@ -119,7 +150,10 @@ async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
   if (!isProd) {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { 
+        middlewareMode: true,
+        hmr: false 
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -130,8 +164,12 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Dapathshala Full-Stack server running on port ${PORT}`);
+  });
+
+  server.on('error', (err: any) => {
+    console.error('Server listen error:', err?.message || err);
   });
 }
 

@@ -21,6 +21,8 @@ interface LandingPageProps {
   onOpenExamWithPin: (test: AssignedTest) => void;
   onCreateCustomExam?: () => void;
   onToggleSidebar?: () => void;
+  onOpenCompetitivePortal?: () => void;
+  onOpenSyllabusBank?: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
@@ -28,6 +30,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onOpenExamWithPin,
   onCreateCustomExam,
   onToggleSidebar,
+  onOpenCompetitivePortal,
+  onOpenSyllabusBank,
 }) => {
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
@@ -89,6 +93,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>এআই প্রশ্ন ও লাইভ প্রক্টরিং</span>
             </div>
+            {onOpenSyllabusBank && (
+              <button
+                type="button"
+                onClick={onOpenSyllabusBank}
+                className="px-3.5 py-1.5 rounded-lg bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 hover:text-white text-xs font-bold transition-colors cursor-pointer"
+                title="এনসিটিবি কারিকুলাম ও ২০২৫ বোর্ড প্রশ্নব্যাংক"
+              >
+                সিলেবাস ও প্রশ্নব্যাংক
+              </button>
+            )}
             <button
               type="button"
               onClick={() => onSelectRole('parent')}
@@ -265,6 +279,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </button>
           </div>
 
+        </div>
+
+        {/* ======================================================== */}
+        {/* NEW: COMPETITIVE EXAM (BCS, Medical, Varsity) HIGHLIGHT  */}
+        {/* ======================================================== */}
+        <div className="mt-8 bg-linear-to-r from-slate-900 via-blue-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white border border-slate-800 shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-2 text-left max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 text-xs font-bold">
+              <span>🏛️ বিসিএস · মেডিকেল · বিশ্ববিদ্যালয় ভর্তি</span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-white">
+              ১ম–১২শ শ্রেণীর পাশাপাশি চাকরি ও ভর্তি পরীক্ষার্থীদের সেলফ-টেস্টিং জোন
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              বিগত বছরের আসল প্রশ্নব্যাংক, নেগেটিভ মার্কিংসহ পূর্ণাঙ্গ মডেল টেস্ট ও বিষয়ভিত্তিক অনুশীলনের মাধ্যমে নিজেকে শতভাগ প্রস্তুত করুন।
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenCompetitivePortal}
+            className="w-full md:w-auto px-6 py-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold text-xs sm:text-sm shadow-lg shadow-blue-600/30 whitespace-nowrap cursor-pointer transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0"
+          >
+            <span>ভর্তি ও বিসিএস পরীক্ষা দিন</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
 
         {/* ======================================================== */}

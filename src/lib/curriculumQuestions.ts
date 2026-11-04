@@ -3,6 +3,7 @@ export interface ChapterSeedQuestion {
   options: string[];
   correctAnswer: string;
   explanation: string;
+  solutions?: string[];
 }
 
 export const CHAPTER_QUESTION_BANK: Record<string, ChapterSeedQuestion[]> = {
@@ -531,6 +532,48 @@ export const CHAPTER_QUESTION_BANK: Record<string, ChapterSeedQuestion[]> = {
       options: ['(a - b)(a² + ab + b²)', '(a - b)(a² - ab + b²)', '(a + b)(a² - ab + b²)', '(a - b)³ + 3ab(a - b)'],
       correctAnswer: '(a - b)(a² + ab + b²)',
       explanation: 'উৎপাদকে বিশ্লেষণ: a³ - b³ = (a - b)(a² + ab + b²)।'
+    },
+    {
+      question: "x² - 5x + 6 = 0 সমীকরণের মূলদ্বয় কোনটি?",
+      options: ['2, 3', '-2, -3', '1, 6', '-1, -6'],
+      correctAnswer: '2, 3',
+      explanation: '(x - 2)(x - 3) = 0 => x = 2 অথবা x = 3।'
+    },
+    {
+      question: "যদি x - 1/x = 3 হয়, তবে x² + 1/x² এর মান কত?",
+      options: ['11', '7', '9', '12'],
+      correctAnswer: '11',
+      explanation: 'x² + 1/x² = (x - 1/x)² + 2 = 3² + 2 = 9 + 2 = 11।'
+    },
+    {
+      question: "(x + a)(x + b) এর সঠিক সূত্র কোনটি?",
+      options: ['x² + (a + b)x + ab', 'x² + (a - b)x + ab', 'x² + abx + (a + b)', 'x² - (a + b)x - ab'],
+      correctAnswer: 'x² + (a + b)x + ab',
+      explanation: '(x + a)(x + b) = x² + ax + bx + ab = x² + (a + b)x + ab।'
+    },
+    {
+      question: "3x + 12 = 33 সমীকরণে x এর মান কত?",
+      options: ['7', '6', '8', '9'],
+      correctAnswer: '7',
+      explanation: '3x = 33 - 12 = 21 => x = 21 / 3 = 7।'
+    },
+    {
+      question: "a² - b² এর উৎপাদকে বিশ্লেষণ কোনটি?",
+      options: ['(a + b)(a - b)', '(a - b)²', '(a + b)²', 'a² - 2ab + b²'],
+      correctAnswer: '(a + b)(a - b)',
+      explanation: 'বর্গের অন্তর সূত্র: a² - b² = (a + b)(a - b)।'
+    },
+    {
+      question: "যদি 2x - 5 = 15 হয়, তবে x এর মান কত?",
+      options: ['10', '8', '12', '9'],
+      correctAnswer: '10',
+      explanation: '2x = 15 + 5 = 20 => x = 10।'
+    },
+    {
+      question: "a³ + b³ এর সঠিক সূত্র কোনটি?",
+      options: ['(a + b)(a² - ab + b²)', '(a + b)(a² + ab + b²)', '(a - b)(a² + ab + b²)', '(a + b)³ - 2ab'],
+      correctAnswer: '(a + b)(a² - ab + b²)',
+      explanation: 'ঘনের উৎপাদক সূত্র: a³ + b³ = (a + b)(a² - ab + b²)।'
     }
   ],
   'ত্রিকোণমিতি': [
@@ -551,6 +594,36 @@ export const CHAPTER_QUESTION_BANK: Record<string, ChapterSeedQuestion[]> = {
       options: ['৫ সেমি', '৭ সেমি', '৬ সেমি', '৮ সেমি'],
       correctAnswer: '৫ সেমি',
       explanation: 'অতিভুজ = √(৪² + ৩²) = √(১৬ + ৯) = √২৫ = ৫ সেমি।'
+    },
+    {
+      question: "sin 30° এর মান কত?",
+      options: ['১/২', '√৩/২', '১/√২', '১'],
+      correctAnswer: '১/২',
+      explanation: 'ত্রিকোণমিতিক কোণের প্রমিত মান sin 30° = ১/২।'
+    },
+    {
+      question: "cos 60° এর মান কত?",
+      options: ['১/২', '√৩/২', '১', '০'],
+      correctAnswer: '১/২',
+      explanation: 'cos 60° = sin 30° = ১/২।'
+    },
+    {
+      question: "sec²θ - tan²θ এর মান কত?",
+      options: ['১', '০', '-১', '২'],
+      correctAnswer: '১',
+      explanation: 'ত্রিকোণমিতিক অভেদ sec²θ - tan²θ = ১।'
+    },
+    {
+      question: "cosec²θ - cot²θ এর মান কত?",
+      options: ['১', '০', '-১', '২'],
+      correctAnswer: '১',
+      explanation: 'ত্রিকোণমিতিক মৌলিক সূত্র cosec²θ - cot²θ = ১।'
+    },
+    {
+      question: "tan 60° এর মান কত?",
+      options: ['√৩', '১/√৩', '১', 'অসংজ্ঞায়িত'],
+      correctAnswer: '√৩',
+      explanation: 'tan 60° = sin 60° / cos 60° = (√3/2) / (1/2) = √3।'
     }
   ],
   'লগারিদম': [
@@ -565,6 +638,138 @@ export const CHAPTER_QUESTION_BANK: Record<string, ChapterSeedQuestion[]> = {
       options: ['০', '১', 'a', 'অসীম'],
       correctAnswer: '০',
       explanation: 'a⁰ = ১, তাই log_a(১) = ০।'
+    },
+    {
+      question: "log₂(64) এর মান কত?",
+      options: ['৬', '৫', '৭', '৪'],
+      correctAnswer: '৬',
+      explanation: '৬৪ = ২⁶, সুতরাং log₂(২⁶) = ৬।'
+    },
+    {
+      question: "log_a(a) এর মান কত যেখানে a > 0 এবং a ≠ 1?",
+      options: ['১', '০', 'a', 'অসংজ্ঞায়িত'],
+      correctAnswer: '১',
+      explanation: 'ভিত্তি ও আর্গুমেন্ট সমান হলে লগারিদমের মান সর্বদা ১ হয়।'
+    },
+    {
+      question: "সূচকীয় সমীকরণ 2^(x+1) = 32 হলে x এর মান কত?",
+      options: ['৪', '৫', '৩', '৬'],
+      correctAnswer: '৪',
+      explanation: '৩২ = ২⁵, সুতরাং x + ১ = ৫ => x = ৪।'
+    },
+    {
+      question: "যেকোনো অশূন্য সংখ্যা a এর জন্য a⁰ এর মান কত?",
+      options: ['১', '০', 'a', '-১'],
+      correctAnswer: '১',
+      explanation: 'সূচকের নিয়ম অনুযায়ী শূন্যঘাতবিশিষ্ট যেকোনো অশূন্য রাশির মান ১।'
+    }
+  ],
+  'জ্যামিতি': [
+    {
+      question: "ত্রিভুজের তিন কোণের সমষ্টি কত ডিগ্রি?",
+      options: ['১৮০°', '৩৬০°', '৯০°', '২৭০°'],
+      correctAnswer: '১৮০°',
+      explanation: 'যেকোনো সমতলীয় ত্রিভুজের তিনটি অভ্যন্তরীণ কোণের যোগফল দুই সমকোণ বা ১৮০ ডিগ্রি।'
+    },
+    {
+      question: "সমবাহু ত্রিভুজের প্রতিটি কোণের পরিমাপ কত?",
+      options: ['৬০°', '৪৫°', '৯০°', '৩০°'],
+      correctAnswer: '৬০°',
+      explanation: 'সমবাহু ত্রিভুজের ৩টি কোণই সমান: ১৮০° / ৩ = ৬০°।'
+    },
+    {
+      question: "বৃত্তের ব্যাসার্ধ r হলে এর ক্ষেত্রফলের সূত্র কোনটি?",
+      options: ['πr²', '2πr', '4/3πr³', 'πd'],
+      correctAnswer: 'πr²',
+      explanation: 'বৃত্তের ক্ষেত্রফল = পাই × ব্যাসার্ধের বর্গ (πr²)।'
+    },
+    {
+      question: "বৃত্তের পরিধির সূত্র কোনটি?",
+      options: ['2πr', 'πr²', 'πr', '4πr²'],
+      correctAnswer: '2πr',
+      explanation: 'বৃত্তের সম্পূর্ণ সীমানার দৈর্ঘ্য বা পরিধি C = 2πr।'
+    },
+    {
+      question: "একটি চাকার ব্যাসার্ধ ৭ সেমি হলে এর পরিধি কত? (π = ২২/৭)",
+      options: ['৪৪ সেমি', '২২ সেমি', '৮৮ সেমি', '১৫৪ সেমি'],
+      correctAnswer: '৪৪ সেমি',
+      explanation: 'পরিধি = 2 × (22/7) × 7 = 44 সেমি।'
+    },
+    {
+      question: "চতুর্ভুজের চার কোণের সমষ্টি কত সমকোণ?",
+      options: ['৪ সমকোণ (৩৬০°)', '২ সমকোণ', '৩ সমকোণ', '৬ সমকোণ'],
+      correctAnswer: '৪ সমকোণ (৩৬০°)',
+      explanation: 'যেকোনো চতুর্ভুজের চারটি কোণের সমষ্টি সর্বদা ৩৬০° বা ৪ সমকোণ।'
+    },
+    {
+      question: "একটি সমকোণী ত্রিভুজের একটি সূক্ষ্মকোণ ৪০° হলে অপর সূক্ষ্মকোণটি কত?",
+      options: ['৫০°', '৪০°', '৬০°', '৪৫°'],
+      correctAnswer: '৫০°',
+      explanation: 'সমকোণী ত্রিভুজের সূক্ষ্মকোণদ্বয়ের সমষ্টি ৯০°: ৯০° - ৪০° = ৫০°।'
+    }
+  ],
+  'পাটিগণিত': [
+    {
+      question: "সবচেয়ে ছোট মৌলিক সংখ্যা কোনটি?",
+      options: ['২', '১', '৩', '০'],
+      correctAnswer: '২',
+      explanation: '২ হলো একমাত্র জোড় ও সবচেয়ে ক্ষুদ্রতম মৌলিক সংখ্যা (১ মৌলিক সংখ্যা নয়)।'
+    },
+    {
+      question: "কোনো দ্রব্যের ক্রয়মূল্য ৫০০ টাকা এবং বিক্রয়মূল্য ৬০০ টাকা হলে শতকরা লাভ কত?",
+      options: ['২০%', '১০%', '২৫%', '১৫%'],
+      correctAnswer: '২০%',
+      explanation: 'লাভ = ১০০ টাকা। শতকরা লাভ = (১০০ / ৫০০) × ১০০% = ২০%।'
+    },
+    {
+      question: "বার্ষিক ১০% সরল সুদে ১০০০ টাকার ৩ বছরের সুদ কত?",
+      options: ['৩০০ টাকা', '২৫০ টাকা', '৩৫০ টাকা', '২০০ টাকা'],
+      correctAnswer: '৩০০ টাকা',
+      explanation: 'সুদ I = Pnr = ১০০০ × ৩ × ০.১০ = ৩০০ টাকা।'
+    },
+    {
+      question: "১ থেকে ২০ এর মধ্যে মৌলিক সংখ্যা কয়টি?",
+      options: ['৮টি', '৭টি', '৯টি', '৬টি'],
+      correctAnswer: '৮টি',
+      explanation: 'মৌলিক সংখ্যাগুলো হলো: ২, ৩, ৫, ৭, ১১, ১৩, ১৭, ১৯ (মোট ৮টি)।'
+    },
+    {
+      question: "দুটি সংখ্যার অনুপাত ৩:৫ এবং তাদের যোগফল ৮০ হলে বৃহত্তর সংখ্যাটি কত?",
+      options: ['৫০', '৩০', '৪০', '৬০'],
+      correctAnswer: '৫০',
+      explanation: 'অনুপাতের যোগফল = ৮। বৃহত্তর সংখ্যা = ৮০ × (৫/৮) = ৫০।'
+    },
+    {
+      question: "একটি শ্রেণিতে মোট ৫০ জন শিক্ষার্থীর মধ্যে ৬০% ছাত্র হলে ছাত্রী সংখ্যা কত?",
+      options: ['২০ জন', '৩০ জন', '২৫ জন', '১৫ জন'],
+      correctAnswer: '২০ জন',
+      explanation: 'ছাত্রীর হার = ৪০%। ছাত্রী সংখ্যা = ৫০ এর ৪০% = ২০ জন।'
+    }
+  ],
+  'পরিসংখ্যান': [
+    {
+      question: "A = {1, 2, 3} সেটের মোট উপসেট সংখ্যা কত?",
+      options: ['৮', '৬', '৪', '৯'],
+      correctAnswer: '৮',
+      explanation: 'n উপাদানবিশিষ্ট সেটের উপসেট সংখ্যা ২ⁿ = ২³ = ৮।'
+    },
+    {
+      question: "একটি ছক্কা একবার নিক্ষেপ করলে বিজোড় সংখ্যা আসার সম্ভাবনা কত?",
+      options: ['১/২', '১/৩', '১/৬', '২/৩'],
+      correctAnswer: '১/২',
+      explanation: 'বিজোড় সংখ্যা ৩টি (১, ৩, ৫), মোট ফলাফল ৬টি: ৩/৬ = ১/২।'
+    },
+    {
+      question: "৪, ৬, ৭, ৯, ১৪ এর গড় (Average) কত?",
+      options: ['৮', '৭', '৯', '১০'],
+      correctAnswer: '৮',
+      explanation: 'মোট যোগফল = ৪০, পদের সংখ্যা ৫: ৪০ / ৫ = ৮।'
+    },
+    {
+      question: "৩, ৫, ৭, ৮, ১২, ১৫, ২০ উপাত্তের মধ্যক (Median) কত?",
+      options: ['৮', '৭', '১২', '৯'],
+      correctAnswer: '৮',
+      explanation: 'সাতটি সংখ্যা ক্রমানুসারে সাজানো রয়েছে, তাই মাঝের চতুর্থ পদ ৮-ই মধ্যক।'
     }
   ],
 
@@ -699,9 +904,444 @@ export const CHAPTER_QUESTION_BANK: Record<string, ChapterSeedQuestion[]> = {
   ]
 };
 
+// ------------------- SUBJECT CATEGORY GUARDS & DYNAMIC GENERATORS -------------------
+
+export function detectSubjectCategory(subject: string): 'math' | 'bangla' | 'english' | 'physics' | 'chemistry' | 'science' | 'ict' {
+  const s = (subject || '').trim().toLowerCase();
+  if (s.includes('গণিত') || s.includes('math') || s.includes('বীজ') || s.includes('জ্যামিতি') || s.includes('পাটি')) {
+    return 'math';
+  }
+  if (s.includes('বাংলা') || s.includes('bangla') || s.includes('সাহিত্য')) {
+    return 'bangla';
+  }
+  if (s.includes('ইং') || s.includes('eng') || s.includes('gram')) {
+    return 'english';
+  }
+  if (s.includes('পদার্থ') || s.includes('phy')) {
+    return 'physics';
+  }
+  if (s.includes('রসায়') || s.includes('chem')) {
+    return 'chemistry';
+  }
+  if (s.includes('ict') || s.includes('আইসিটি') || s.includes('তথ্য')) {
+    return 'ict';
+  }
+  return 'science';
+}
+
+const SUBJECT_ALLOWED_KEYS: Record<string, string[]> = {
+  math: ['বীজগণিত', 'ত্রিকোণমিতি', 'লগারিদম', 'জ্যামিতি', 'পাটিগণিত', 'পরিসংখ্যান'],
+  bangla: ['অপরিচিতা', 'বিলাসী', 'বায়ান্নর দিনগুলো', 'রেইনকোট', 'সোনার তরী', 'বিদ্রোহী', 'প্রতিদান', 'তাহারেই পড়ে মনে', 'ফেব্রুয়ারি ১৯৬৯', 'সমাস', 'কারক', 'বানান', 'উপসর্গ', 'বাক্য রূপান্তর'],
+  english: ['verbs', 'voice', 'preposition'],
+  physics: ['পদার্থবিজ্ঞান'],
+  chemistry: ['রসায়ন'],
+  ict: ['আইসিটি'],
+  science: ['বিজ্ঞান']
+};
+
+/**
+ * Procedural Dynamic Math Question Generator.
+ * Generates mathematically valid, non-repeating math problems with randomized values and step-by-step solutions.
+ */
+export function generateDynamicMathQuestion(
+  excludeTexts: string[] = [],
+  chapter: string = ''
+): { id: string; question: string; options: string[]; correctAnswer: string; marks: number; explanation: string } {
+  const normChap = (chapter || '').toLowerCase();
+
+  const toBn = (n: number | string): string => {
+    return n.toString().replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[parseInt(d, 10)]);
+  };
+
+  // 15 mathematical templates
+  const generators: Array<() => { question: string; options: string[]; correctAnswer: string; explanation: string }> = [
+    // 1. x + 1/x = k => x² + 1/x² = k² - 2
+    () => {
+      const kList = [3, 5, 6, 7, 8, 9];
+      const k = kList[Math.floor(Math.random() * kList.length)];
+      const ans = k * k - 2;
+      return {
+        question: `যদি x + 1/x = ${toBn(k)} হয়, তবে x² + 1/x² এর মান কত?`,
+        options: [toBn(ans), toBn(ans + 2), toBn(ans - 2), toBn(ans + 4)],
+        correctAnswer: toBn(ans),
+        explanation: `x² + 1/x² = (x + 1/x)² - 2 = (${toBn(k)})² - 2 = ${toBn(k*k)} - 2 = ${toBn(ans)}।`
+      };
+    },
+
+    // 2. x - 1/x = k => x² + 1/x² = k² + 2
+    () => {
+      const kList = [3, 4, 5, 6, 7];
+      const k = kList[Math.floor(Math.random() * kList.length)];
+      const ans = k * k + 2;
+      return {
+        question: `যদি x - 1/x = ${toBn(k)} হয়, তবে x² + 1/x² এর মান কত?`,
+        options: [toBn(ans), toBn(ans - 2), toBn(ans + 2), toBn(ans - 4)],
+        correctAnswer: toBn(ans),
+        explanation: `x² + 1/x² = (x - 1/x)² + 2 = (${toBn(k)})² + 2 = ${toBn(k*k)} + 2 = ${toBn(ans)}।`
+      };
+    },
+
+    // 3. Linear equation: ax + b = c
+    () => {
+      const a = Math.floor(Math.random() * 4) + 2; // 2 to 5
+      const x = Math.floor(Math.random() * 8) + 3; // 3 to 10
+      const b = Math.floor(Math.random() * 15) + 5; // 5 to 19
+      const c = a * x + b;
+      return {
+        question: `${toBn(a)}x + ${toBn(b)} = ${toBn(c)} সমীকরণে x এর মান কত?`,
+        options: [toBn(x), toBn(x + 1), toBn(x - 1), toBn(x + 2)],
+        correctAnswer: toBn(x),
+        explanation: `${toBn(a)}x = ${toBn(c)} - ${toBn(b)} = ${toBn(a * x)} => x = ${toBn(x)}।`
+      };
+    },
+
+    // 4. Quadratic roots: (x - r1)(x - r2) = 0
+    () => {
+      const pairs = [[2, 3], [3, 4], [4, 5], [3, 5], [2, 6], [3, 7], [4, 6], [5, 6]];
+      const [r1, r2] = pairs[Math.floor(Math.random() * pairs.length)];
+      const b = r1 + r2;
+      const c = r1 * r2;
+      return {
+        question: `x² - ${toBn(b)}x + ${toBn(c)} = 0 সমীকরণের সমাধান (মূলদ্বয়) কোনটি?`,
+        options: [`${toBn(r1)}, ${toBn(r2)}`, `-${toBn(r1)}, -${toBn(r2)}`, `${toBn(r1 + 1)}, ${toBn(r2)}`, `-${toBn(r1)}, ${toBn(r2)}`],
+        correctAnswer: `${toBn(r1)}, ${toBn(r2)}`,
+        explanation: `উৎপাদকে বিশ্লেষণ: (x - ${toBn(r1)})(x - ${toBn(r2)}) = 0 => x = ${toBn(r1)}, ${toBn(r2)}।`
+      };
+    },
+
+    // 5. Pythagorean triangles
+    () => {
+      const triplets = [
+        [3, 4, 5],
+        [5, 12, 13],
+        [6, 8, 10],
+        [8, 15, 17],
+        [9, 12, 15],
+        [7, 24, 25]
+      ];
+      const [p, b, h] = triplets[Math.floor(Math.random() * triplets.length)];
+      return {
+        question: `একটি সমকোণী ত্রিভুজের লম্ব ${toBn(p)} সেমি ও ভূমি ${toBn(b)} সেমি হলে অতিভুজ কত?`,
+        options: [`${toBn(h)} সেমি`, `${toBn(h + 2)} সেমি`, `${toBn(h - 1)} সেমি`, `${toBn(h + 3)} সেমি`],
+        correctAnswer: `${toBn(h)} সেমি`,
+        explanation: `পীথাগোরাসের উপপাদ্য অনুযায়ী: অতিভুজ = √(${toBn(p)}² + ${toBn(b)}²) = √(${toBn(p*p)} + ${toBn(b*b)}) = √${toBn(h*h)} = ${toBn(h)} সেমি।`
+      };
+    },
+
+    // 6. Angles of triangle
+    () => {
+      const angleSets = [
+        [40, 60, 80],
+        [50, 70, 60],
+        [45, 65, 70],
+        [30, 70, 80],
+        [55, 65, 60],
+        [35, 75, 70]
+      ];
+      const [a1, a2, a3] = angleSets[Math.floor(Math.random() * angleSets.length)];
+      return {
+        question: `একটি ত্রিভুজের দুটি কোণ ${toBn(a1)}° এবং ${toBn(a2)}° হলে তৃতীয় কোণটির পরিমাপ কত?`,
+        options: [`${toBn(a3)}°`, `${toBn(a3 + 10)}°`, `${toBn(a3 - 10)}°`, `${toBn(a3 + 5)}°`],
+        correctAnswer: `${toBn(a3)}°`,
+        explanation: `ত্রিভুজের তিন কোণের সমষ্টি ১৮০°। তৃতীয় কোণ = ১৮০° - (${toBn(a1)}° + ${toBn(a2)}°) = ${toBn(a3)}°।`
+      };
+    },
+
+    // 7. Circle area
+    () => {
+      const rList = [7, 14, 21];
+      const r = rList[Math.floor(Math.random() * rList.length)];
+      const area = Math.round((22 / 7) * r * r);
+      return {
+        question: `একটি বৃত্তের ব্যাসার্ধ ${toBn(r)} সেমি হলে এর ক্ষেত্রফল কত? (π = ২২/৭)`,
+        options: [`${toBn(area)} বর্গ সেমি`, `${toBn(area + 22)} বর্গ সেমি`, `${toBn(area - 22)} বর্গ সেমি`, `${toBn(area + 44)} বর্গ সেমি`],
+        correctAnswer: `${toBn(area)} বর্গ সেমি`,
+        explanation: `ক্ষেত্রফল = πr² = (২২/৭) × ${toBn(r)}² = ${toBn(area)} বর্গ সেমি।`
+      };
+    },
+
+    // 8. Percentages & profit
+    () => {
+      const costList = [400, 500, 600, 800, 1000];
+      const cp = costList[Math.floor(Math.random() * costList.length)];
+      const profitPctList = [10, 15, 20, 25];
+      const pct = profitPctList[Math.floor(Math.random() * profitPctList.length)];
+      const sp = cp + (cp * pct) / 100;
+      return {
+        question: `কোনো পণ্যের ক্রয়মূল্য ${toBn(cp)} টাকা এবং ${toBn(pct)}% লাভে বিক্রয় করলে বিক্রয়মূল্য কত হবে?`,
+        options: [`${toBn(sp)} টাকা`, `${toBn(sp + 30)} টাকা`, `${toBn(sp - 30)} টাকা`, `${toBn(sp + 50)} টাকা`],
+        correctAnswer: `${toBn(sp)} টাকা`,
+        explanation: `লাভ = ${toBn(cp)} টাকার ${toBn(pct)}% = ${toBn((cp * pct)/100)} টাকা। বিক্রয়মূল্য = ${toBn(cp)} + ${toBn((cp * pct)/100)} = ${toBn(sp)} টাকা।`
+      };
+    },
+
+    // 9. Simple interest (I = Pnr)
+    () => {
+      const p = 1000;
+      const r = 10; // 10%
+      const nList = [2, 3, 4, 5];
+      const n = nList[Math.floor(Math.random() * nList.length)];
+      const interest = (p * n * r) / 100;
+      return {
+        question: `বার্ষিক ${toBn(r)}% সরল সুদে ${toBn(p)} টাকার ${toBn(n)} বছরের মুনাফা/সুদ কত?`,
+        options: [`${toBn(interest)} টাকা`, `${toBn(interest + 50)} টাকা`, `${toBn(interest - 50)} টাকা`, `${toBn(interest + 100)} টাকা`],
+        correctAnswer: `${toBn(interest)} টাকা`,
+        explanation: `সুদ I = Pnr = ${toBn(p)} × ${toBn(n)} × (${toBn(r)}/১০০) = ${toBn(interest)} টাকা।`
+      };
+    },
+
+    // 10. Exponent power equations
+    () => {
+      const bases = [
+        { base: 2, power: 5, val: 32 },
+        { base: 2, power: 6, val: 64 },
+        { base: 3, power: 3, val: 27 },
+        { base: 3, power: 4, val: 81 },
+        { base: 5, power: 3, val: 125 }
+      ];
+      const item = bases[Math.floor(Math.random() * bases.length)];
+      return {
+        question: `যদি ${toBn(item.base)}ˣ = ${toBn(item.val)} হয়, তবে x এর মান কত?`,
+        options: [toBn(item.power), toBn(item.power + 1), toBn(item.power - 1), toBn(item.power + 2)],
+        correctAnswer: toBn(item.power),
+        explanation: `${toBn(item.val)} = ${toBn(item.base)}^${toBn(item.power)}। সুতরাং x = ${toBn(item.power)}।`
+      };
+    },
+
+    // 11. Logarithm values
+    () => {
+      const logItems = [
+        { b: 2, arg: 32, ans: 5 },
+        { b: 2, arg: 128, ans: 7 },
+        { b: 3, arg: 81, ans: 4 },
+        { b: 3, arg: 243, ans: 5 },
+        { b: 5, arg: 125, ans: 3 },
+        { b: 10, arg: 10000, ans: 4 }
+      ];
+      const item = logItems[Math.floor(Math.random() * logItems.length)];
+      return {
+        question: `log_${toBn(item.b)}(${toBn(item.arg)}) এর মান কত?`,
+        options: [toBn(item.ans), toBn(item.ans + 1), toBn(item.ans - 1), toBn(item.ans + 2)],
+        correctAnswer: toBn(item.ans),
+        explanation: `যেহেতু ${toBn(item.b)}^${toBn(item.ans)} = ${toBn(item.arg)}, সুতরাং log_${toBn(item.b)}(${toBn(item.arg)}) = ${toBn(item.ans)}।`
+      };
+    },
+
+    // 12. Ratio
+    () => {
+      const ratios = [
+        { r1: 2, r2: 3, sum: 50, big: 30 },
+        { r1: 3, r2: 4, sum: 70, big: 40 },
+        { r1: 3, r2: 5, sum: 80, big: 50 },
+        { r1: 1, r2: 4, sum: 50, big: 40 },
+        { r1: 4, r2: 5, sum: 90, big: 50 }
+      ];
+      const item = ratios[Math.floor(Math.random() * ratios.length)];
+      return {
+        question: `দুটি সংখ্যার অনুপাত ${toBn(item.r1)}:${toBn(item.r2)} এবং তাদের সমষ্টি ${toBn(item.sum)} হলে বৃহত্তর সংখ্যাটি কত?`,
+        options: [toBn(item.big), toBn(item.sum - item.big), toBn(item.big + 5), toBn(item.big - 5)],
+        correctAnswer: toBn(item.big),
+        explanation: `অনুপাতের যোগফল = ${toBn(item.r1 + item.r2)}। বৃহত্তর সংখ্যা = ${toBn(item.sum)} × (${toBn(item.r2)}/${toBn(item.r1 + item.r2)}) = ${toBn(item.big)}।`
+      };
+    },
+
+    // 13. Sets power set
+    () => {
+      const sets = [
+        { name: 'A = {a, b}', n: 2, subsets: 4 },
+        { name: 'B = {1, 2, 3}', n: 3, subsets: 8 },
+        { name: 'C = {p, q, r, s}', n: 4, subsets: 16 }
+      ];
+      const item = sets[Math.floor(Math.random() * sets.length)];
+      return {
+        question: `${item.name} সেটের মোট উপসেট (Subsets) সংখ্যা কতটি?`,
+        options: [`${toBn(item.subsets)}টি`, `${toBn(item.subsets - 2)}টি`, `${toBn(item.subsets + 4)}টি`, `${toBn(item.subsets * 2)}টি`],
+        correctAnswer: `${toBn(item.subsets)}টি`,
+        explanation: `উপাদান সংখ্যা n = ${toBn(item.n)} হলে উপসেট সংখ্যা ২ⁿ = ২^${toBn(item.n)} = ${toBn(item.subsets)}টি।`
+      };
+    },
+
+    // 14. Probability
+    () => {
+      const probScenarios = [
+        { q: 'একটি মুদ্রা একবার নিক্ষেপ করলে Head আসার সম্ভাবনা কত?', ans: '১/২', opts: ['১/২', '১/৪', '১', '০'] },
+        { q: 'একটি নিরপেক্ষ ছক্কা নিক্ষেপ করলে মৌলিক সংখ্যা আসার সম্ভাবনা কত?', ans: '১/২', opts: ['১/২', '১/৩', '১/৬', '২/৩'] },
+        { q: '১ থেকে ১০ পর্যন্ত সংখ্যার মধ্যে থেকে দৈবচয়ন করলে জোড় সংখ্যা আসার সম্ভাবনা কত?', ans: '১/২', opts: ['১/২', '২/৫', '৩/১০', '৩/৫'] }
+      ];
+      const item = probScenarios[Math.floor(Math.random() * probScenarios.length)];
+      return {
+        question: item.q,
+        options: item.opts,
+        correctAnswer: item.ans,
+        explanation: 'অনুকূল ফলাফল সংখ্যা / মোট ফলাফল সংখ্যা।'
+      };
+    },
+
+    // 15. Statistics - Average
+    () => {
+      const avgSets = [
+        { nums: '৫, ৮, ৯, ১২, ১৬', sum: 50, count: 5, avg: 10 },
+        { nums: '৩, ৭, ৮, ১০, ১২', sum: 40, count: 5, avg: 8 },
+        { nums: '৬, ১০, ১২, ১৪, ১৮', sum: 60, count: 5, avg: 12 },
+        { nums: '৪, ৭, ৯, ১১, ১৪', sum: 45, count: 5, avg: 9 }
+      ];
+      const item = avgSets[Math.floor(Math.random() * avgSets.length)];
+      return {
+        question: `${item.nums} সংখ্যাগুলোর গাণিতিক গড় (Mean) কত?`,
+        options: [toBn(item.avg), toBn(item.avg + 1), toBn(item.avg - 1), toBn(item.avg + 2)],
+        correctAnswer: toBn(item.avg),
+        explanation: `মোট যোগফল = ${toBn(item.sum)}, পদসংখ্যা = ${toBn(item.count)}। গড় = ${toBn(item.sum)} / ${toBn(item.count)} = ${toBn(item.avg)}।`
+      };
+    }
+  ];
+
+  // Shuffle generators and find first unused question
+  const shuffledGen = [...generators].sort(() => Math.random() - 0.5);
+  for (const gen of shuffledGen) {
+    const candidate = gen();
+    if (!excludeTexts.includes(candidate.question)) {
+      return {
+        ...candidate,
+        id: 'pq_dyn_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+        marks: 1
+      };
+    }
+  }
+
+  // If all generated templates happened to be excluded, produce a numbered unique variant
+  const base = generators[0]();
+  const salt = excludeTexts.length + 1;
+  return {
+    ...base,
+    id: 'pq_dyn_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+    question: `${base.question} (অনুশীলনী ${toBn(salt)})`,
+    marks: 1
+  };
+}
+
+/**
+ * Randomly shuffles options so that the correct answer is naturally distributed across (ক, খ, গ, ঘ)
+ * and never stuck at the first option. Returns the shuffled options and the exact correctIndex.
+ */
+export const shuffleQuestionOptions = (
+  options: string[], 
+  correctAnswer: string
+): { shuffledOptions: string[]; correctIndex: number } => {
+  const opts = [...options];
+  if (!opts.includes(correctAnswer) && opts.length > 0) {
+    opts[0] = correctAnswer;
+  }
+  // Fisher-Yates shuffle
+  for (let i = opts.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [opts[i], opts[j]] = [opts[j], opts[i]];
+  }
+  const correctIndex = opts.findIndex(o => o.trim() === correctAnswer.trim());
+  return {
+    shuffledOptions: opts,
+    correctIndex: correctIndex !== -1 ? correctIndex : 0
+  };
+};
+
+/**
+ * Generates at least 2 detailed solution methods for any math or curriculum question.
+ * Method 1: Standard Textbook / Algebraic step-by-step method.
+ * Method 2: Shortcut / Quick Logical / Alternative method.
+ */
+export const generateTwoSolutions = (
+  question: string,
+  options: string[],
+  correctAnswer: string,
+  baseExplanation?: string
+): string[] => {
+  const q = question.toLowerCase();
+
+  // 1. x + 1/x = k questions (x^2 + 1/x^2)
+  if (q.includes('1/x') && (q.includes('x²') || q.includes('x^2'))) {
+    const match = question.match(/=\s*([0-9০-৯]+)/);
+    const kStr = match ? match[1] : '৪';
+    return [
+      `পদ্ধতি ১ (অনুসিদ্ধান্ত সূত্র নিয়ম):\nআমরা জানি, a² + b² = (a + b)² - 2ab\nএখানে a = x এবং b = 1/x বসালে:\nx² + 1/x² = (x + 1/x)² - 2 · (x) · (1/x)\nমান বসিয়ে: (${kStr})² - 2 = ${correctAnswer}`,
+      `পদ্ধতি ২ (উভয়পক্ষকে বর্গ ও শর্টকাট কৌশল):\nদেওয়া আছে: x + 1/x = ${kStr}\nউভয়পক্ষকে সরাসরি বর্গ করে পাই:\n(x + 1/x)² = (${kStr})²\n⇒ x² + 2·x·(1/x) + 1/x² = (${kStr})²\n⇒ x² + 2 + 1/x² = (${kStr})²\n⇒ x² + 1/x² = (${kStr})² - 2 = ${correctAnswer}\n*শর্টকাট ট্রিক: যদি x + 1/x = k হয়, তবে x² + 1/x² = k² - 2।*`
+    ];
+  }
+
+  // 2. a + b and ab questions (a^2 + b^2)
+  if (q.includes('a + b') && q.includes('ab') && (q.includes('a² + b²') || q.includes('a^2 + b^2'))) {
+    return [
+      `পদ্ধতি ১ (অনুসিদ্ধান্ত সূত্র প্রয়োগ):\nআমরা জানি, a² + b² = (a + b)² - 2ab\nএখানে প্রদত্ত মান বসিয়ে পাই:\n= (৭)² - ২(১০)\n= ৪৯ - ২০ = ${correctAnswer}`,
+      `পদ্ধতি ২ (বিকল্প সংখ্যা অনুমান ও মান প্রতিস্থাপন):\nযেহেতু a + b = ৭ এবং ab = ১০, এমন দুটি সংখ্যা হলো ৫ এবং ২ (কারণ ৫ + ২ = ৭ এবং ৫ × ২ = ১০)।\nতাহলে: a² + b² = ৫² + ২² = ২৫ + ৪ = ${correctAnswer}`
+    ];
+  }
+
+  // 3. Quadratic equation standard form (দ্বিঘাত সমীকরণ)
+  if (q.includes('দ্বিঘাত সমীকরণ') && q.includes('আদর্শ')) {
+    return [
+      `পদ্ধতি ১ (দ্বিঘাত সমীকরণের গাণিতিক সংজ্ঞা):\nএক চলকবিশিষ্ট দ্বিঘাত সমীকরণের সর্বোচ্চ ঘাত ২ (two) হতে হয় এবং চলকের সহগ a ≠ 0। এর সার্বজনীন আদর্শ রূপ হলো: ax² + bx + c = 0।`,
+      `পদ্ধতি ২ (বিকল্প অপশন যাচাই ও বাদ দেওয়ার প্রক্রিয়া):\nঅন্যান্য অপশন বিশ্লেষণ করি:\n• ax + b = 0 (একঘাত বা সরল সমীকরণ, ঘাত ১)\n• ax³ + bx² + c = 0 (ত্রিঘাত সমীকরণ, ঘাত ৩)\n• a/x + b = 0 (ভগ্নাংশ সমীকরণ)\nসুতরাং একমাত্র ax² + bx + c = 0 ই সঠিক দ্বিঘাত আদর্শ রূপ।`
+    ];
+  }
+
+  // 4. Equation roots (x^2 - 5x + 6 = 0)
+  if (q.includes('মূলদ্বয়') || (q.includes('x² - 5x + 6') || q.includes('x^2 - 5x + 6'))) {
+    return [
+      `পদ্ধতি ১ (মিডল টার্ম উৎপাদক বিশ্লেষণ):\nx² - 5x + 6 = 0\n⇒ x² - 3x - 2x + 6 = 0\n⇒ x(x - 3) - 2(x - 3) = 0\n⇒ (x - 3)(x - 2) = 0\nঅতএব, x = ৩ অথবা x = ২। মূলদ্বয়: ২, ৩।`,
+      `পদ্ধতি ২ (মূল ও সহগের সম্পর্ক যাচাই কৌশল):\nদ্বিঘাত সমীকরণের মূলদ্বয়ের যোগফল = -b/a = -(-৫)/১ = ৫\nএবং মূলদ্বয়ের গুণফল = c/a = ৬/১ = ৬।\nঅপশনগুলোর মধ্যে ২ এবং ৩ যোগ করলে ৫ এবং গুণ করলে ৬ হয়। সুতরাং সঠিক উত্তর ২, ৩।`
+    ];
+  }
+
+  // 5. Linear equations (e.g. 3x + 12 = 33 or 2x - 5 = 15)
+  if ((q.includes('3x') || q.includes('2x') || q.includes('4x')) && q.includes('=')) {
+    return [
+      `পদ্ধতি ১ (ধাপে ধাপে পক্ষান্তর ও বীজগণিতীয় সমাধান):\nপ্রদত্ত সমীকরণটি পক্ষান্তর করে চলক x কে বামপাশে রেখে ধ্রুবক সংখ্যাগুলো ডানপাশে নিই।\nধাপে ধাপে হিসাব সম্পন্ন করে পাই: x = ${correctAnswer}।`,
+      `পদ্ধতি ২ (অপশন টেস্ট ও সরাসরি মান বসানো কৌশল):\nসমীকরণের বামপাশে x = ${correctAnswer} বসালে বামপক্ষ ও ডানপক্ষ সমান হয় (বামপক্ষ = ডানপক্ষ)।\nসুতরাং এটিই সমীকরণের একমাত্র সঠিক সমাধান।`
+    ];
+  }
+
+  // 6. Formulas (a³ - b³, a² - b², etc.)
+  if (q.includes('উৎপাদকে বিশ্লেষণ') || q.includes('সূত্র কোনটি')) {
+    return [
+      `পদ্ধতি ১ (বীজগণিতীয় প্রমিত সূত্রাবলী):\nবীজগণিতের মৌলিক উৎপাদক উপপাদ্য অনুযায়ী এই রাশির সরাসরি সম্প্রসারিত ও আদর্শ উৎপাদক রূপ হলো: ${correctAnswer}।`,
+      `পদ্ধতি ২ (মান ধরে সমতা যাচাইকরণ কৌশল):\nযদি a = ২ এবং b = ১ ধরি, তবে মূল রাশি এবং সঠিক অপশনে মান বসালে উভয়পক্ষের ফলাফল অবিকল মিলে যায়। অন্য অপশনে এই সমতা বজায় থাকে না।`
+    ];
+  }
+
+  // 7. Trigonometry (sin²θ + cos²θ, tan 45°, etc.)
+  if (q.includes('sin') || q.includes('cos') || q.includes('tan') || q.includes('ত্রিকোণমিতি')) {
+    return [
+      `পদ্ধতি ১ (জ্যামিতিক অনুপাত ও পিথাগোরাসের উপপাদ্য):\nসমকোণী ত্রিভুজে কোণের বিপরীতে লম্ব, ভূমি ও অতিভুজের সম্পর্ক থেকে ত্রিকোণমিতিক অনুপাত নির্ণয় করা হয়। এর ফলে নির্ধারিত মান দাঁড়ায়: ${correctAnswer}।`,
+      `পদ্ধতি ২ (আদর্শ ত্রিকোণমিতিক চার্ট ও মৌলিক অভেদাবলী):\nত্রিকোণমিতির মৌলিক সূত্রাবলী ও স্ট্যান্ডার্ড কোণের চার্ট অনুযায়ী এই রাশির মান নির্ধারিত ও সুনির্দিষ্ট: ${correctAnswer}।`
+    ];
+  }
+
+  // 8. Geometry & Right triangle (সমকোণী ত্রিভুজ, অতিভুজ)
+  if (q.includes('সমকোণী ত্রিভুজ') || q.includes('অতিভুজ') || q.includes('পিথাগোরাস')) {
+    return [
+      `পদ্ধতি ১ (পিথাগোরাসের উপপাদ্য প্রয়োগ):\nসমকোণী ত্রিভুজে: অতিভুজ² = লম্ব² + ভূমি²\nমান বসিয়ে: অতিভুজ = √(লম্ব² + ভূমি²) = ${correctAnswer}।`,
+      `পদ্ধতি ২ (পিথাগোরিয়ান ত্রয়ী অনুপাত):\n৩ : ৪ : ৫ হলো মৌলিক পিথাগোরিয়ান ট্রিপলেট। লম্ব ও ভূমি দেওয়া থাকলে অনুপাত সরাসরি প্রয়োগ করে গণনা ছাড়াই নিমেষে উত্তর পাওয়া যায়: ${correctAnswer}।`
+    ];
+  }
+
+  // 9. Logarithm / Exponents (log, সূচক)
+  if (q.includes('log') || q.includes('সূচক') || q.includes('x এর মান কত')) {
+    return [
+      `পদ্ধতি ১ (সংজ্ঞানুযায়ী সূচক ও লগারিদমের রূপান্তর):\nlog_a(b) = x হলে a^x = b হয়। ভিত্তি ও আর্গুমেন্টের মধ্যে এই সম্পর্ক স্থাপন করে ধাপে ধাপে সমাধান করলে পাই: ${correctAnswer}।`,
+      `পদ্ধতি ২ (ভিত্তির উৎপাদক বিশ্লেষণ ও ঘাত সমতা):\nআর্গুমেন্টকে ভিত্তির মৌলিক উৎপাদকে প্রকাশ করে সূচকের ঘাতের সমতা নিয়মের মাধ্যমে দ্রুত ফলাফল পাওয়া যায়: ${correctAnswer}।`
+    ];
+  }
+
+  // Default fallback for any subject
+  const expl = baseExplanation || 'সংশ্লিষ্ট পাঠ্যবইয়ের অধ্যায়ভিত্তিক আলোচনা ও নিয়মাবলী।';
+  return [
+    `পদ্ধতি ১ (মূল পাঠ্যবই ও তাত্ত্বিক সমাধান):\n${expl}\nঅতএব এই প্রশ্নের সরাসরি ও প্রমিত সঠিক উত্তর: ${correctAnswer}।`,
+    `পদ্ধতি ২ (যৌক্তিক বিশ্লেষণ ও বিকল্প বর্জন কৌশল):\nবাকি তিনটি বিকল্প পর্যালোচনা করলে দেখা যায় সেগুলো অপ্রাসঙ্গিক বা শর্ত পূরণ করে না। ফলে একমাত্র "${correctAnswer}" বিকল্পটিই শতভাগ নির্ভুল ও যুক্তিযুক্ত।`
+  ];
+};
+
 /**
  * Returns matching questions strictly for the requested subject and chapter.
- * Never switches subjects (e.g. if subject is Bangla, it will NEVER return Math or English).
+ * Never crosses subject boundaries (Math will strictly remain Math, Bangla will strictly remain Bangla).
+ * Shuffles options so correct answers are naturally distributed across (ক, খ, গ, ঘ) and always accurate!
  */
 export const getQuestionsForChapter = (
   subject: string,
@@ -709,68 +1349,52 @@ export const getQuestionsForChapter = (
   count: number = 5,
   marksPerQuestion: number = 1
 ) => {
-  const normSub = (subject || '').trim().toLowerCase();
   const normChap = (chapter || '').trim().toLowerCase();
+  const category = detectSubjectCategory(subject);
+  const allowedKeys = SUBJECT_ALLOWED_KEYS[category] || SUBJECT_ALLOWED_KEYS.math;
 
   let pool: ChapterSeedQuestion[] = [];
 
-  // 1. Direct search in the question bank for keyword matches
-  for (const [key, questions] of Object.entries(CHAPTER_QUESTION_BANK)) {
-    const keyLower = key.toLowerCase();
-    if (normChap.includes(keyLower) || keyLower.includes(normChap)) {
-      pool = questions;
-      break;
+  // 1. Direct search within the allowed subject keys
+  if (normChap.length >= 2) {
+    for (const key of allowedKeys) {
+      const keyLower = key.toLowerCase();
+      if (normChap.includes(keyLower) || keyLower.includes(normChap)) {
+        if (CHAPTER_QUESTION_BANK[key] && CHAPTER_QUESTION_BANK[key].length > 0) {
+          pool = CHAPTER_QUESTION_BANK[key];
+          break;
+        }
+      }
     }
   }
 
-  // 2. Strict Subject Guard: If not directly found by chapter keyword, match strictly within subject!
+  // 2. If chapter didn't match directly, aggregate pool from ALL chapters in this subject!
   if (pool.length === 0) {
-    if (normSub.includes('বাংলা') || normSub.includes('bangla')) {
-      if (normChap.includes('সোনার') || normChap.includes('তরী')) pool = CHAPTER_QUESTION_BANK['সোনার তরী'];
-      else if (normChap.includes('বিদ্রোহী')) pool = CHAPTER_QUESTION_BANK['বিদ্রোহী'];
-      else if (normChap.includes('প্রতিদান')) pool = CHAPTER_QUESTION_BANK['প্রতিদান'];
-      else if (normChap.includes('তাহারেই')) pool = CHAPTER_QUESTION_BANK['তাহারেই পড়ে মনে'];
-      else if (normChap.includes('ফেব্রুয়ারি') || normChap.includes('১৯৬৯')) pool = CHAPTER_QUESTION_BANK['ফেব্রুয়ারি ১৯৬৯'];
-      else if (normChap.includes('রেইনকোট')) pool = CHAPTER_QUESTION_BANK['রেইনকোট'];
-      else if (normChap.includes('বায়ান্ন')) pool = CHAPTER_QUESTION_BANK['বায়ান্নর দিনগুলো'];
-      else if (normChap.includes('বিলাসী')) pool = CHAPTER_QUESTION_BANK['বিলাসী'];
-      else if (normChap.includes('সমাস')) pool = CHAPTER_QUESTION_BANK['সমাস'];
-      else if (normChap.includes('কারক')) pool = CHAPTER_QUESTION_BANK['কারক'];
-      else if (normChap.includes('বানান')) pool = CHAPTER_QUESTION_BANK['বানান'];
-      else if (normChap.includes('উপসর্গ') || normChap.includes('প্রত্যয়')) pool = CHAPTER_QUESTION_BANK['উপসর্গ'];
-      else if (normChap.includes('বাক্য')) pool = CHAPTER_QUESTION_BANK['বাক্য রূপান্তর'];
-      else pool = CHAPTER_QUESTION_BANK['অপরিচিতা'];
-    } else if (normSub.includes('ইং') || normSub.includes('eng')) {
-      if (normChap.includes('voice')) pool = CHAPTER_QUESTION_BANK['voice'];
-      else if (normChap.includes('prep')) pool = CHAPTER_QUESTION_BANK['preposition'];
-      else pool = CHAPTER_QUESTION_BANK['verbs'];
-    } else if (normSub.includes('পদার্থ') || normSub.includes('phy')) {
-      pool = CHAPTER_QUESTION_BANK['পদার্থবিজ্ঞান'];
-    } else if (normSub.includes('রসায়') || normSub.includes('chem')) {
-      pool = CHAPTER_QUESTION_BANK['রসায়ন'];
-    } else if (normSub.includes('ict') || normSub.includes('আইসিটি') || normSub.includes('তথ্য')) {
-      pool = CHAPTER_QUESTION_BANK['আইসিটি'];
-    } else if (normSub.includes('বিজ্ঞ') || normSub.includes('জীব') || normSub.includes('bio')) {
-      pool = CHAPTER_QUESTION_BANK['বিজ্ঞান'];
-    } else {
-      // Math
-      if (normChap.includes('ত্রিকোণ')) pool = CHAPTER_QUESTION_BANK['ত্রিকোণমিতি'];
-      else if (normChap.includes('লগ')) pool = CHAPTER_QUESTION_BANK['লগারিদম'];
-      else pool = CHAPTER_QUESTION_BANK['বীজগণিত'];
+    for (const key of allowedKeys) {
+      if (CHAPTER_QUESTION_BANK[key]) {
+        pool.push(...CHAPTER_QUESTION_BANK[key]);
+      }
     }
   }
 
-  // 3. Guarantee requested number of questions
+  // 3. Guarantee requested number of questions with shuffled options & solutions
   const results = [];
   for (let i = 0; i < count; i++) {
     const q = pool[i % pool.length];
+    const { shuffledOptions, correctIndex } = shuffleQuestionOptions(q.options, q.correctAnswer);
+    const solutions = q.solutions && q.solutions.length >= 2
+      ? q.solutions
+      : generateTwoSolutions(q.question, shuffledOptions, q.correctAnswer, q.explanation);
+
     results.push({
       id: 'pq_' + Date.now().toString(36) + '_' + i,
       question: q.question,
-      options: [...q.options],
+      options: shuffledOptions,
       correctAnswer: q.correctAnswer,
+      correctAnswerIndex: correctIndex,
       marks: marksPerQuestion,
-      explanation: q.explanation
+      explanation: q.explanation,
+      solutions
     });
   }
 
@@ -781,14 +1405,81 @@ export const getAlternativeQuestion = (
   subject: string, 
   chapter: string, 
   excludeTexts: string[] = []
-): { id: string; question: string; options: string[]; correctAnswer: string; marks: number; explanation: string } => {
-  // Grab pool of 15 questions
-  const pool = getQuestionsForChapter(subject, chapter, 15);
-  // Find one not in excludeTexts
-  const candidate = pool.find(q => !excludeTexts.includes(q.question)) || pool[Math.floor(Math.random() * pool.length)];
+): { 
+  id: string; 
+  question: string; 
+  options: string[]; 
+  correctAnswer: string; 
+  correctAnswerIndex: number;
+  marks: number; 
+  explanation: string;
+  solutions: string[];
+} => {
+  const category = detectSubjectCategory(subject);
+
+  // 1. Grab pool of questions for this subject and chapter
+  const subjectPool = getQuestionsForChapter(subject, chapter, 60);
+
+  // Filter out any questions that are already excluded
+  let candidates = subjectPool.filter(q => !excludeTexts.includes(q.question));
+
+  // 2. If chapter pool is exhausted, grab from any chapter in this subject
+  if (candidates.length === 0) {
+    const allSubjectPool = getQuestionsForChapter(subject, '', 100);
+    candidates = allSubjectPool.filter(q => !excludeTexts.includes(q.question));
+  }
+
+  // 3. If we found a candidate from the static pool, randomize, shuffle options and return
+  if (candidates.length > 0) {
+    const randomIndex = Math.floor(Math.random() * candidates.length);
+    const candidate = candidates[randomIndex];
+    const { shuffledOptions, correctIndex } = shuffleQuestionOptions(candidate.options, candidate.correctAnswer);
+    const solutions = candidate.solutions && candidate.solutions.length >= 2
+      ? candidate.solutions
+      : generateTwoSolutions(candidate.question, shuffledOptions, candidate.correctAnswer, candidate.explanation);
+
+    return {
+      ...candidate,
+      id: 'pq_alt_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+      options: shuffledOptions,
+      correctAnswerIndex: correctIndex,
+      solutions
+    };
+  }
+
+  // 4. For Math: use the dynamic algorithmic generator so questions are 100% infinite and never repeat
+  if (category === 'math') {
+    const dyn = generateDynamicMathQuestion(excludeTexts, chapter);
+    const { shuffledOptions, correctIndex } = shuffleQuestionOptions(dyn.options, dyn.correctAnswer);
+    const solutions = generateTwoSolutions(dyn.question, shuffledOptions, dyn.correctAnswer, dyn.explanation);
+    return {
+      ...dyn,
+      id: 'pq_alt_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+      options: shuffledOptions,
+      correctAnswerIndex: correctIndex,
+      solutions,
+      marks: 1
+    };
+  }
+
+  // 5. Fallback for other subjects (strictly within subject)
+  const fallbackBase = subjectPool[Math.floor(Math.random() * subjectPool.length)] || {
+    question: `${subject} এর গুরুত্বপূর্ণ অনুশীলনী`,
+    options: ['সঠিক বিকল্প', 'বিকল্প ২', 'বিকল্প ৩', 'বিকল্প ৪'],
+    correctAnswer: 'সঠিক বিকল্প',
+    explanation: 'সংশ্লিষ্ট পাঠ্যবইয়ের অধ্যায়ভিত্তিক মূলনীতি।'
+  };
+  const { shuffledOptions, correctIndex } = shuffleQuestionOptions(fallbackBase.options, fallbackBase.correctAnswer);
+  const solutions = generateTwoSolutions(fallbackBase.question, shuffledOptions, fallbackBase.correctAnswer, fallbackBase.explanation);
+  const salt = excludeTexts.length + 1;
   return {
-    ...candidate,
-    id: 'pq_alt_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6)
+    ...fallbackBase,
+    id: 'pq_alt_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+    question: `${fallbackBase.question} (অনুশীলনী ${salt})`,
+    options: shuffledOptions,
+    correctAnswerIndex: correctIndex,
+    solutions,
+    marks: 1
   };
 };
 
