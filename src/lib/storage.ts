@@ -1,5 +1,6 @@
 import { AssignedTest, AppNotification, StudentSubmission } from '../types';
 import { getQuestionsForChapter } from './curriculumQuestions';
+import { supabase } from '../supabase';
 
 const TESTS_KEY = "dapathshala_assigned_tests_v2";
 const NOTIFS_KEY = "dapathshala_notifications_v2";
@@ -239,9 +240,34 @@ export function getShareableTestUrl(test: AssignedTest): string {
 }
 
 /**
- * Backend synchronization helpers for cross-device persistence
+ * Backend synchronization helpers for cross-device persistence with Supabase + Server
  */
 export async function syncTestToServer(test: AssignedTest): Promise<boolean> {
+  // 1. Sync to Supabase Cloud if connected
+  if (supabase) {
+    try {
+      await supabase.from('assigned_tests').upsert([{
+        pin: String(test.pin).trim(),
+        id: test.id,
+        title: test.title,
+        subject: test.subject,
+        chapter: test.chapter,
+        status: test.status,
+        question_count: test.questionCount,
+        duration_minutes: test.durationMinutes,
+        score: test.score,
+        parent_comment: test.parentComment,
+        proctoring_flags: test.proctoringFlags || [],
+        questions: test.questions || [],
+        payload: test,
+        updated_at: new Date().toISOString()
+      }], { onConflict: 'pin' });
+    } catch (sbErr) {
+      // Table might not exist yet; safe fallback
+    }
+  }
+
+  // 2. Also sync to local Node Express Server
   try {
     const res = await fetch('/api/tests', {
       method: 'POST',
@@ -255,14 +281,59 @@ export async function syncTestToServer(test: AssignedTest): Promise<boolean> {
 }
 
 export async function fetchTestFromServer(pinOrId: string): Promise<AssignedTest | null> {
+  const pin = String(pinOrId).trim();
+
+  // 1. Try Supabase Cloud first
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('assigned_tests')
+        .select('*')
+        .or(`pin.eq.${pin},id.eq.${pin}`)
+        .limit(1);
+
+      if (data && data.length > 0) {
+        const item = data[0];
+        const payload = item.payload || {};
+        let questions = (Array.isArray(item.questions) && item.questions.length > 0)
+          ? item.questions
+          : (Array.isArray(payload.questions) && payload.questions.length > 0 ? payload.questions : []);
+        if (questions.length === 0 && (item.pin || pin)) {
+          const fallback = generateFallbackTestForPin(item.pin || pin);
+          if (fallback && fallback.questions) {
+            questions = fallback.questions;
+          }
+        }
+        return {
+          ...payload,
+          id: item.id || payload.id,
+          pin: item.pin || payload.pin,
+          title: item.title || payload.title,
+          subject: item.subject || payload.subject,
+          chapter: item.chapter || payload.chapter,
+          status: item.status || payload.status,
+          score: item.score ?? payload.score,
+          parentComment: item.parent_comment || payload.parentComment,
+          questionCount: item.question_count ?? payload.questionCount ?? questions.length,
+          durationMinutes: item.duration_minutes ?? payload.durationMinutes ?? 15,
+          questions,
+          proctoringFlags: item.proctoring_flags || payload.proctoringFlags || []
+        };
+      }
+    } catch (sbErr) {
+      // Supabase table or network issue; fallback to Express API
+    }
+  }
+
+  // 2. Fallback to Express API
   try {
-    const res = await fetch(`/api/tests/${pinOrId}`);
+    const res = await fetch(`/api/tests/${pin}`);
     if (res.ok) {
       const data = await res.json();
       if (data) {
         let questions = Array.isArray(data.questions) && data.questions.length > 0 ? data.questions : [];
-        if (questions.length === 0 && (data.pin || pinOrId)) {
-          const fallback = generateFallbackTestForPin(data.pin || pinOrId);
+        if (questions.length === 0 && (data.pin || pin)) {
+          const fallback = generateFallbackTestForPin(data.pin || pin);
           if (fallback && fallback.questions) {
             questions = fallback.questions;
           }
@@ -283,6 +354,49 @@ export async function fetchTestFromServer(pinOrId: string): Promise<AssignedTest
 }
 
 export async function fetchAllTestsFromServer(): Promise<AssignedTest[]> {
+  // 1. Try Supabase Cloud first
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('assigned_tests')
+        .select('*')
+        .order('updated_at', { ascending: false });
+
+      if (Array.isArray(data) && data.length > 0) {
+        return data.map((item: any) => {
+          const payload = item.payload || {};
+          let questions = (Array.isArray(item.questions) && item.questions.length > 0)
+            ? item.questions
+            : (Array.isArray(payload.questions) && payload.questions.length > 0 ? payload.questions : []);
+          if (questions.length === 0 && item.pin) {
+            const fallback = generateFallbackTestForPin(item.pin);
+            if (fallback && fallback.questions) {
+              questions = fallback.questions;
+            }
+          }
+          return {
+            ...payload,
+            id: item.id || payload.id,
+            pin: item.pin || payload.pin,
+            title: item.title || payload.title,
+            subject: item.subject || payload.subject,
+            chapter: item.chapter || payload.chapter,
+            status: item.status || payload.status,
+            score: item.score ?? payload.score,
+            parentComment: item.parent_comment || payload.parentComment,
+            questionCount: item.question_count ?? payload.questionCount ?? questions.length,
+            durationMinutes: item.duration_minutes ?? payload.durationMinutes ?? 15,
+            questions,
+            proctoringFlags: item.proctoring_flags || payload.proctoringFlags || []
+          };
+        });
+      }
+    } catch (sbErr) {
+      // Fallback to Express API
+    }
+  }
+
+  // 2. Fallback to Express API
   try {
     const res = await fetch('/api/tests');
     if (res.ok) {
@@ -313,6 +427,38 @@ export async function fetchAllTestsFromServer(): Promise<AssignedTest[]> {
 }
 
 export async function syncSubmissionToServer(submission: any): Promise<boolean> {
+  const pin = String(submission.pin || '').trim();
+
+  // 1. Sync to Supabase Cloud
+  if (supabase && pin) {
+    try {
+      await supabase.from('exam_submissions').upsert([{
+        pin: pin,
+        test_id: submission.id,
+        title: submission.title,
+        status: submission.status || 'submitted',
+        score: submission.score,
+        student_name: submission.studentName || 'পরীক্ষার্থী',
+        proctoring_flags: submission.proctoringFlags || [],
+        questions: submission.questions || [],
+        payload: submission,
+        updated_at: new Date().toISOString()
+      }], { onConflict: 'pin' });
+
+      // Also update assigned_tests table
+      await supabase.from('assigned_tests').update({
+        status: submission.status || 'submitted',
+        score: submission.score,
+        proctoring_flags: submission.proctoringFlags || [],
+        questions: submission.questions || [],
+        updated_at: new Date().toISOString()
+      }).eq('pin', pin);
+    } catch (sbErr) {
+      // Safe fallback
+    }
+  }
+
+  // 2. Sync to Express Server
   try {
     const res = await fetch('/api/submissions', {
       method: 'POST',
@@ -326,8 +472,40 @@ export async function syncSubmissionToServer(submission: any): Promise<boolean> 
 }
 
 export async function fetchSubmissionFromServer(pinOrId: string): Promise<any | null> {
+  const pin = String(pinOrId).trim();
+
+  // 1. Try Supabase Cloud first
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('exam_submissions')
+        .select('*')
+        .or(`pin.eq.${pin},test_id.eq.${pin}`)
+        .limit(1);
+
+      if (data && data.length > 0) {
+        const item = data[0];
+        const payload = item.payload || {};
+        return {
+          ...payload,
+          pin: item.pin || payload.pin,
+          id: item.test_id || payload.id,
+          title: item.title || payload.title,
+          status: item.status || payload.status,
+          score: item.score ?? payload.score,
+          studentName: item.student_name || payload.studentName,
+          questions: item.questions || payload.questions || [],
+          proctoringFlags: item.proctoring_flags || payload.proctoringFlags || []
+        };
+      }
+    } catch (sbErr) {
+      // Fallback
+    }
+  }
+
+  // 2. Fallback to Express Server
   try {
-    const res = await fetch(`/api/submissions/${pinOrId}`);
+    const res = await fetch(`/api/submissions/${pin}`);
     if (res.ok) {
       const data = await res.json();
       return data;

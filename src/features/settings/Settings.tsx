@@ -76,10 +76,8 @@ export const Settings: React.FC<SettingsProps> = ({ user, onUpdateUser }) => {
       }
       
       try {
-        const { data, error } = await supabase.from('_test_connection').select('*').limit(1);
-        // Note: _test_connection might not exist, but we just want to see if the client can talk to the server
-        // If we get an error that isn't a network error, it usually means we are connected but the table doesn't exist
-        if (error && error.message.includes('FetchError')) {
+        const { error } = await supabase.auth.getSession();
+        if (error && (error.message.includes('FetchError') || error.message.includes('Failed to fetch'))) {
           setSupabaseStatus('error');
         } else {
           setSupabaseStatus('connected');
