@@ -10,35 +10,6 @@ const SUBMISSIONS_KEY = "dapathshala_submissions_v2";
 // No automatic dummy tests - user will create tests deliberately
 export const INITIAL_TESTS: AssignedTest[] = [];
 
-export function getStoredTests(): AssignedTest[] {
-  try {
-    const raw = localStorage.getItem(TESTS_KEY);
-    if (!raw) {
-      localStorage.setItem(TESTS_KEY, JSON.stringify([]));
-      return [];
-    }
-    const list = JSON.parse(raw);
-    if (!Array.isArray(list)) {
-      localStorage.setItem(TESTS_KEY, JSON.stringify([]));
-      return [];
-    }
-    // Filter out previous automatic demo tests (test-101, test-102, test-103)
-    const cleaned: AssignedTest[] = list
-      .filter((t: any) => t && t.id !== 'test-101' && t.id !== 'test-102' && t.id !== 'test-103')
-      .map((t: any) => ({
-        ...t,
-        questions: Array.isArray(t.questions) ? t.questions : [],
-        proctoringFlags: Array.isArray(t.proctoringFlags) ? t.proctoringFlags : []
-      }));
-    if (cleaned.length !== list.length) {
-      localStorage.setItem(TESTS_KEY, JSON.stringify(cleaned));
-    }
-    return cleaned;
-  } catch {
-    return [];
-  }
-}
-
 const DELETED_PINS_KEY = "dapathshala_deleted_pins_v2";
 const CLEARED_ALL_KEY = "dapathshala_all_tests_cleared_at";
 
@@ -67,6 +38,48 @@ export function isPinDeleted(pin?: string, id?: string): boolean {
   return false;
 }
 
+export function getStoredTests(): AssignedTest[] {
+  try {
+    const raw = localStorage.getItem(TESTS_KEY);
+    if (!raw) {
+      localStorage.setItem(TESTS_KEY, JSON.stringify([]));
+      return [];
+    }
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) {
+      localStorage.setItem(TESTS_KEY, JSON.stringify([]));
+      return [];
+    }
+
+    const clearedAtRaw = localStorage.getItem(CLEARED_ALL_KEY);
+    const clearedAt = clearedAtRaw ? parseInt(clearedAtRaw, 10) : 0;
+
+    // Filter out previous automatic demo tests, deleted pins, and tests older than clearedAt
+    const cleaned: AssignedTest[] = list
+      .filter((t: any) => {
+        if (!t) return false;
+        if (t.id === 'test-101' || t.id === 'test-102' || t.id === 'test-103') return false;
+        if (isPinDeleted(t.pin, t.id)) return false;
+        if (clearedAt > 0 && t.id && String(t.id).startsWith('test-')) {
+          const time = parseInt(String(t.id).replace('test-', ''), 10);
+          if (time && time < clearedAt) return false;
+        }
+        return true;
+      })
+      .map((t: any) => ({
+        ...t,
+        questions: Array.isArray(t.questions) ? t.questions : [],
+        proctoringFlags: Array.isArray(t.proctoringFlags) ? t.proctoringFlags : []
+      }));
+    if (cleaned.length !== list.length) {
+      localStorage.setItem(TESTS_KEY, JSON.stringify(cleaned));
+    }
+    return cleaned;
+  } catch {
+    return [];
+  }
+}
+
 export async function clearAllStoredTests(): Promise<void> {
   try {
     localStorage.setItem(TESTS_KEY, JSON.stringify([]));
@@ -83,11 +96,11 @@ export async function clearAllStoredTests(): Promise<void> {
       console.warn('Failed to clear server tests:', e);
     }
 
-    // 2. Delete all from Supabase (using reliable PostgREST filters)
+    // 2. Delete all from Supabase (using reliable PostgREST filters for each table schema)
     if (supabase) {
       try {
         await supabase.from('assigned_tests').delete().neq('id', '___dummy___');
-        await supabase.from('exam_submissions').delete().neq('id', '___dummy___');
+        await supabase.from('exam_submissions').delete().neq('pin', '___dummy___');
         await supabase.from('assigned_tests').delete().gte('pin', '0');
         await supabase.from('exam_submissions').delete().gte('pin', '0');
       } catch (e) {
@@ -420,6 +433,9 @@ export async function fetchTestFromServer(pinOrId: string): Promise<AssignedTest
 }
 
 export async function fetchAllTestsFromServer(): Promise<AssignedTest[]> {
+  const clearedAtRaw = typeof window !== 'undefined' ? localStorage.getItem(CLEARED_ALL_KEY) : null;
+  const clearedAt = clearedAtRaw ? parseInt(clearedAtRaw, 10) : 0;
+
   // 1. Try Supabase Cloud first
   if (supabase) {
     try {
@@ -430,7 +446,18 @@ export async function fetchAllTestsFromServer(): Promise<AssignedTest[]> {
 
       if (Array.isArray(data) && data.length > 0) {
         return data
-          .filter((item: any) => !isPinDeleted(item.pin, item.id))
+          .filter((item: any) => {
+            if (isPinDeleted(item.pin, item.id)) return false;
+            if (clearedAt > 0 && item.id && String(item.id).startsWith('test-')) {
+              const time = parseInt(String(item.id).replace('test-', ''), 10);
+              if (time && time < clearedAt) return false;
+            }
+            if (clearedAt > 0 && item.created_at) {
+              const itemTime = new Date(item.created_at).getTime();
+              if (itemTime && itemTime < clearedAt) return false;
+            }
+            return true;
+          })
           .map((item: any) => {
             const payload = item.payload || {};
             let questions = (Array.isArray(item.questions) && item.questions.length > 0)
@@ -465,7 +492,14 @@ export async function fetchAllTestsFromServer(): Promise<AssignedTest[]> {
       const data = await res.json();
       if (Array.isArray(data)) {
         return data
-          .filter((t: any) => !isPinDeleted(t.pin, t.id))
+          .filter((t: any) => {
+            if (isPinDeleted(t.pin, t.id)) return false;
+            if (clearedAt > 0 && t.id && String(t.id).startsWith('test-')) {
+              const time = parseInt(String(t.id).replace('test-', ''), 10);
+              if (time && time < clearedAt) return false;
+            }
+            return true;
+          })
           .map((t: any) => {
             let questions = Array.isArray(t.questions) && t.questions.length > 0 ? t.questions : [];
             return {

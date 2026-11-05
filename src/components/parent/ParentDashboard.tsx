@@ -116,12 +116,6 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
   useEffect(() => {
     loadTests();
-    // Ensure all locally stored tests are pushed to the backend server
-    // so students on any device or tab can immediately fetch and take them
-    const stored = getStoredTests();
-    stored.forEach(t => {
-      syncTestToServer(t);
-    });
 
     const handleStorage = () => loadTests();
     window.addEventListener('storage', handleStorage);
