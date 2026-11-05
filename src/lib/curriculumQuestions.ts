@@ -949,8 +949,11 @@ export function generateDynamicMathQuestion(
 ): { id: string; question: string; options: string[]; correctAnswer: string; marks: number; explanation: string } {
   const normChap = (chapter || '').toLowerCase();
 
-  const toBn = (n: number | string): string => {
-    return n.toString().replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[parseInt(d, 10)]);
+  const toBn = (n: any, fallback = '০'): string => {
+    if (n === undefined || n === null || n === '' || (typeof n === 'number' && isNaN(n))) {
+      return fallback;
+    }
+    return String(n).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[parseInt(d, 10)]);
   };
 
   // 15 mathematical templates

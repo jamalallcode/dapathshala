@@ -29,8 +29,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 }) => {
   const [answers, setAnswers] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
-    test.questions.forEach((q) => {
-      if (q.studentAnswer) {
+    (test.questions || []).forEach((q) => {
+      if (q && q.studentAnswer) {
         initial[q.id] = q.studentAnswer;
       }
     });
@@ -551,7 +551,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }
 
     let correctCount = 0;
-    const updatedQuestions = test.questions.map((q) => {
+    const questionsList = test.questions || [];
+    const updatedQuestions = questionsList.map((q) => {
       const chosen = answers[q.id] || "";
       const isCorrect = chosen === q.correctAnswer;
       if (isCorrect) correctCount++;
@@ -562,7 +563,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       };
     });
 
-    const calculatedScore = Math.round((correctCount / test.questions.length) * 100);
+    const calculatedScore = questionsList.length > 0 ? Math.round((correctCount / questionsList.length) * 100) : 0;
     
     const finalFlags = isForcedByProctor 
       ? ['৩ বার অসদুপায় / বই-নোট পড়ার চেষ্টার কারণে পরীক্ষা নির্ধারিত সময়ের পূর্বে স্বয়ংক্রিয়ভাবে জমা হয়েছে', ...proctorLogs]
@@ -908,7 +909,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       {/* Questions Answering Sheet - hidden for student right after submission until reviewed */}
       {(!isSubmitted || isReviewOnly || isReviewed) && (
       <div className="space-y-4">
-        {test.questions.map((q, idx) => {
+        {(test.questions || []).map((q, idx) => {
           const chosenAnswer = answers[q.id];
           const isCorrect = chosenAnswer === q.correctAnswer;
           const showGrading = isReviewOnly || isSubmitted;
@@ -968,7 +969,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
               {/* Options */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3">
-                {q.options.map((opt, oIdx) => {
+                {(q.options || []).map((opt, oIdx) => {
                   const isSelected = chosenAnswer === opt;
                   const isRightAnswer = q.correctAnswer === opt;
 

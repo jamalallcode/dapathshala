@@ -263,7 +263,11 @@ export async function fetchAllTestsFromServer(): Promise<AssignedTest[]> {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) {
-        return data;
+        return data.map((t: any) => ({
+          ...t,
+          questionCount: t.questionCount ?? t.questions?.length ?? 0,
+          durationMinutes: t.durationMinutes ?? 15
+        }));
       }
     }
   } catch (err) {

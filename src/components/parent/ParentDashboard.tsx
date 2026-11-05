@@ -20,7 +20,8 @@ import {
   fetchTestFromServer,
   fetchSubmissionFromServer,
   fetchAllTestsFromServer,
-  syncSubmissionToServer
+  syncSubmissionToServer,
+  generateFallbackTestForPin
 } from '../../lib/storage';
 import { 
   CHAPTER_QUESTION_BANK, 
@@ -545,7 +546,21 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
   // Open Review Modal for a submitted test
   const handleOpenReviewModal = (test: AssignedTest) => {
-    setReviewTest(test);
+    let safeQuestions = Array.isArray(test.questions) && test.questions.length > 0 
+      ? test.questions 
+      : [];
+    if (safeQuestions.length === 0 && (test.pin || test.id)) {
+      const fallback = generateFallbackTestForPin(test.pin || test.id);
+      if (fallback && fallback.questions) {
+        safeQuestions = fallback.questions;
+      }
+    }
+    const safeTest: AssignedTest = {
+      ...test,
+      questions: safeQuestions,
+      proctoringFlags: Array.isArray(test.proctoringFlags) ? test.proctoringFlags : []
+    };
+    setReviewTest(safeTest);
     setParentComment(test.parentComment || '');
     setApprovedScore(test.score !== undefined ? test.score : 80);
   };
@@ -636,7 +651,10 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           score: undefined,
           parentComment: undefined,
           proctoringFlags: [],
-          questions: t.questions.map(q => ({
+          questions: (Array.isArray(t.questions) && t.questions.length > 0 
+            ? t.questions 
+            : generateFallbackTestForPin(t.pin).questions
+          ).map(q => ({
             ...q,
             studentAnswer: undefined,
             isCorrect: undefined
@@ -667,15 +685,18 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     showToast('🔄 পরীক্ষাটি পুনরায় দেওয়ার জন্য পেন্ডিং করা হয়েছে! সন্তান আবার পরীক্ষা দিতে পারবে।');
   };
 
-  const toBn = (num: number | string) => {
-    return num.toString().replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[parseInt(d)]);
+  const toBn = (num: any, fallback = '০'): string => {
+    if (num === undefined || num === null || num === '' || (typeof num === 'number' && isNaN(num))) {
+      return fallback;
+    }
+    return String(num).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[parseInt(d, 10)]);
   };
 
   // Only count tests pending evaluation so the badge count decreases upon review
   const pendingReviewCount = tests.filter(t => t.status === 'submitted').length;
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4">
       
       {/* Toast Alert: repositioned to bottom center to prevent covering header/navigation */}
       {toastMessage && (
@@ -688,7 +709,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* ======================================================== */}
       {/* 1. TOP PORTAL HEADER & MAIN VIEW SWITCHER                */}
       {/* ======================================================== */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
             <GraduationCap className="w-6 h-6" />
@@ -984,7 +1005,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                   className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
-                  <span>+ নতুন প্রশ্ন যোগ করুন</span>
+                  <span>নতুন প্রশ্ন যোগ করুন</span>
                 </button>
 
                 {creationMode === 'manual' && (
@@ -1003,7 +1024,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
             {/* Questions List */}
             <div className="space-y-4">
-              {generatedQuestions.map((q, qIndex) => {
+              {(generatedQuestions || []).map((q, qIndex) => {
                 return (
                   <div 
                     key={q.id || `q_${qIndex}`}
@@ -1054,7 +1075,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
                     {/* 2. 4 Clean Options (Left column strictly aligned with Question Number, no 'সঠিক' / 'টিক দিন' labels) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 pt-1">
-                      {q.options.map((opt, optIndex) => {
+                      {(q.options || ['', '', '', '']).map((opt, optIndex) => {
                         const isCorrect = (q.correctAnswer && q.correctAnswer === opt && opt !== '') ||
                                           (q.correctAnswerIndex !== undefined && q.correctAnswerIndex === optIndex);
                         const optLetters = ['ক', 'খ', 'গ', 'ঘ'];
@@ -1220,8 +1241,8 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* VIEW 2: TESTS LIST & EVALUATION (SUBMITTED EXAMS)        */}
       {/* ======================================================== */}
       {activeViewMode === 'tests' && (
-        <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
               <h2 className="text-base sm:text-lg font-black text-slate-900">
                 অভিভাবকের নির্ধারিত পরীক্ষাসমূহ ও খাতা
@@ -1232,6 +1253,16 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowCreationModeModal(true)}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                title="নতুন পরীক্ষা বা প্রশ্নপত্র তৈরি করুন"
+              >
+                <Plus className="w-4 h-4" />
+                <span>নতুন পরীক্ষা তৈরি করুন</span>
+              </button>
+
               {tests.length > 0 && (
                 <button
                   type="button"
@@ -1243,44 +1274,34 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                   <span>সকল পরীক্ষা মুছুন</span>
                 </button>
               )}
-
-              {/* Marked Button 1: Opens creation mode modal */}
-              <button
-                type="button"
-                onClick={() => setShowCreationModeModal(true)}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
-              >
-                <Plus className="w-4 h-4" />
-                <span>+ নতুন পরীক্ষা তৈরি করুন</span>
-              </button>
             </div>
           </div>
 
           {tests.length === 0 ? (
-            <div className="py-14 text-center bg-slate-50/70 rounded-3xl border border-dashed border-slate-300 p-6">
-              <div className="w-16 h-16 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center mx-auto mb-3 shadow-2xs">
-                <FileText className="w-8 h-8" />
+            <div className="py-7 sm:py-9 text-center bg-slate-50/70 rounded-3xl border border-dashed border-slate-300 px-4 sm:px-6">
+              <div className="w-13 h-13 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center mx-auto mb-2.5 shadow-2xs">
+                <FileText className="w-6 h-6" />
               </div>
               <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">
                 এখনও কোনো পরীক্ষা তৈরি করা হয়নি
               </h3>
-              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mb-5 font-medium leading-relaxed">
+              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mb-4 font-medium leading-relaxed">
                 আপনার সন্তানের জন্য নতুন পরীক্ষা তৈরি করতে নিচের বাটনে ক্লিক করুন। আপনি চাইলে নিজে প্রশ্ন লিখতে পারেন অথবা এআই দিয়ে স্বয়ংক্রিয়ভাবে তৈরি করতে পারেন।
               </p>
               
-              {/* Marked Button 2: Opens creation mode modal */}
+              {/* Marked Button: Opens creation mode modal with single + icon */}
               <button
                 type="button"
                 onClick={() => setShowCreationModeModal(true)}
-                className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold shadow-md cursor-pointer inline-flex items-center gap-2 transition-transform active:scale-95"
+                className="px-6 py-2.5 sm:py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold shadow-md cursor-pointer inline-flex items-center gap-2 transition-transform active:scale-95"
               >
                 <Plus className="w-4 h-4" />
-                <span>+ নতুন পরীক্ষা তৈরি করুন</span>
+                <span>নতুন পরীক্ষা তৈরি করুন</span>
               </button>
             </div>
           ) : (
             <div className="space-y-3.5">
-              {tests.map(test => {
+              {(tests || []).map(test => {
                 const isSubmitted = test.status === 'submitted';
                 const isReviewed = test.status === 'reviewed';
                 const isPending = test.status === 'pending';
@@ -1338,13 +1359,13 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                         <span>অধ্যায়: <span className="font-bold text-slate-800">{test.chapter}</span></span>
                         <span className="text-slate-300">•</span>
                         <span className="inline-flex items-center gap-1">
-                          মোট প্রশ্ন: <strong className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 tracking-wider font-['Noto_Sans_Bengali']">{toBn(test.questionCount)}টি</strong>
+                          মোট প্রশ্ন: <strong className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 tracking-wider font-['Noto_Sans_Bengali']">{toBn(test.questionCount ?? test.questions?.length ?? 0)}টি</strong>
                         </span>
                         <span className="text-slate-300">•</span>
                         <span className="inline-flex items-center gap-1">
-                          সময়: <strong className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 tracking-wider font-['Noto_Sans_Bengali']">{toBn(test.durationMinutes)} মিনিট</strong>
+                          সময়: <strong className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 tracking-wider font-['Noto_Sans_Bengali']">{toBn(test.durationMinutes ?? 15)} মিনিট</strong>
                         </span>
-                        {test.score !== undefined && (
+                        {test.score !== undefined && test.score !== null && (
                           <>
                             <span className="text-slate-300">•</span>
                             <span className="inline-flex items-center gap-1 font-bold text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200 tracking-wider font-['Noto_Sans_Bengali']">
@@ -1493,7 +1514,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500 font-semibold">মোট প্রশ্ন ও সময়:</span>
                   <span className="font-bold text-slate-900">
-                    {toBn(createdTestResult.questionCount)}টি প্রশ্ন ({toBn(createdTestResult.durationMinutes)} মিনিট)
+                    {toBn(createdTestResult.questionCount ?? createdTestResult.questions?.length ?? 0)}টি প্রশ্ন ({toBn(createdTestResult.durationMinutes ?? 15)} মিনিট)
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200">
@@ -1628,7 +1649,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                     <span>ক্যামেরা ও এআই কর্তৃক সনাক্তকৃত সতর্কতার লগ:</span>
                   </div>
                   <ul className="space-y-1 pl-1 text-[11px] text-amber-800 font-medium">
-                    {reviewTest.proctoringFlags.map((flag, fIdx) => (
+                    {(reviewTest.proctoringFlags || []).map((flag, fIdx) => (
                       <li key={fIdx} className="flex items-start gap-1.5">
                         <span className="text-amber-600 font-bold">•</span>
                         <span>{flag}</span>
@@ -1642,10 +1663,15 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             {/* Questions breakdown */}
             <div className="max-h-60 overflow-y-auto space-y-3 pr-2">
               <h4 className="text-xs font-bold text-slate-500">উত্তরপত্র বিস্তারিত:</h4>
-              {reviewTest.questions.map((q, idx) => {
-                const isCorrect = q.studentAnswer === q.correctAnswer;
-                return (
-                  <div key={q.id} className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+              {(reviewTest.questions || []).length === 0 ? (
+                <div className="p-4 text-center text-slate-400 bg-slate-50 rounded-xl">
+                  কোনো প্রশ্ন পাওয়া যায়নি।
+                </div>
+              ) : (
+                (reviewTest.questions || []).map((q, idx) => {
+                  const isCorrect = q.studentAnswer === q.correctAnswer;
+                  return (
+                    <div key={q.id || `rq_${idx}`} className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
                     <div className="flex items-start justify-between gap-2">
                       <span className="font-bold text-slate-900">
                         {toBn(idx + 1)}. {q.question}
@@ -1666,8 +1692,9 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                     </div>
                   </div>
                 );
-              })}
-            </div>
+              })
+            )}
+          </div>
 
             {/* Parent Feedback & Score Input */}
             <div className="space-y-4 pt-2 border-t border-slate-100">
@@ -1815,7 +1842,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 font-medium">মোট প্রশ্ন ও সময়:</span>
                 <span className="font-semibold text-slate-800">
-                  {toBn(shareModalTest.questionCount)}টি প্রশ্ন • {toBn(shareModalTest.durationMinutes)} মিনিট
+                  {toBn(shareModalTest.questionCount ?? shareModalTest.questions?.length ?? 0)}টি প্রশ্ন • {toBn(shareModalTest.durationMinutes ?? 15)} মিনিট
                 </span>
               </div>
               <div className="flex justify-between items-center pt-1 border-t border-slate-200">
@@ -1878,7 +1905,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             <div className="space-y-2 pt-1">
               <a
                 href={`https://wa.me/?text=${encodeURIComponent(
-                  `দা পাঠশালা: ${shareModalTest.title}\nসময়: ${toBn(shareModalTest.durationMinutes)} মিনিট, মোট প্রশ্ন: ${toBn(shareModalTest.questionCount)}টি।\n\nপরীক্ষায় অংশ নিতে নিচের লিংকে ক্লিক করো:\n${getShareableTestUrl(shareModalTest)}\n\n(অথবা দা পাঠশালা পোর্টালে পিন দাও: ${shareModalTest.pin})`
+                  `দা পাঠশালা: ${shareModalTest.title}\nসময়: ${toBn(shareModalTest.durationMinutes ?? 15)} মিনিট, মোট প্রশ্ন: ${toBn(shareModalTest.questionCount ?? shareModalTest.questions?.length ?? 0)}টি।\n\nপরীক্ষায় অংশ নিতে নিচের লিংকে ক্লিক করো:\n${getShareableTestUrl(shareModalTest)}\n\n(অথবা দা পাঠশালা পোর্টালে পিন দাও: ${shareModalTest.pin})`
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -1948,7 +1975,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 <span className="text-slate-500 font-medium">পরীক্ষার নাম:</span>
                 <span className="font-bold text-slate-800 text-right">{retakeModalTest.title}</span>
               </div>
-              {retakeModalTest.score !== undefined && (
+              {retakeModalTest.score !== undefined && retakeModalTest.score !== null && (
                 <div className="flex justify-between">
                   <span className="text-slate-500 font-medium">পূর্ববর্তী প্রাপ্ত নম্বর:</span>
                   <span className="font-bold text-amber-700">{toBn(retakeModalTest.score)}%</span>
