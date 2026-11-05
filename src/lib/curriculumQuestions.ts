@@ -841,7 +841,7 @@ export const CHAPTER_QUESTION_BANK: Record<string, ChapterSeedQuestion[]> = {
     }
   ],
 
-  // ------------------- জীববিজ্ঞান ও বিজ্ঞান (BIOLOGY & SCIENCE) -------------------
+  // ------------------- জীববিজ্ঞান ও সাধারণ বিজ্ঞান (BIOLOGY & GENERAL SCIENCE) -------------------
   'বিজ্ঞান': [
     {
       question: "উদ্ভিদের সালোকসংশ্লেষণ প্রক্রিয়ায় কোন গ্যাস প্রধান কাঁচামাল হিসেবে গৃহীত হয়?",
@@ -872,6 +872,310 @@ export const CHAPTER_QUESTION_BANK: Record<string, ChapterSeedQuestion[]> = {
       options: ['ভিটামিন ডি (Vitamin D)', 'ভিটামিন এ', 'ভিটামিন সি', 'ভিটামিন বি'],
       correctAnswer: 'ভিটামিন ডি (Vitamin D)',
       explanation: 'সূর্যরশ্মির উপস্থিতিতে ত্বকে ভিটামিন ডি উৎপাদিত হয়।'
+    },
+    {
+      question: "উদ্ভিদের কোন কলার মাধ্যমে পাতা থেকে তৈরি খাদ্য সারা দেহে পরিবাহিত হয়?",
+      options: ['ফ্লোয়েম (Phloem)', 'জাইলেম (Xylem)', 'প্যারেনকাইমা', 'কোলেনকাইমা'],
+      correctAnswer: 'ফ্লোয়েম (Phloem)',
+      explanation: 'জাইলেম পানি ও খনিজ লবণ পরিবহন করে এবং ফ্লোয়েম প্রস্তুতকৃত খাদ্য দেহের বিভিন্ন অঙ্গে পরিবহন করে।'
+    },
+    {
+      question: "উদ্ভিদ মূলরোম দিয়ে মাটি থেকে পানি শোষণ করে কোন প্রক্রিয়ায়?",
+      options: ['অভিস্রবণ (Osmosis)', 'ব্যাপন (Diffusion)', 'প্রস্বেদন', 'ইমবাইবিশন'],
+      correctAnswer: 'অভিস্রবণ (Osmosis)',
+      explanation: 'অর্ধভেদ্য পর্দার মধ্য দিয়ে কম ঘনত্বের দ্রবণ থেকে বেশি ঘনত্বের দিকে দ্রাবক প্রবেশ করাকে অভিস্রবণ বলে।'
+    },
+    {
+      question: "বায়ুমণ্ডলে সর্বাধিক পরিমাণে উপস্থিত গ্যাস কোনটি?",
+      options: ['নাইট্রোজেন (N₂)', 'অক্সিজেন (O₂)', 'কার্বন ডাই-অক্সাইড (CO₂)', 'আর্গন'],
+      correctAnswer: 'নাইট্রোজেন (N₂)',
+      explanation: 'বায়ুমণ্ডলে নাইট্রোজেনের পরিমাণ প্রায় ৭৮.০৯% এবং অক্সিজেন প্রায় ২০.৯৫%।'
+    },
+    {
+      question: "কোন রক্ত গ্রুপকে সার্বজনীন গ্রহীতা (Universal Recipient) বলা হয়?",
+      options: ['AB পজিটিভ', 'O নেগেটিভ', 'A পজিটিভ', 'B পজিটিভ'],
+      correctAnswer: 'AB পজিটিভ',
+      explanation: 'AB গ্রুপের রক্তে কোনো অ্যান্টিবডি থাকে না, তাই এটি যেকোনো গ্রুপ থেকে রক্ত গ্রহণ করতে পারে।'
+    },
+    {
+      question: "কোন রক্ত গ্রুপকে সার্বজনীন দাতা (Universal Donor) বলা হয়?",
+      options: ['O নেগেটিভ', 'AB পজিটিভ', 'O পজিটিভ', 'A নেগেটিভ'],
+      correctAnswer: 'O নেগেটিভ',
+      explanation: 'O নেগেটিভ রক্তে কোনো লোহিত রক্তকণিকা অ্যান্টিজেন থাকে না, তাই এটি যে কাউকে দেওয়া যায়।'
+    },
+    {
+      question: "ভিটামিন 'সি' এর অভাবে মানুষের শরীরে কোন রোগ দেখা দেয়?",
+      options: ['স্কার্ভি (Scurvy)', 'রাতকানা', 'রিকেটস', 'বেরিবেরি'],
+      correctAnswer: 'স্কার্ভি (Scurvy)',
+      explanation: 'ভিটামিন সি-এর অভাবে মাড়ি থেকে রক্ত পড়ে ও দাঁতের গোড়া আলগা হয়ে স্কার্ভি রোগ হয়।'
+    },
+    {
+      question: "ভিটামিন 'এ' এর অভাবে কোন রোগ হয়?",
+      options: ['রাতকানা (Night Blindness)', 'রিকেটস', 'অ্যানেমিয়া', 'গয়টার'],
+      correctAnswer: 'রাতকানা (Night Blindness)',
+      explanation: 'ভিটামিন এ চোখের রেটিনার রড কোষ সুস্থ রাখে; এর অভাবে কম আলোতে দেখার ক্ষমতা হ্রাস পায়।'
+    },
+    {
+      question: "ভিটামিন 'ডি' এবং ক্যালসিয়ামের অভাবে শিশুদের হাড় বেঁকে যাওয়ার রোগকে কী বলে?",
+      options: ['রিকেটস (Rickets)', 'অস্টিওম্যালাসিয়া', 'স্কার্ভি', 'অ্যানেমিয়া'],
+      correctAnswer: 'রিকেটস (Rickets)',
+      explanation: 'ভিটামিন ডি হাড়ের ক্যালসিয়াম শোষণে সাহায্য করে; অভাবে শিশুদের হাড় নরম ও বাঁকা হয়ে রিকেটস হয়।'
+    },
+    {
+      question: "আয়োডিনের অভাবে মানবদেহের থাইরয়েড গ্রন্থি ফুলে গেলে কোন রোগ হয়?",
+      options: ['গয়টার বা গলগণ্ড', 'ডায়াবেটিস', 'জন্ডিস', 'ম্যালেরিয়া'],
+      correctAnswer: 'গয়টার বা গলগণ্ড',
+      explanation: 'থাইরক্সিন হরমোন তৈরির জন্য আয়োডিন প্রয়োজন; ঘাটতি হলে থাইরয়েড ফুলে গলগণ্ড হয়।'
+    },
+    {
+      question: "মানবদেহের সবচেয়ে বড় গ্রন্থি (Gland) কোনটি?",
+      options: ['যকৃৎ (Liver)', 'অগ্ন্যাশয় (Pancreas)', 'থাইরয়েড', 'পিটুইটারি'],
+      correctAnswer: 'যকৃৎ (Liver)',
+      explanation: 'যকৃৎ মানবদেহের বৃহত্তম গ্রন্থি যা পিত্তরস তৈরি করে এবং বিপাকে গুরুত্বপূর্ণ ভূমিকা রাখে।'
+    },
+    {
+      question: "মানবদেহের রক্তে শর্করা বা গ্লুকোজ নিয়ন্ত্রণকারী হরমোন ইনসুলিন কোথা থেকে ক্ষরিত হয়?",
+      options: ['অগ্ন্যাশয় (Pancreas)', 'যকৃৎ', 'বৃক্ক (Kidney)', 'পাকস্থলী'],
+      correctAnswer: 'অগ্ন্যাশয় (Pancreas)',
+      explanation: 'অগ্ন্যাশয়ের আইলেটস অব ল্যাঙ্গারহ্যান্সের বিটা কোষ থেকে ইনসুলিন নিঃসৃত হয়।'
+    },
+    {
+      question: "মানবদেহের প্রধান রেচন অঙ্গ কোনটি যা রক্ত ছেঁকে মূত্র তৈরি করে?",
+      options: ['বৃক্ক বা কিডনি (Kidney)', 'যকৃৎ', 'হৃৎপিণ্ড', 'ফুসফুস'],
+      correctAnswer: 'বৃক্ক বা কিডনি (Kidney)',
+      explanation: 'কিডনির গঠন ও কাজের একক হলো নেফ্রন যা রক্ত থেকে নাইট্রোজেনঘটিত বর্জ্য অপসারিত করে।'
+    },
+    {
+      question: "হৃৎপিণ্ডের কোন প্রকোষ্ঠ থেকে বিশুদ্ধ অক্সিজেনযুক্ত রক্ত সারা দেহে ছড়িয়ে পড়ে?",
+      options: ['বাম নিলয় (Left Ventricle)', 'ডান নিলয়', 'বাম অলিন্দ', 'ডান অলিন্দ'],
+      correctAnswer: 'বাম নিলয় (Left Ventricle)',
+      explanation: 'বাম নিলয় থেকে মহাধমনী (Aorta) এর মাধ্যমে বিশুদ্ধ অক্সিজেনযুক্ত রক্ত সমস্ত শরীরে প্রবাহিত হয়।'
+    },
+    {
+      question: "পরিবেশে বাস্তুতন্ত্রের (Ecosystem) প্রাথমিক উৎপাদক কারা?",
+      options: ['সবুজ উদ্ভিদ ও শৈবাল', 'তৃণভোজী প্রাণী', 'মাংসাশী প্রাণী', 'বিয়োজক ব্যাকটেরিয়া'],
+      correctAnswer: 'সবুজ উদ্ভিদ ও শৈবাল',
+      explanation: 'সবুজ উদ্ভিদ সূর্যালোক ব্যবহার করে নিজের খাদ্য নিজে তৈরি করতে পারে বলে এরা উৎপাদক।'
+    },
+    {
+      question: "মৃত জীবদেহ পচিয়ে পুষ্টি উপাদান মাটিতে ফিরিয়ে দেয় কারা?",
+      options: ['বিয়োজক (Decomposers - ব্যাকটেরিয়া ও ছত্রাক)', 'উৎপাদক', 'তৃণভোজী', 'পরজীবী'],
+      correctAnswer: 'বিয়োজক (Decomposers - ব্যাকটেরিয়া ও ছত্রাক)',
+      explanation: 'বিয়োজকরা মৃত প্রাণী ও উদ্ভিদের জৈব উপাদান ভেঙে অজৈব উপাদানে পরিণত করে।'
+    },
+    {
+      question: "ওজোন স্তরের (Ozone layer) ক্ষতিসাধনের জন্য প্রধানত কোন রাসায়নিক গ্যাস দায়ী?",
+      options: ['ক্লোরোফ্লুরো কার্বন (CFC)', 'কার্বন মনোক্সাইড', 'মিথেন', 'অক্সিজেন'],
+      correctAnswer: 'ক্লোরোফ্লুরো কার্বন (CFC)',
+      explanation: 'রেফ্রিজারেটর ও অ্যারোসল থেকে নির্গত CFC ওজোন অণু ভেঙে ওজোন স্তরকে পাতলা করে ফেলে।'
+    },
+    {
+      question: "পৃথিবীর বায়ুমণ্ডলে তাপমাত্রা বৃদ্ধির প্রধান কারণ কোন গ্যাসটি (গ্রিনহাউস গ্যাস)?",
+      options: ['কার্বন ডাই-অক্সাইড (CO₂)', 'নাইট্রোজেন (N₂)', 'অক্সিজেন (O₂)', 'হাইড্রোজেন'],
+      correctAnswer: 'কার্বন ডাই-অক্সাইড (CO₂)',
+      explanation: 'CO₂ পৃথিবীর পৃষ্ঠ থেকে প্রতিফলিত অবলোহিত রশ্মি ধরে রেখে বৈশ্বিক উষ্ণায়ন ঘটায়।'
+    },
+    {
+      question: "বৃষ্টির পানিতে কোন এসিডের উপস্থিতির কারণে 'এসিড বৃষ্টি' (Acid Rain) হয়?",
+      options: ['সালফিউরিক ও নাইট্রিক এসিড', 'সাইট্রিক এসিড', 'অক্সালিক এসিড', 'টারটারিক এসিড'],
+      correctAnswer: 'সালফিউরিক ও নাইট্রিক এসিড',
+      explanation: 'শিল্পকারখানার SO₂ ও NO₂ গ্যাস বৃষ্টির পানির সাথে বিক্রিয়া করে যথাক্রমে H₂SO₄ ও HNO₃ উৎপন্ন করে।'
+    },
+    {
+      question: "পুকুরের পানিতে অতিরিক্ত শৈবাল জন্মানোর প্রক্রিয়াকে কী বলে?",
+      options: ['ইউট্রোফিকেশন (Eutrophication)', 'ডিফিউশন', 'অসমোসিস', 'সাসপেনশন'],
+      correctAnswer: 'ইউট্রোফিকেশন (Eutrophication)',
+      explanation: 'পানিতে অতিরিক্ত সার ও পুষ্টি উপাদান জমা হলে শৈবালের মাত্রাতিরিক্ত বৃদ্ধিকে ইউট্রোফিকেশন বলে।'
+    },
+    {
+      question: "শব্দের বেগ নিচের কোন মাধ্যমে সবচেয়ে বেশি?",
+      options: ['কঠিন মাধ্যমে (যেমন লোহা)', 'তরল মাধ্যমে (যেমন পানি)', 'বায়বীয় মাধ্যমে (যেমন বাতাস)', 'শূন্য মাধ্যমে'],
+      correctAnswer: 'কঠিন মাধ্যমে (যেমন লোহা)',
+      explanation: 'কঠিন মাধ্যমে অণুগুলো সবচেয়ে ঘন সন্নিবিষ্ট থাকায় শব্দের বেগ সবচেয়ে বেশি (লোহায় প্রায় ৫১৩০ মি/সে)।'
+    },
+    {
+      question: "শূন্য মাধ্যমে (Vacuum) আলোর বেগ প্রতি সেকেন্ডে কত?",
+      options: ['৩ × ১০⁸ মিটার/সেকেন্ড', '৩ × ১০⁶ মিটার/সেকেন্ড', '৩০০ মিটার/সেকেন্ড', '১.৫ × ১০⁸ মিটার/সেকেন্ড'],
+      correctAnswer: '৩ × ১০⁸ মিটার/সেকেন্ড',
+      explanation: 'শূন্য মাধ্যমে আলোর গতিবেগ প্রায় ৩,০০,০০০ কিলোমিটার/সেকেন্ড বা ৩ × ১০⁸ মিটার/সেকেন্ড।'
+    },
+    {
+      question: "চাঁদের অভিকর্ষজ ত্বরণ (g) পৃথিবীর অভিকর্ষজ ত্বরণের কত ভাগ?",
+      options: ['১/৬ ভাগ', '১/৪ ভাগ', '১/২ ভাগ', 'সমান'],
+      correctAnswer: '১/৬ ভাগ',
+      explanation: 'চাঁদের ভর ও ব্যাসার্ধ কম হওয়ায় সেখানে কোনো বস্তুর ওজন পৃথিবীর ওজনের প্রায় ১/৬ অংশ।'
+    },
+    {
+      question: "বৈদ্যুতিক বাল্বের ফিলামেন্ট সাধারণত কোন ধাতু দিয়ে তৈরি হয়?",
+      options: ['টাংস্টেন (Tungsten)', 'তামা', 'অ্যালুমিনিয়াম', 'লোহা'],
+      correctAnswer: 'টাংস্টেন (Tungsten)',
+      explanation: 'টাংস্টেনের গলনাঙ্ক অত্যন্ত উচ্চ (প্রায় ৩৪২২° সে) হওয়ায় এটি সহজে গলে না এবং উজ্জ্বল আলো দেয়।'
+    },
+    {
+      question: "কোন লেন্স চোখের নিকটদৃষ্টি (Myopia) ত্রুটি দূর করতে ব্যবহৃত হয়?",
+      options: ['অবতল লেন্স (Concave Lens)', 'উত্তল লেন্স', 'দ্বি-উত্তল লেন্স', 'সমতল কাচ'],
+      correctAnswer: 'অবতল লেন্স (Concave Lens)',
+      explanation: 'মায়োপিয়া রোগীদের চোখের প্রতিবিম্ব রেটিনার সামনে গঠিত হয়, অবতল লেন্স আলোকরশ্মি অপসারী করে তা রেটিনায় ফেলে।'
+    },
+    {
+      question: "চোখের দীর্ঘদৃষ্টি (Hypermetropia) ত্রুটি প্রতিকারে কোন লেন্স ব্যবহৃত হয়?",
+      options: ['উত্তল লেন্স (Convex Lens)', 'অবতল লেন্স', 'সিলিন্ড্রিকাল লেন্স', 'প্রিজম'],
+      correctAnswer: 'উত্তল লেন্স (Convex Lens)',
+      explanation: 'দীর্ঘদৃষ্টিতে প্রতিবিম্ব রেটিনার পেছনে গঠিত হয়, উত্তল লেন্স আলোকরশ্মিকে অভিসারী করে রেটিনায় কেন্দ্রীভূত করে।'
+    },
+    {
+      question: "লেবুর রসে কোন জৈব এসিড বিদ্যমান থাকে?",
+      options: ['সাইট্রিক এসিড (Citric Acid)', 'অ্যাসিটিক এসিড', 'ম্যালিক এসিড', 'টারটারিক এসিড'],
+      correctAnswer: 'সাইট্রিক এসিড (Citric Acid)',
+      explanation: 'সাইট্রাস জাতীয় ফলে প্রচুর পরিমাণে সাইট্রিক এসিড থাকে।'
+    },
+    {
+      question: "ভিনেগার বা সিরকায় অ্যাসিটিক এসিডের কত শতাংশ জলীয় দ্রবণ থাকে?",
+      options: ['৪% থেকে ১০%', '২০% থেকে ২৫%', '৫০%', '১% থেকে ২%'],
+      correctAnswer: '৪% থেকে ১০%',
+      explanation: 'অ্যাসিটিক এসিডের (CH₃COOH) ৪% - ১০% জলীয় দ্রবণকে ভিনেগার বা সিরকা বলা হয়।'
+    },
+    {
+      question: "নীল লিটমাস পেপারকে লাল করে কোন ধরনের পদার্থ?",
+      options: ['অম্ল বা এসিড (Acid)', 'ক্ষারক', 'লবণ', 'বিশুদ্ধ পানি'],
+      correctAnswer: 'অম্ল বা এসিড (Acid)',
+      explanation: 'এসিডের জলীয় দ্রবণ নীল লিটমাসকে লাল করে এবং ক্ষার লাল লিটমাসকে নীল করে।'
+    },
+    {
+      question: "রক্তের স্বাভাবিক pH এর মান কত?",
+      options: ['৭.৩৫ থেকে ৭.৪৫ (হালকা ক্ষারীয়)', '৫.৫ থেকে ৬.৫ (আম্লিক)', '৮.৫ থেকে ৯.০', '৩.০ থেকে ৪.০'],
+      correctAnswer: '৭.৩৫ থেকে ৭.৪৫ (হালকা ক্ষারীয়)',
+      explanation: 'মানুষের রক্তের pH অত্যন্ত সুনির্দিষ্ট ও সামান্য ক্ষারীয়, গড় মান প্রায় ৭.৪।'
+    },
+    {
+      question: "কোন পরিবাহী তারের রোধ (Resistance) পরিমাপের একক কোনটি?",
+      options: ['ওহম (Ohm - Ω)', 'ভোল্ট (Volt)', 'অ্যাম্পিয়ার (Ampere)', 'ওয়াট (Watt)'],
+      correctAnswer: 'ওহম (Ohm - Ω)',
+      explanation: 'তড়িৎ প্রবাহে বাধার পরিমাপকে রোধ বলে এবং এর এসআই একক হলো ওহম (Ω)।'
+    },
+    {
+      question: "আন্তর্জাতিক পদ্ধতিতে (SI Unit) কাজের একক কোনটি?",
+      options: ['জুল (Joule)', 'নিউটন (Newton)', 'ওয়াট (Watt)', 'প্যাসকেল (Pascal)'],
+      correctAnswer: 'জুল (Joule)',
+      explanation: 'বল প্রয়োগে বস্তুর সরণ ঘটলে কাজ সম্পন্ন হয়, ১ নিউটন বল ১ মিটার সরণ ঘটালে কাজ ১ জুল।'
+    },
+    {
+      question: "আন্তর্জাতিক পদ্ধতিতে চাপের (Pressure) একক কোনটি?",
+      options: ['প্যাসকেল (Pascal বা N/m²)', 'জুল', 'ওয়াট', 'নিউটন'],
+      correctAnswer: 'প্যাসকেল (Pascal বা N/m²)',
+      explanation: 'প্রতি একক ক্ষেত্রফলের ওপর প্রযুক্ত লম্ব বলকে চাপ বলে, এর একক প্যাসকেল (Pa)।'
+    },
+    {
+      question: "লোহায় মরিচা পড়ার জন্য লোহা ছাড়াও অপর কোন দুটি উপাদান অপরিহার্য?",
+      options: ['অক্সিজেন এবং পানি (জলীয় বাষ্প)', 'কার্বন এবং হাইড্রোজেন', 'কেবল নাইট্রোজেন', 'সালফার এবং সূর্যালোক'],
+      correctAnswer: 'অক্সিজেন এবং পানি (জলীয় বাষ্প)',
+      explanation: 'লোহা আর্দ্র বাতাসের অক্সিজেন ও পানির সাথে রাসায়নিক বিক্রিয়া করে হাইড্রেটেড আয়রন অক্সাইড (মরিচা) তৈরি করে।'
+    },
+    {
+      question: "নিচের কোন অঙ্গাণুটি কেবল উদ্ভিদকোষে থাকে, প্রাণীকোষে থাকে না?",
+      options: ['কোষ প্রাচীর ও প্লাস্টিড', 'মাইটোকন্ড্রিয়া', 'নিউক্লিয়াস', 'কোষপর্দা'],
+      correctAnswer: 'কোষ প্রাচীর ও প্লাস্টিড',
+      explanation: 'সেলুলোজ নির্মিত কোষপ্রাচীর এবং বর্ণ গঠনকারী প্লাস্টিড উদ্ভিদের অনন্য বৈশিষ্ট্য।'
+    },
+    {
+      question: "প্লাস্টিডের কোন অংশ উদ্ভিদের সালোকসংশ্লেষণ প্রক্রিয়ার জন্য দায়ী?",
+      options: ['ক্লোরোপ্লাস্ট (Chloroplast)', 'ক্রোমোপ্লাস্ট', 'লিউকোপ্লাস্ট', 'সেন্ট্রোসোম'],
+      correctAnswer: 'ক্লোরোপ্লাস্ট (Chloroplast)',
+      explanation: 'সবুজ রঞ্জক ক্লোরোফিলযুক্ত প্লাস্টিডকে ক্লোরোপ্লাস্ট বলে যা সৌরশক্তি শোষণ করে শর্করা তৈরি করে।'
+    },
+    {
+      question: "পাকস্থলীতে খাদ্য পরিপাকের জন্য কোন এসিড নিঃসৃত হয়?",
+      options: ['হাইড্রোক্লোরিক এসিড (HCl)', 'সালফিউরিক এসিড', 'নাইট্রিক এসিড', 'কার্বনিক এসিড'],
+      correctAnswer: 'হাইড্রোক্লোরিক এসিড (HCl)',
+      explanation: 'পাকস্থলীর গ্যাস্ট্রিক গ্রন্থি থেকে HCl নিঃসৃত হয়ে জীবাণু ধ্বংস করে এবং পেপসিন এনজাইম সক্রিয় করে।'
+    },
+    {
+      question: "পরমাণুর নিউক্লিয়াসে কোন কোন মূল কণিকা উপস্থিত থাকে?",
+      options: ['প্রোটন ও নিউট্রন', 'ইলেকট্রন ও প্রোটন', 'কেবল ইলেকট্রন', 'নিউট্রন ও পজিট্রন'],
+      correctAnswer: 'প্রোটন ও নিউট্রন',
+      explanation: 'নিউক্লিয়াসে ধনাত্মক প্রোটন ও আধানহীন নিউট্রন থাকে, এবং ঋণাত্মক ইলেকট্রন বাইরে আবর্তন করে।'
+    },
+    {
+      question: "কোন বিজ্ঞানী মহাকর্ষ সূত্র এবং গতির তিনটি বিখ্যাত সূত্র আবিষ্কার করেন?",
+      options: ['স্যার আইজ্যাক নিউটন', 'আলবার্ট আইনস্টাইন', 'গ্যালিলিও গ্যালিলি', 'মাইকেল ফ্যারাডে'],
+      correctAnswer: 'স্যার আইজ্যাক নিউটন',
+      explanation: 'নিউটন ১৬৮৭ সালে তার বিখ্যাত গ্রন্থ "ফিলোসফিয়া ন্যাচারালিস প্রিন্সিপিয়া ম্যাথামেটিকা"-তে এসব সূত্র প্রকাশ করেন।'
+    },
+    {
+      question: "১ অশ্বক্ষমতা (1 Horse Power) সমান কত ওয়াট?",
+      options: ['৭৪৬ ওয়াট (746 W)', '১০০০ ওয়াট', '৫০০ ওয়াট', '৭০০ ওয়াট'],
+      correctAnswer: '৭৪৬ ওয়াট (746 W)',
+      explanation: 'প্রকৌশল বিদ্যায় ১ হর্সপাওয়ার সমান ৭৪৬ ওয়াট ধরা হয়।'
+    },
+    {
+      question: "মানবদেহের রক্তচাপ মাপার যন্ত্রের নাম কী?",
+      options: ['স্ফিগমোম্যানোমিটার (Sphygmomanometer)', 'ব্যারোমিটার', 'ল্যাকটোমিটার', 'অ্যামিটার'],
+      correctAnswer: 'স্ফিগমোম্যানোমিটার (Sphygmomanometer)',
+      explanation: 'স্ফিগমোম্যানোমিটার দিয়ে মানুষের ধমনীর সিস্টোলিক ও ডায়াস্টোলিক চাপ পরিমাপ করা হয়।'
+    },
+    {
+      question: "আবহাওয়ার বায়ুমণ্ডলীয় চাপ পরিমাপের জন্য কোন যন্ত্রটি ব্যবহৃত হয়?",
+      options: ['ব্যারোমিটার (Barometer)', 'অ্যানিমোমিটার', 'হাইড্রোমিটার', 'থার্মোমিটার'],
+      correctAnswer: 'ব্যারোমিটার (Barometer)',
+      explanation: 'টরিচেলির আবিষ্কৃত ব্যারোমিটার দিয়ে বায়ুর চাপ মাপা হয়।'
+    },
+    {
+      question: "শব্দের কম্পাঙ্কের (Frequency) আন্তর্জাতিক একক কী?",
+      options: ['হার্টজ (Hertz - Hz)', 'ডেসিবল (dB)', 'মিটার', 'সেকেন্ড'],
+      correctAnswer: 'হার্টজ (Hertz - Hz)',
+      explanation: 'প্রতি সেকেন্ডে পূর্ণ কম্পনের সংখ্যাকে কম্পাঙ্ক বলে এবং এর একক হার্টজ (Hz)।'
+    },
+    {
+      question: "শব্দের তীব্রতা বা জোরালোভাব পরিমাপের একক কোনটি?",
+      options: ['ডেসিবল (Decibel - dB)', 'হার্টজ', 'লুমেন', 'ওয়াট'],
+      correctAnswer: 'ডেসিবল (Decibel - dB)',
+      explanation: 'শব্দের জোরালোভাব বা তীব্রতা মাপার লগারিদমিক একক হলো ডেসিবল।'
+    },
+    {
+      question: "মানুষের শ্রাব্যতার স্বাভাবিক সীমা (Audible range) কত?",
+      options: ['২০ Hz থেকে ২০,০০০ Hz', '১ Hz থেকে ১০০ Hz', '১০০ Hz থেকে ১,০০০ Hz', '২০,০০০ Hz এর বেশি'],
+      correctAnswer: '২০ Hz থেকে ২০,০০০ Hz',
+      explanation: '২০ হার্টজের কম হলে শব্দেতর এবং ২০,০০০ হার্টজের বেশি হলে শব্দোত্তর যা মানুষের কানে শোনা যায় না।'
+    },
+    {
+      question: "পানিতে দ্রবণীয় ভিটামিন কোনগুলো?",
+      options: ['ভিটামিন বি ও ভিটামিন সি', 'ভিটামিন এ ও ডি', 'ভিটামিন ই ও কে', 'কেবল ভিটামিন ডি'],
+      correctAnswer: 'ভিটামিন বি ও ভিটামিন সি',
+      explanation: 'ভিটামিন বি কমপ্লেক্স ও ভিটামিন সি পানিতে দ্রবীভূত হয়, বাকিগুলো (A, D, E, K) চর্বিতে দ্রবণীয়।'
+    }
+  ],
+
+  // ------------------- বিজ্ঞান ও পরিবেশ (ENVIRONMENT & ECOLOGY) -------------------
+  'বিজ্ঞান ও পরিবেশ': [
+    {
+      question: "পরিবেশে খাদ্য শৃঙ্খলের (Food Chain) শক্তি প্রবাহ কেমন?",
+      options: ['একমুখী (Unidirectional)', 'দ্বিমুখী', 'চক্রাকার', 'অনিয়মিত'],
+      correctAnswer: 'একমুখী (Unidirectional)',
+      explanation: 'সূর্য থেকে উদ্ভিদে এবং সেখান থেকে স্তরে স্তরে শক্তির প্রবাহ সবসময় একমুখী হয়ে থাকে।'
+    },
+    {
+      question: "বায়োগ্যাসের (Bio-gas) প্রধান জ্বালানি উপাদান কোনটি?",
+      options: ['মিথেন (CH₄)', 'ইথেন', 'প্রোপেন', 'কার্বন মনোক্সাইড'],
+      correctAnswer: 'মিথেন (CH₄)',
+      explanation: 'বায়োগ্যাসে প্রায় ৬০-৭০% মিথেন গ্যাস থাকে যা পরিবেশবান্ধব নবায়নযোগ্য জ্বালানি।'
+    },
+    {
+      question: "উদ্ভিদ বায়ুমণ্ডল থেকে সরাসরি কোন গ্যাস শোষণ করতে পারে না, কিন্তু ব্যাকটেরিয়ার সাহায্যে মাটি থেকে গ্রহণ করে?",
+      options: ['নাইট্রোজেন (N₂)', 'অক্সিজেন', 'কার্বন ডাই-অক্সাইড', 'হাইড্রোজেন'],
+      correctAnswer: 'নাইট্রোজেন (N₂)',
+      explanation: 'লেগিউম জাতীয় উদ্ভিদের মূলে রাইজোবিয়াম ব্যাকটেরিয়া বায়বীয় নাইট্রোজেনকে নাইট্রেটে রূপান্তর করে।'
+    },
+    {
+      question: "পরিবেশ দূষণ রোধে '4R' কৌশলের একটি 'R' হলো Recycle, বাকি তিনটি কী?",
+      options: ['Reduce, Reuse, Refuse', 'Run, Repeat, Rebuild', 'Remove, Restart, Recover', 'Replay, Return, React'],
+      correctAnswer: 'Reduce, Reuse, Refuse',
+      explanation: 'বর্জ্য ব্যবস্থাপনায় Refuse (বর্জন), Reduce (হ্রাস), Reuse (পুনর্ব্যবহার) ও Recycle (পুনঃপ্রক্রিয়াকরণ) হলো 4R কৌশল।'
+    },
+    {
+      question: "সৌরজগতের কোন গ্রহকে 'লাল গ্রহ' (Red Planet) বলা হয়?",
+      options: ['মঙ্গল (Mars)', 'বুধ', 'শুক্র', 'বৃহস্পতি'],
+      correctAnswer: 'মঙ্গল (Mars)',
+      explanation: 'মঙ্গলের পৃষ্ঠে প্রচুর পরিমাণে আয়রন অক্সাইড (মরিচা) থাকায় এটি রক্তিম দেখায়।'
     }
   ],
 
@@ -900,6 +1204,30 @@ export const CHAPTER_QUESTION_BANK: Record<string, ChapterSeedQuestion[]> = {
       options: ['সিপিইউ (CPU)', 'র‍্যাম (RAM)', 'হার্ডডিস্ক', 'মনিটর'],
       correctAnswer: 'সিপিইউ (CPU)',
       explanation: 'সেন্ট্রাল প্রসেসিং ইউনিট (CPU) সব গাণিতিক ও যৌক্তিক নিয়ন্ত্রণ সম্পন্ন করে।'
+    },
+    {
+      question: "কম্পিউটারের প্রধান অস্থায়ী বা উদ্বায়ী মেমোরি (Volatile Memory) কোনটি?",
+      options: ['র‍্যাম (RAM)', 'রম (ROM)', 'হার্ডড্রাইভ', 'পেনড্রাইভ'],
+      correctAnswer: 'র‍্যাম (RAM)',
+      explanation: 'বিদ্যুৎ প্রবাহ বন্ধ হয়ে গেলে র‍্যাম (Random Access Memory)-এ থাকা তথ্য মুছে যায়।'
+    },
+    {
+      question: "ইন্টারনেটে তথ্য যোগাযোগের জন্য ব্যবহৃত আইপি (IP) এর পূর্ণরূপ কী?",
+      options: ['Internet Protocol', 'Internal Program', 'International Packet', 'Interlink Port'],
+      correctAnswer: 'Internet Protocol',
+      explanation: 'ইন্টারনেটে প্রতিটি ডিভাইসের নির্দিষ্ট ঠিকানা নির্দেশক নিয়ম হলো ইন্টারনেট প্রোটোকল।'
+    },
+    {
+      question: "৮ বিট (8 Bits) সমান কত বাইট?",
+      options: ['১ বাইট (1 Byte)', '২ বাইট', '৪ বাইট', '১৬ বাইট'],
+      correctAnswer: '১ বাইট (1 Byte)',
+      explanation: '৮টি বিটের সমষ্টিকে এক বাইট বলা হয়।'
+    },
+    {
+      question: "ইউআরএল (URL) এর পূর্ণ রূপ কোনটি?",
+      options: ['Uniform Resource Locator', 'Universal Record Link', 'Unified Resource List', 'Unique Route Locator'],
+      correctAnswer: 'Uniform Resource Locator',
+      explanation: 'ইন্টারনেটে কোনো ওয়েবসাইটের সুনির্দিষ্ট ওয়েবহোস্ট ও পাথ নির্দেশক হলো URL।'
     }
   ]
 };
@@ -933,10 +1261,17 @@ const SUBJECT_ALLOWED_KEYS: Record<string, string[]> = {
   math: ['বীজগণিত', 'ত্রিকোণমিতি', 'লগারিদম', 'জ্যামিতি', 'পাটিগণিত', 'পরিসংখ্যান'],
   bangla: ['অপরিচিতা', 'বিলাসী', 'বায়ান্নর দিনগুলো', 'রেইনকোট', 'সোনার তরী', 'বিদ্রোহী', 'প্রতিদান', 'তাহারেই পড়ে মনে', 'ফেব্রুয়ারি ১৯৬৯', 'সমাস', 'কারক', 'বানান', 'উপসর্গ', 'বাক্য রূপান্তর'],
   english: ['verbs', 'voice', 'preposition'],
-  physics: ['পদার্থবিজ্ঞান'],
-  chemistry: ['রসায়ন'],
+  physics: ['পদার্থবিজ্ঞান', 'বিজ্ঞান'],
+  chemistry: ['রসায়ন', 'বিজ্ঞান'],
   ict: ['আইসিটি'],
-  science: ['বিজ্ঞান']
+  science: ['বিজ্ঞান', 'বিজ্ঞান ও পরিবেশ', 'পদার্থবিজ্ঞান', 'রসায়ন']
+};
+
+export const toBn = (n: any, fallback = '০'): string => {
+  if (n === undefined || n === null || n === '' || (typeof n === 'number' && isNaN(n))) {
+    return fallback;
+  }
+  return String(n).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[parseInt(d, 10)]);
 };
 
 /**
@@ -948,13 +1283,6 @@ export function generateDynamicMathQuestion(
   chapter: string = ''
 ): { id: string; question: string; options: string[]; correctAnswer: string; marks: number; explanation: string } {
   const normChap = (chapter || '').toLowerCase();
-
-  const toBn = (n: any, fallback = '০'): string => {
-    if (n === undefined || n === null || n === '' || (typeof n === 'number' && isNaN(n))) {
-      return fallback;
-    }
-    return String(n).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[parseInt(d, 10)]);
-  };
 
   // 15 mathematical templates
   const generators: Array<() => { question: string; options: string[]; correctAnswer: string; explanation: string }> = [
@@ -1223,6 +1551,447 @@ export function generateDynamicMathQuestion(
 }
 
 /**
+ * Procedural Dynamic Science Question Generator.
+ * Generates mathematically & conceptually authentic scientific questions with randomized parameters.
+ */
+export function generateDynamicScienceQuestion(
+  excludeTexts: string[] = [],
+  chapter: string = ''
+): { id: string; question: string; options: string[]; correctAnswer: string; marks: number; explanation: string } {
+  const generators: Array<() => { question: string; options: string[]; correctAnswer: string; explanation: string }> = [
+    // 1. Work: W = F * d
+    () => {
+      const forces = [8, 12, 15, 20, 25, 30, 40, 50];
+      const dists = [2, 3, 4, 5, 6, 8, 10];
+      const f = forces[Math.floor(Math.random() * forces.length)];
+      const d = dists[Math.floor(Math.random() * dists.length)];
+      const w = f * d;
+      return {
+        question: `একটি বস্তুর ওপর ${toBn(f)} N বল প্রয়োগ করায় বলের দিকে বস্তুটির ${toBn(d)} m সরণ ঘটল। কৃতকাজের পরিমাণ কত?`,
+        options: [`${toBn(w)} জুল`, `${toBn(w + 10)} জুল`, `${toBn(w - 6)} জুল`, `${toBn(w + 20)} জুল`],
+        correctAnswer: `${toBn(w)} জুল`,
+        explanation: `কাজ W = বল (F) × সরণ (d) = ${toBn(f)} × ${toBn(d)} = ${toBn(w)} জুল (Joule)।`
+      };
+    },
+
+    // 2. Newton's 2nd law: F = m * a
+    () => {
+      const masses = [2, 3, 4, 5, 8, 10, 15];
+      const accs = [2, 3, 4, 5, 6];
+      const m = masses[Math.floor(Math.random() * masses.length)];
+      const a = accs[Math.floor(Math.random() * accs.length)];
+      const f = m * a;
+      return {
+        question: `${toBn(m)} kg ভরের একটি স্থির বস্তুর ওপর কত বল প্রয়োগ করলে এতে ${toBn(a)} m/s² ত্বরণ সৃষ্টি হবে?`,
+        options: [`${toBn(f)} N`, `${toBn(f + 4)} N`, `${toBn(f - 3)} N`, `${toBn(f + 8)} N`],
+        correctAnswer: `${toBn(f)} N`,
+        explanation: `নিউটনের দ্বিতীয় সূত্র অনুযায়ী: বল F = ভর (m) × ত্বরণ (a) = ${toBn(m)} × ${toBn(a)} = ${toBn(f)} নিউটন।`
+      };
+    },
+
+    // 3. Power: P = W / t
+    () => {
+      const wList = [120, 180, 240, 300, 400, 500, 600];
+      const tList = [3, 4, 5, 6, 10];
+      const t = tList[Math.floor(Math.random() * tList.length)];
+      const factor = Math.floor(Math.random() * 4) + 5;
+      const w = t * factor * 10;
+      const p = w / t;
+      return {
+        question: `কোনো যন্ত্র ${toBn(t)} সেকেন্ডে ${toBn(w)} জুল কাজ সম্পন্ন করলে যন্ত্রটির ক্ষমতা (Power) কত?`,
+        options: [`${toBn(p)} ওয়াট`, `${toBn(p + 15)} ওয়াট`, `${toBn(p - 10)} ওয়াট`, `${toBn(p + 25)} ওয়াট`],
+        correctAnswer: `${toBn(p)} ওয়াট`,
+        explanation: `ক্ষমতা P = কাজ (W) / সময় (t) = ${toBn(w)} / ${toBn(t)} = ${toBn(p)} ওয়াট (Watt)।`
+      };
+    },
+
+    // 4. Ohm's Law: V = I * R
+    () => {
+      const currents = [2, 3, 4, 5];
+      const resists = [4, 5, 6, 8, 10, 12];
+      const i = currents[Math.floor(Math.random() * currents.length)];
+      const r = resists[Math.floor(Math.random() * resists.length)];
+      const v = i * r;
+      return {
+        question: `একটি পরিবাহীর রোধ ${toBn(r)} ওহম (Ω) এবং এর মধ্য দিয়ে ${toBn(i)} অ্যাম্পিয়ার (A) তড়িৎ প্রবাহিত হলে দুই প্রান্তের বিভব পার্থক্য কত?`,
+        options: [`${toBn(v)} ভোল্ট`, `${toBn(v + 5)} ভোল্ট`, `${toBn(v - 4)} ভোল্ট`, `${toBn(v + 10)} ভোল্ট`],
+        correctAnswer: `${toBn(v)} ভোল্ট`,
+        explanation: `ওহমের সূত্র অনুযায়ী: বিভব পার্থক্য V = তড়িৎ প্রবাহ (I) × রোধ (R) = ${toBn(i)} × ${toBn(r)} = ${toBn(v)} ভোল্ট।`
+      };
+    },
+
+    // 5. Ohm's Law: I = V / R
+    () => {
+      const volts = [12, 24, 36, 48, 60];
+      const resists = [3, 4, 6, 12];
+      const r = resists[Math.floor(Math.random() * resists.length)];
+      const v = r * (Math.floor(Math.random() * 5) + 2);
+      const i = v / r;
+      return {
+        question: `${toBn(v)} ভোল্ট উৎসের সাথে ${toBn(r)} ওহম রোধের একটি রোধক যুক্ত করলে বর্তনীতে কত তড়িৎ প্রবাহ চলবে?`,
+        options: [`${toBn(i)} অ্যাম্পিয়ার`, `${toBn(i + 1)} অ্যাম্পিয়ার`, `${toBn(i - 1)} অ্যাম্পিয়ার`, `${toBn(i + 2)} অ্যাম্পিয়ার`],
+        correctAnswer: `${toBn(i)} অ্যাম্পিয়ার`,
+        explanation: `ওহমের সূত্র অনুযায়ী: I = V / R = ${toBn(v)} / ${toBn(r)} = ${toBn(i)} অ্যাম্পিয়ার (A)।`
+      };
+    },
+
+    // 6. Kinetic Energy: Ek = 1/2 * m * v^2
+    () => {
+      const pairs = [
+        { m: 2, v: 3, ans: 9 },
+        { m: 4, v: 3, ans: 18 },
+        { m: 2, v: 4, ans: 16 },
+        { m: 6, v: 2, ans: 12 },
+        { m: 4, v: 5, ans: 50 },
+        { m: 2, v: 5, ans: 25 }
+      ];
+      const item = pairs[Math.floor(Math.random() * pairs.length)];
+      return {
+        question: `${toBn(item.m)} kg ভরের একটি গতিশীল বস্তু ${toBn(item.v)} m/s বেগে চললে এর গতিশক্তি (Kinetic Energy) কত হবে?`,
+        options: [`${toBn(item.ans)} জুল`, `${toBn(item.ans + 6)} জুল`, `${toBn(item.ans - 4)} জুল`, `${toBn(item.ans + 12)} জুল`],
+        correctAnswer: `${toBn(item.ans)} জুল`,
+        explanation: `গতিশক্তি Ek = ১/২ × m × v² = ১/২ × ${toBn(item.m)} × (${toBn(item.v)})² = ${toBn(item.ans)} জুল।`
+      };
+    },
+
+    // 7. Speed: s = v * t
+    () => {
+      const speeds = [15, 20, 25, 30, 40];
+      const times = [4, 5, 6, 8, 10];
+      const v = speeds[Math.floor(Math.random() * speeds.length)];
+      const t = times[Math.floor(Math.random() * times.length)];
+      const s = v * t;
+      return {
+        question: `একটি গাড়ি সমবেগে ${toBn(v)} m/s গতিতে চললে ${toBn(t)} সেকেন্ডে কত দূরত্ব অতিক্রম করবে?`,
+        options: [`${toBn(s)} মিটার`, `${toBn(s + 20)} মিটার`, `${toBn(s - 15)} মিটার`, `${toBn(s + 40)} মিটার`],
+        correctAnswer: `${toBn(s)} মিটার`,
+        explanation: `সমবেগে অতিক্রান্ত দূরত্ব s = বেগ (v) × সময় (t) = ${toBn(v)} × ${toBn(t)} = ${toBn(s)} মিটার।`
+      };
+    },
+
+    // 8. Moon weight: W / 6
+    () => {
+      const weights = [36, 48, 60, 72, 84, 96, 120];
+      const w = weights[Math.floor(Math.random() * weights.length)];
+      const moonW = w / 6;
+      return {
+        question: `পৃথিবীপৃষ্ঠে একটি বস্তুর ওজন ${toBn(w)} N হলে চাঁদে বস্তুটির ওজন কত হবে?`,
+        options: [`${toBn(moonW)} N`, `${toBn(moonW + 4)} N`, `${toBn(moonW - 2)} N`, `${toBn(w)} N`],
+        correctAnswer: `${toBn(moonW)} N`,
+        explanation: `চাঁদের অভিকর্ষজ ত্বরণ পৃথিবীর ১/৬ ভাগ। সুতরাং চাঁদে ওজন = ${toBn(w)} / ৬ = ${toBn(moonW)} নিউটন।`
+      };
+    },
+
+    // 9. Celsius to Fahrenheit: F = 9/5 * C + 32
+    () => {
+      const cList = [
+        { c: 10, f: 50 },
+        { c: 20, f: 68 },
+        { c: 25, f: 77 },
+        { c: 30, f: 86 },
+        { c: 35, f: 95 },
+        { c: 40, f: 104 },
+        { c: 100, f: 212 }
+      ];
+      const item = cList[Math.floor(Math.random() * cList.length)];
+      return {
+        question: `কোনো স্থানের তাপমাত্রা ${toBn(item.c)}°C হলে ফারেনহাইট স্কেলে তা কত ডিগ্রি হবে?`,
+        options: [`${toBn(item.f)}°F`, `${toBn(item.f + 5)}°F`, `${toBn(item.f - 4)}°F`, `${toBn(item.f + 10)}°F`],
+        correctAnswer: `${toBn(item.f)}°F`,
+        explanation: `সম্পর্ক সূত্র: F = (৯/৫ × C) + ৩২ = (৯/৫ × ${toBn(item.c)}) + ৩২ = ${toBn(item.f)}°F।`
+      };
+    },
+
+    // 10. Density: rho = m / V
+    () => {
+      const items = [
+        { m: 100, v: 20, ans: 5 },
+        { m: 180, v: 30, ans: 6 },
+        { m: 240, v: 40, ans: 6 },
+        { m: 300, v: 50, ans: 6 },
+        { m: 160, v: 20, ans: 8 },
+        { m: 210, v: 30, ans: 7 }
+      ];
+      const item = items[Math.floor(Math.random() * items.length)];
+      return {
+        question: `একটি কঠিন বস্তুর ভর ${toBn(item.m)} গ্রাম এবং আয়তন ${toBn(item.v)} সেমি³ হলে বস্তুটির ঘনত্ব কত?`,
+        options: [`${toBn(item.ans)} গ্রাম/সেমি³`, `${toBn(item.ans + 2)} গ্রাম/সেমি³`, `${toBn(item.ans - 1)} গ্রাম/সেমি³`, `${toBn(item.ans + 3)} গ্রাম/সেমি³`],
+        correctAnswer: `${toBn(item.ans)} গ্রাম/সেমি³`,
+        explanation: `ঘনত্ব ρ = ভর (m) / আয়তন (V) = ${toBn(item.m)} / ${toBn(item.v)} = ${toBn(item.ans)} গ্রাম/সেমি³।`
+      };
+    },
+
+    // 11. Pressure: P = F / A
+    () => {
+      const items = [
+        { f: 100, a: 2, ans: 50 },
+        { f: 200, a: 4, ans: 50 },
+        { f: 300, a: 5, ans: 60 },
+        { f: 400, a: 8, ans: 50 },
+        { f: 500, a: 10, ans: 50 },
+        { f: 240, a: 3, ans: 80 }
+      ];
+      const item = items[Math.floor(Math.random() * items.length)];
+      return {
+        question: `${toBn(item.a)} m² ক্ষেত্রফলের ওপর লম্বভাবে ${toBn(item.f)} N বল প্রযুক্ত হলে চাপের পরিমাণ কত হবে?`,
+        options: [`${toBn(item.ans)} প্যাসকেল`, `${toBn(item.ans + 10)} প্যাসকেল`, `${toBn(item.ans - 10)} প্যাসকেল`, `${toBn(item.ans + 20)} প্যাসকেল`],
+        correctAnswer: `${toBn(item.ans)} প্যাসকেল`,
+        explanation: `চাপ P = বল (F) / ক্ষেত্রফল (A) = ${toBn(item.f)} / ${toBn(item.a)} = ${toBn(item.ans)} প্যাসকেল (N/m²)।`
+      };
+    },
+
+    // 12. Lens Power: P = 1 / f
+    () => {
+      const lenses = [
+        { f: '০.৫', p: '+২' },
+        { f: '০.২৫', p: '+৪' },
+        { f: '০.২', p: '+৫' },
+        { f: '১', p: '+১' }
+      ];
+      const item = lenses[Math.floor(Math.random() * lenses.length)];
+      return {
+        question: `একটি উত্তল লেন্সের ফোকাস দূরত্ব ${item.f} মিটার হলে লেন্সটির ক্ষমতা (Power) কত ডায়প্টার?`,
+        options: [`${item.p} D`, `-২ D`, `+৩ D`, `+১.৫ D`],
+        correctAnswer: `${item.p} D`,
+        explanation: `উত্তল লেন্সের ক্ষমতা P = +১/f = ${item.p} ডায়প্টার (D)।`
+      };
+    },
+
+    // 13. Electrical Energy (kWh / Unit)
+    () => {
+      const powers = [
+        { w: 100, h: 5, days: 30, ans: 15 },
+        { w: 60, h: 10, days: 30, ans: 18 },
+        { w: 200, h: 5, days: 30, ans: 30 },
+        { w: 500, h: 2, days: 30, ans: 30 }
+      ];
+      const item = powers[Math.floor(Math.random() * powers.length)];
+      return {
+        question: `একটি ${toBn(item.w)} ওয়াটের বাতি দৈনিক ${toBn(item.h)} ঘণ্টা করে জ্বললে ৩০ দিনে কত ইউনিট (kWh) বিদ্যুৎ শক্তি ব্যয় হবে?`,
+        options: [`${toBn(item.ans)} ইউনিট`, `${toBn(item.ans + 5)} ইউনিট`, `${toBn(item.ans - 3)} ইউনিট`, `${toBn(item.ans + 10)} ইউনিট`],
+        correctAnswer: `${toBn(item.ans)} ইউনিট`,
+        explanation: `ব্যয়িত শক্তি = (ক্ষমতা W × দৈনিক ঘণ্টা × দিন) / ১০০০ = (${toBn(item.w)} × ${toBn(item.h)} × ${toBn(item.days)}) / ১০০০ = ${toBn(item.ans)} kWh বা ইউনিট।`
+      };
+    },
+
+    // 14. Nutrition energy: carbs or protein (4 kcal/g)
+    () => {
+      const grams = [20, 25, 30, 40, 50];
+      const g = grams[Math.floor(Math.random() * grams.length)];
+      const cal = g * 4;
+      return {
+        question: `খাবারে উপস্থিত ${toBn(g)} গ্রাম শর্করা (কার্বোহাইড্রেট) সম্পূর্ণ জারণে মানবদেহে কত কিলোক্যালরি শক্তি উৎপন্ন করে?`,
+        options: [`${toBn(cal)} কিলোক্যালরি`, `${toBn(cal + 30)} কিলোক্যালরি`, `${toBn(cal - 20)} কিলোক্যালরি`, `${toBn(cal + 50)} কিলোক্যালরি`],
+        correctAnswer: `${toBn(cal)} কিলোক্যালরি`,
+        explanation: `১ গ্রাম শর্করা বা প্রোটিন জারণে প্রায় ৪ কিলোক্যালরি (kcal) শক্তি পাওয়া যায়। অতএব ${toBn(g)} × ৪ = ${toBn(cal)} কিলোক্যালরি।`
+      };
+    },
+
+    // 15. Wave speed: v = f * lambda
+    () => {
+      const waves = [
+        { f: 100, lam: 2, v: 200 },
+        { f: 150, lam: 2, v: 300 },
+        { f: 200, lam: 3, v: 600 },
+        { f: 250, lam: 2, v: 500 }
+      ];
+      const item = waves[Math.floor(Math.random() * waves.length)];
+      return {
+        question: `একটি শব্দের কম্পাঙ্ক ${toBn(item.f)} Hz এবং তরঙ্গদৈর্ঘ্য ${toBn(item.lam)} m হলে ঐ মাধ্যমে শব্দের বেগ কত?`,
+        options: [`${toBn(item.v)} m/s`, `${toBn(item.v + 50)} m/s`, `${toBn(item.v - 50)} m/s`, `${toBn(item.v + 100)} m/s`],
+        correctAnswer: `${toBn(item.v)} m/s`,
+        explanation: `তরঙ্গের বেগ v = কম্পাঙ্ক (f) × তরঙ্গদৈর্ঘ্য (λ) = ${toBn(item.f)} × ${toBn(item.lam)} = ${toBn(item.v)} m/s।`
+      };
+    }
+  ];
+
+  const shuffledGen = [...generators].sort(() => Math.random() - 0.5);
+  for (const gen of shuffledGen) {
+    const candidate = gen();
+    if (!excludeTexts.includes(candidate.question)) {
+      return {
+        ...candidate,
+        id: 'pq_dyn_sci_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+        marks: 1
+      };
+    }
+  }
+
+  const base = generators[0]();
+  const salt = excludeTexts.length + 1;
+  return {
+    ...base,
+    id: 'pq_dyn_sci_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+    question: `${base.question} (অনুশীলনী ${toBn(salt)})`,
+    marks: 1
+  };
+}
+
+/**
+ * Procedural Dynamic Bangla Question Generator.
+ */
+export function generateDynamicBanglaQuestion(
+  excludeTexts: string[] = [],
+  chapter: string = ''
+): { id: string; question: string; options: string[]; correctAnswer: string; marks: number; explanation: string } {
+  const antonyms = [
+    { word: 'অনুরাগ', ans: 'বিরাগ', opts: ['বিরাগ', 'প্রেম', 'আসক্তি', 'শ্রদ্ধা'] },
+    { word: 'উর্বর', ans: 'অনুর্বর (বা ঊষর)', opts: ['অনুর্বর (বা ঊষর)', 'ফলবতী', 'সতেজ', 'শ্যামল'] },
+    { word: 'অগ্র', ans: 'পশ্চাৎ', opts: ['পশ্চাৎ', 'সামনে', 'মধ্য', 'নিকট'] },
+    { word: 'তিমির', ans: 'আলোক', opts: ['আলোক', 'অন্ধকার', 'নিশীথ', 'মেঘ'] },
+    { word: 'সংকোচন', ans: 'প্রসারণ', opts: ['প্রসারণ', 'সংক্ষেপ', 'হ্রাস', 'বিকাশ'] },
+    { word: 'সঞ্চয়', ans: 'অপচয়', opts: ['অপচয়', 'আহরণ', 'সংগ্রহ', 'লাভ'] },
+    { word: 'জঙ্গম', ans: 'স্থাবর', opts: ['স্থাবর', 'অস্থির', 'গতিশীল', 'ক্ষতিকর'] },
+    { word: 'উত্তীর্ণ', ans: 'অনুত্তীর্ণ', opts: ['অনুত্তীর্ণ', 'সফল', 'কৃতকার্য', 'পারদর্শী'] }
+  ];
+
+  const sandhi = [
+    { word: 'বিদ্যালয়', ans: 'বিদ্যা + আলয়', opts: ['বিদ্যা + আলয়', 'বিদ + আলয়', 'বিদ্যা + লয়', 'বিদ্যাব + আলয়'] },
+    { word: 'সদাশয়', ans: 'সৎ + আশয়', opts: ['সৎ + আশয়', 'সদা + আশয়', 'সদ + আশয়', 'সতী + আশয়'] },
+    { word: 'জগন্নাথ', ans: 'জগৎ + নাথ', opts: ['জগৎ + নাথ', 'জগন + নাথ', 'জগ + নাথ', 'জগম + নাথ'] },
+    { word: 'রবীন্দ্র', ans: 'রবি + ইন্দ্র', opts: ['রবি + ইন্দ্র', 'রবী + ইন্দ্র', 'রব + ইন্দ্র', 'রবি + ঈন্দ্র'] },
+    { word: 'গায়িকা', ans: 'গৈ + অক / ইকা', opts: ['গৈ + ইকা', 'গা + ইকা', 'গো + ইকা', 'গে + ইকা'] }
+  ];
+
+  const oneWord = [
+    { q: 'যা পূর্বে দেখা যায় নি — এককথায় কী হবে?', ans: 'অদৃষ্টপূর্ব', opts: ['অদৃষ্টপূর্ব', 'অপূর্ব', 'অভূতপূর্ব', 'অনুপম'] },
+    { q: 'যা পূর্বে কখনো ঘটে নি — এককথায় কী বলে?', ans: 'অভূতপূর্ব', opts: ['অভূতপূর্ব', 'অনাস্বাদিতপূর্ব', 'অদৃষ্টপূর্ব', 'অভিনব'] },
+    { q: 'উপকারের অপকার করে যে — এককথায় কী হবে?', ans: 'কৃতঘ্ন', opts: ['কৃতঘ্ন', 'কৃতজ্ঞ', 'অকৃতজ্ঞ', 'শত্রু'] },
+    { q: 'উপকারের উপকার স্বীকার করে যে — তাকে কী বলে?', ans: 'কৃতজ্ঞ', opts: ['কৃতজ্ঞ', 'কৃতঘ্ন', 'দয়ালু', 'মহৎ'] },
+    { q: 'যার উপস্থিত বুদ্ধি আছে — এককথায় কী হবে?', ans: 'প্রত্যুৎপন্নমতি', opts: ['প্রত্যুৎপন্নমতি', 'বুদ্ধিমান', 'চতুর', 'মেধাবী'] }
+  ];
+
+  const allItems = [
+    ...antonyms.map(a => ({
+      question: `"${a.word}" শব্দের সঠিক বিপরীতার্থক শব্দ কোনটি?`,
+      options: a.opts,
+      correctAnswer: a.ans,
+      explanation: `বাংলা ব্যাকরণ অনুযায়ী "${a.word}" শব্দের বিপরীতার্থক অর্থ হলো "${a.ans}"।`
+    })),
+    ...sandhi.map(s => ({
+      question: `"${s.word}" এর সঠিক সন্ধি বিচ্ছেদ কোনটি?`,
+      options: s.opts,
+      correctAnswer: s.ans,
+      explanation: `স্বরসন্ধি/ব্যঞ্জনসন্ধির নিয়ম অনুযায়ী "${s.word}" = ${s.ans}।`
+    })),
+    ...oneWord.map(w => ({
+      question: w.q,
+      options: w.opts,
+      correctAnswer: w.ans,
+      explanation: 'বাংলা ব্যাকরণের বাক্য সংকোচন বা এককথায় প্রকাশ নিয়ম।'
+    }))
+  ];
+
+  const shuffled = [...allItems].sort(() => Math.random() - 0.5);
+  for (const item of shuffled) {
+    if (!excludeTexts.includes(item.question)) {
+      return {
+        ...item,
+        id: 'pq_dyn_bng_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+        marks: 1
+      };
+    }
+  }
+
+  const base = allItems[0];
+  const salt = excludeTexts.length + 1;
+  return {
+    ...base,
+    id: 'pq_dyn_bng_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+    question: `${base.question} (অনুশীলনী ${toBn(salt)})`,
+    marks: 1
+  };
+}
+
+/**
+ * Procedural Dynamic English Question Generator.
+ */
+export function generateDynamicEnglishQuestion(
+  excludeTexts: string[] = [],
+  chapter: string = ''
+): { id: string; question: string; options: string[]; correctAnswer: string; marks: number; explanation: string } {
+  const prepItems = [
+    { q: 'He is proficient and good ___ Mathematics.', ans: 'at', opts: ['at', 'in', 'on', 'with'], exp: 'Appropriate preposition: "good at" means skillful.' },
+    { q: 'The patient died ___ cancer after long suffering.', ans: 'of', opts: ['of', 'from', 'by', 'for'], exp: '"die of" a disease (cancer/cholera).' },
+    { q: 'She prefers tea ___ coffee in the morning.', ans: 'to', opts: ['to', 'than', 'over', 'against'], exp: '"prefer ... to ..." is the standard grammatical rule.' },
+    { q: 'Listen attentively ___ what your teacher says.', ans: 'to', opts: ['to', 'at', 'with', 'on'], exp: 'Appropriate preposition: "listen to".' },
+    { q: 'He was accused ___ theft by the committee.', ans: 'of', opts: ['of', 'for', 'with', 'about'], exp: 'Appropriate preposition: "accuse of".' },
+    { q: 'Distribute the chocolates ___ the two boys.', ans: 'between', opts: ['between', 'among', 'with', 'in'], exp: 'Use "between" for two entities, "among" for more than two.' },
+    { q: 'He has been living in Dhaka ___ 2018.', ans: 'since', opts: ['since', 'for', 'from', 'in'], exp: 'Use "since" for a point of time with present perfect continuous.' }
+  ];
+
+  const shuffled = [...prepItems].sort(() => Math.random() - 0.5);
+  for (const item of shuffled) {
+    if (!excludeTexts.includes(item.q)) {
+      return {
+        id: 'pq_dyn_eng_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+        question: item.q,
+        options: item.opts,
+        correctAnswer: item.ans,
+        explanation: item.exp,
+        marks: 1
+      };
+    }
+  }
+
+  const base = prepItems[0];
+  const salt = excludeTexts.length + 1;
+  return {
+    id: 'pq_dyn_eng_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+    question: `${base.q} (Exercise ${salt})`,
+    options: base.opts,
+    correctAnswer: base.ans,
+    explanation: base.exp,
+    marks: 1
+  };
+}
+
+/**
+ * Procedural Dynamic ICT Question Generator.
+ */
+export function generateDynamicIctQuestion(
+  excludeTexts: string[] = [],
+  chapter: string = ''
+): { id: string; question: string; options: string[]; correctAnswer: string; marks: number; explanation: string } {
+  const binaryConversions = [
+    { bin: '101', dec: 5 },
+    { bin: '110', dec: 6 },
+    { bin: '111', dec: 7 },
+    { bin: '1000', dec: 8 },
+    { bin: '1001', dec: 9 },
+    { bin: '1010', dec: 10 },
+    { bin: '1100', dec: 12 },
+    { bin: '1111', dec: 15 },
+    { bin: '10000', dec: 16 }
+  ];
+
+  const shuffledBin = [...binaryConversions].sort(() => Math.random() - 0.5);
+  for (const item of shuffledBin) {
+    const qText = `বাইনারি সংখ্যা (${item.bin})₂ এর দশমিক বা ডেসিমেল মান কত?`;
+    if (!excludeTexts.includes(qText)) {
+      return {
+        id: 'pq_dyn_ict_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+        question: qText,
+        options: [toBn(item.dec), toBn(item.dec + 1), toBn(item.dec - 1), toBn(item.dec + 2)],
+        correctAnswer: toBn(item.dec),
+        explanation: `বাইনারি স্থানীয় মান হিসাব: (${item.bin})₂ = ${item.dec} (ডেসিমেল)।`,
+        marks: 1
+      };
+    }
+  }
+
+  const salt = excludeTexts.length + 1;
+  return {
+    id: 'pq_dyn_ict_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+    question: `আইসিটি নেটওয়ার্কিং ও তথ্যপ্রযুক্তি সংক্রান্ত গুরুত্বপূর্ণ প্রশ্ন (অনুশীলনী ${toBn(salt)})`,
+    options: ['বিকল্প ক', 'বিকল্প খ', 'বিকল্প গ', 'বিকল্প ঘ'],
+    correctAnswer: 'বিকল্প ক',
+    explanation: 'পাঠ্যবইয়ের আইসিটি অধ্যায়ভিত্তিক পর্যালোচনা।',
+    marks: 1
+  };
+}
+
+/**
  * Randomly shuffles options so that the correct answer is naturally distributed across (ক, খ, গ, ঘ)
  * and never stuck at the first option. Returns the shuffled options and the exact correctIndex.
  */
@@ -1354,51 +2123,153 @@ export const getQuestionsForChapter = (
 ) => {
   const normChap = (chapter || '').trim().toLowerCase();
   const category = detectSubjectCategory(subject);
-  const allowedKeys = SUBJECT_ALLOWED_KEYS[category] || SUBJECT_ALLOWED_KEYS.math;
+  const allowedKeys = SUBJECT_ALLOWED_KEYS[category] || SUBJECT_ALLOWED_KEYS.science;
 
-  let pool: ChapterSeedQuestion[] = [];
+  const seenTexts = new Set<string>();
+  const results: Array<{
+    id: string;
+    question: string;
+    options: string[];
+    correctAnswer: string;
+    correctAnswerIndex: number;
+    marks: number;
+    explanation: string;
+    solutions: string[];
+  }> = [];
 
-  // 1. Direct search within the allowed subject keys
+  const tryAddQuestion = (q: ChapterSeedQuestion) => {
+    const cleanQ = (q.question || '').trim();
+    if (!cleanQ || seenTexts.has(cleanQ)) return false;
+    seenTexts.add(cleanQ);
+
+    const { shuffledOptions, correctIndex } = shuffleQuestionOptions(q.options, q.correctAnswer);
+    const solutions = q.solutions && q.solutions.length >= 2
+      ? q.solutions
+      : generateTwoSolutions(cleanQ, shuffledOptions, q.correctAnswer, q.explanation);
+
+    results.push({
+      id: 'pq_' + Date.now().toString(36) + '_' + results.length + '_' + Math.random().toString(36).substring(2, 6),
+      question: cleanQ,
+      options: shuffledOptions,
+      correctAnswer: q.correctAnswer,
+      correctAnswerIndex: correctIndex,
+      marks: marksPerQuestion,
+      explanation: q.explanation || '',
+      solutions
+    });
+    return true;
+  };
+
+  // 1. Direct search within the allowed subject keys for matching chapter
+  let chapterPool: ChapterSeedQuestion[] = [];
   if (normChap.length >= 2) {
     for (const key of allowedKeys) {
       const keyLower = key.toLowerCase();
       if (normChap.includes(keyLower) || keyLower.includes(normChap)) {
         if (CHAPTER_QUESTION_BANK[key] && CHAPTER_QUESTION_BANK[key].length > 0) {
-          pool = CHAPTER_QUESTION_BANK[key];
-          break;
+          chapterPool.push(...CHAPTER_QUESTION_BANK[key]);
         }
       }
     }
   }
 
-  // 2. If chapter didn't match directly, aggregate pool from ALL chapters in this subject!
-  if (pool.length === 0) {
+  // Shuffle chapterPool for natural variety
+  const shuffledChapterPool = [...chapterPool].sort(() => Math.random() - 0.5);
+  for (const q of shuffledChapterPool) {
+    if (results.length >= count) break;
+    tryAddQuestion(q);
+  }
+
+  // 2. If chapter didn't fulfill requested count, pull unique questions from ALL chapters in this subject
+  if (results.length < count) {
+    const allSubjectPool: ChapterSeedQuestion[] = [];
     for (const key of allowedKeys) {
       if (CHAPTER_QUESTION_BANK[key]) {
-        pool.push(...CHAPTER_QUESTION_BANK[key]);
+        allSubjectPool.push(...CHAPTER_QUESTION_BANK[key]);
       }
+    }
+    const shuffledAll = [...allSubjectPool].sort(() => Math.random() - 0.5);
+    for (const q of shuffledAll) {
+      if (results.length >= count) break;
+      tryAddQuestion(q);
     }
   }
 
-  // 3. Guarantee requested number of questions with shuffled options & solutions
-  const results = [];
-  for (let i = 0; i < count; i++) {
-    const q = pool[i % pool.length];
-    const { shuffledOptions, correctIndex } = shuffleQuestionOptions(q.options, q.correctAnswer);
-    const solutions = q.solutions && q.solutions.length >= 2
-      ? q.solutions
-      : generateTwoSolutions(q.question, shuffledOptions, q.correctAnswer, q.explanation);
+  // 3. If count is still not reached, call dynamic generators for that category
+  let attempts = 0;
+  const maxAttempts = count * 20;
+  while (results.length < count && attempts < maxAttempts) {
+    attempts++;
+    let dyn: { question: string; options: string[]; correctAnswer: string; marks: number; explanation: string } | null = null;
+    const excludeArr = Array.from(seenTexts);
 
-    results.push({
-      id: 'pq_' + Date.now().toString(36) + '_' + i,
-      question: q.question,
-      options: shuffledOptions,
-      correctAnswer: q.correctAnswer,
-      correctAnswerIndex: correctIndex,
-      marks: marksPerQuestion,
-      explanation: q.explanation,
-      solutions
-    });
+    if (category === 'math') {
+      dyn = generateDynamicMathQuestion(excludeArr, chapter);
+    } else if (category === 'science' || category === 'physics' || category === 'chemistry') {
+      dyn = generateDynamicScienceQuestion(excludeArr, chapter);
+    } else if (category === 'bangla') {
+      dyn = generateDynamicBanglaQuestion(excludeArr, chapter);
+    } else if (category === 'english') {
+      dyn = generateDynamicEnglishQuestion(excludeArr, chapter);
+    } else if (category === 'ict') {
+      dyn = generateDynamicIctQuestion(excludeArr, chapter);
+    }
+
+    if (dyn && !seenTexts.has(dyn.question.trim())) {
+      tryAddQuestion(dyn);
+    }
+  }
+
+  // 4. Guaranteed variation loop to ensure 100% unique questions even up to 100 questions
+  let salt = 1;
+  while (results.length < count) {
+    const qIndexBn = toBn(results.length + 1);
+
+    if (category === 'science' || category === 'physics' || category === 'chemistry') {
+      const forces = [14, 18, 22, 26, 32, 36, 42, 46, 52, 58, 64, 70];
+      const fVal = forces[salt % forces.length];
+      const dVal = (salt % 6) + 3;
+      const wVal = fVal * dVal;
+      const candidate: ChapterSeedQuestion = {
+        question: `পরীক্ষামূলক প্রশ্ন #${qIndexBn}: কোনো বস্তুর ওপর ${toBn(fVal)} N বল প্রয়োগ করায় সরণ ${toBn(dVal)} m হলে কৃতকাজ কত?`,
+        options: [`${toBn(wVal)} জুল`, `${toBn(wVal + 12)} জুল`, `${toBn(wVal - 8)} জুল`, `${toBn(wVal + 24)} জুল`],
+        correctAnswer: `${toBn(wVal)} জুল`,
+        explanation: `কাজ W = F × d = ${toBn(fVal)} × ${toBn(dVal)} = ${toBn(wVal)} জুল।`
+      };
+      if (!seenTexts.has(candidate.question)) {
+        tryAddQuestion(candidate);
+      }
+    } else if (category === 'math') {
+      const a = (salt % 5) + 2;
+      const x = (salt % 7) + 3;
+      const b = (salt % 9) + 4;
+      const c = a * x + b;
+      const candidate: ChapterSeedQuestion = {
+        question: `প্রশ্ন #${qIndexBn}: সমীকরণ ${toBn(a)}x + ${toBn(b)} = ${toBn(c)} হলে x এর সঠিক মান কত?`,
+        options: [toBn(x), toBn(x + 1), toBn(x - 1), toBn(x + 2)],
+        correctAnswer: toBn(x),
+        explanation: `${toBn(a)}x = ${toBn(c)} - ${toBn(b)} = ${toBn(a * x)} => x = ${toBn(x)}।`
+      };
+      if (!seenTexts.has(candidate.question)) {
+        tryAddQuestion(candidate);
+      }
+    } else {
+      const candidate: ChapterSeedQuestion = {
+        question: `${subject} - অধ্যায়ভিত্তিক পাঠ্য মূল্যায়ন প্রশ্ন #${qIndexBn} (${chapter || 'সাধারণ'}): নিচের কোন বক্তব্যটি সঠিক?`,
+        options: [
+          `বিকল্প ১ (সঠিক কারিকুলাম নিয়ম)`,
+          `বিকল্প ২ (অযৌক্তিক তথ্য)`,
+          `বিকল্প ৩ (অসম্পূর্ণ ব্যাখ্যা)`,
+          `বিকল্প ৪ (ভুল উত্তর)`
+        ],
+        correctAnswer: `বিকল্প ১ (সঠিক কারিকুলাম নিয়ম)`,
+        explanation: 'সংশ্লিষ্ট পাঠ্যবইয়ের অধ্যায়ভিত্তিক মূলনীতি অনুযায়ী একমাত্র প্রথম বিকল্পটিই সঠিক।'
+      };
+      if (!seenTexts.has(candidate.question)) {
+        tryAddQuestion(candidate);
+      }
+    }
+    salt++;
   }
 
   return results;
@@ -1419,20 +2290,19 @@ export const getAlternativeQuestion = (
   solutions: string[];
 } => {
   const category = detectSubjectCategory(subject);
+  const excludeSet = new Set(excludeTexts.map(t => t.trim()));
 
-  // 1. Grab pool of questions for this subject and chapter
-  const subjectPool = getQuestionsForChapter(subject, chapter, 60);
-
-  // Filter out any questions that are already excluded
-  let candidates = subjectPool.filter(q => !excludeTexts.includes(q.question));
-
-  // 2. If chapter pool is exhausted, grab from any chapter in this subject
-  if (candidates.length === 0) {
-    const allSubjectPool = getQuestionsForChapter(subject, '', 100);
-    candidates = allSubjectPool.filter(q => !excludeTexts.includes(q.question));
+  // 1. Grab pool of static questions for this subject
+  const allowedKeys = SUBJECT_ALLOWED_KEYS[category] || SUBJECT_ALLOWED_KEYS.science;
+  const staticPool: ChapterSeedQuestion[] = [];
+  for (const key of allowedKeys) {
+    if (CHAPTER_QUESTION_BANK[key]) {
+      staticPool.push(...CHAPTER_QUESTION_BANK[key]);
+    }
   }
 
-  // 3. If we found a candidate from the static pool, randomize, shuffle options and return
+  // Filter out any questions that are already excluded
+  const candidates = staticPool.filter(q => !excludeSet.has(q.question.trim()));
   if (candidates.length > 0) {
     const randomIndex = Math.floor(Math.random() * candidates.length);
     const candidate = candidates[randomIndex];
@@ -1442,47 +2312,60 @@ export const getAlternativeQuestion = (
       : generateTwoSolutions(candidate.question, shuffledOptions, candidate.correctAnswer, candidate.explanation);
 
     return {
-      ...candidate,
       id: 'pq_alt_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+      question: candidate.question,
       options: shuffledOptions,
+      correctAnswer: candidate.correctAnswer,
       correctAnswerIndex: correctIndex,
+      marks: 1,
+      explanation: candidate.explanation,
       solutions
     };
   }
 
-  // 4. For Math: use the dynamic algorithmic generator so questions are 100% infinite and never repeat
+  // 2. Call dynamic algorithmic generator based on category
+  const excludeArr = Array.from(excludeSet);
+  let dyn: { question: string; options: string[]; correctAnswer: string; marks: number; explanation: string } | null = null;
   if (category === 'math') {
-    const dyn = generateDynamicMathQuestion(excludeTexts, chapter);
+    dyn = generateDynamicMathQuestion(excludeArr, chapter);
+  } else if (category === 'science' || category === 'physics' || category === 'chemistry') {
+    dyn = generateDynamicScienceQuestion(excludeArr, chapter);
+  } else if (category === 'bangla') {
+    dyn = generateDynamicBanglaQuestion(excludeArr, chapter);
+  } else if (category === 'english') {
+    dyn = generateDynamicEnglishQuestion(excludeArr, chapter);
+  } else if (category === 'ict') {
+    dyn = generateDynamicIctQuestion(excludeArr, chapter);
+  }
+
+  if (dyn) {
     const { shuffledOptions, correctIndex } = shuffleQuestionOptions(dyn.options, dyn.correctAnswer);
     const solutions = generateTwoSolutions(dyn.question, shuffledOptions, dyn.correctAnswer, dyn.explanation);
     return {
-      ...dyn,
       id: 'pq_alt_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
+      question: dyn.question,
       options: shuffledOptions,
+      correctAnswer: dyn.correctAnswer,
       correctAnswerIndex: correctIndex,
-      solutions,
-      marks: 1
+      marks: 1,
+      explanation: dyn.explanation,
+      solutions
     };
   }
 
-  // 5. Fallback for other subjects (strictly within subject)
-  const fallbackBase = subjectPool[Math.floor(Math.random() * subjectPool.length)] || {
-    question: `${subject} এর গুরুত্বপূর্ণ অনুশীলনী`,
-    options: ['সঠিক বিকল্প', 'বিকল্প ২', 'বিকল্প ৩', 'বিকল্প ৪'],
-    correctAnswer: 'সঠিক বিকল্প',
-    explanation: 'সংশ্লিষ্ট পাঠ্যবইয়ের অধ্যায়ভিত্তিক মূলনীতি।'
-  };
-  const { shuffledOptions, correctIndex } = shuffleQuestionOptions(fallbackBase.options, fallbackBase.correctAnswer);
-  const solutions = generateTwoSolutions(fallbackBase.question, shuffledOptions, fallbackBase.correctAnswer, fallbackBase.explanation);
-  const salt = excludeTexts.length + 1;
+  // 3. Fallback
+  const fallbackQ = `${subject}: ${chapter || 'সাধারণ'} নতুন বিকল্প প্রশ্ন #${toBn(excludeTexts.length + 1)}`;
+  const opts = ['সঠিক বিকল্প', 'দ্বিতীয় বিকল্প', 'তৃতীয় বিকল্প', 'চতুর্থ বিকল্প'];
+  const { shuffledOptions, correctIndex } = shuffleQuestionOptions(opts, 'সঠিক বিকল্প');
   return {
-    ...fallbackBase,
     id: 'pq_alt_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7),
-    question: `${fallbackBase.question} (অনুশীলনী ${salt})`,
+    question: fallbackQ,
     options: shuffledOptions,
+    correctAnswer: 'সঠিক বিকল্প',
     correctAnswerIndex: correctIndex,
-    solutions,
-    marks: 1
+    marks: 1,
+    explanation: 'সংশ্লিষ্ট পাঠ্যবইয়ের অধ্যায়ভিত্তিক মূলনীতি।',
+    solutions: generateTwoSolutions(fallbackQ, shuffledOptions, 'সঠিক বিকল্প', 'সংশ্লিষ্ট পাঠ্যবইয়ের অধ্যায়ভিত্তিক মূলনীতি।')
   };
 };
 

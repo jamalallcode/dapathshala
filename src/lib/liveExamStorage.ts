@@ -505,8 +505,13 @@ export const getSharedLiveExam = (idOrPin: string): SharedLiveExam | null => {
             childName: match.childName || match.studentName || 'শিক্ষার্থী',
             parentName: 'অভিভাবক',
             createdAt: Date.now(),
-            questions: formattedQuestions.length > 0 ? formattedQuestions : getQuestionsForChapter(match.subject || 'বাংলা', match.chapter || '', fallbackCount, 1),
-            isPublished: match.isPublished === true || match.status === 'reviewed',
+            questions: formattedQuestions.length > 0 ? formattedQuestions : getQuestionsForChapter(match.subject || 'বাংলা', match.chapter || '', fallbackCount, 1).map((q, idx) => ({
+              id: q.id || `q_${idx + 1}`,
+              text: q.question,
+              options: q.options,
+              correctAnswer: q.correctAnswerIndex,
+              explanation: q.explanation
+            })),
             status: match.status,
             score: match.score,
             totalScoreObtained: match.totalScoreObtained,
@@ -558,8 +563,13 @@ export const getSharedLiveExam = (idOrPin: string): SharedLiveExam | null => {
           childName: pub.childName || pub.studentName || 'শিক্ষার্থী',
           parentName: 'অভিভাবক',
           createdAt: Date.now(),
-          questions: formattedQuestions.length > 0 ? formattedQuestions : getQuestionsForChapter(pub.subject || 'বাংলা', pub.chapter || '', pubFallbackCount, 1),
-          isPublished: true,
+          questions: formattedQuestions.length > 0 ? formattedQuestions : getQuestionsForChapter(pub.subject || 'বাংলা', pub.chapter || '', pubFallbackCount, 1).map((q, idx) => ({
+            id: q.id || `q_${idx + 1}`,
+            text: q.question,
+            options: q.options,
+            correctAnswer: q.correctAnswerIndex,
+            explanation: q.explanation
+          })),
           status: 'reviewed',
           score: pub.score,
           totalScoreObtained: pub.totalScoreObtained,
