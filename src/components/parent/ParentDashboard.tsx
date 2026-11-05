@@ -133,89 +133,122 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     };
   }, []);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Background sync from server: checks if student has submitted any exam
   // so the button flips from "প্রশ্নপত্র দেখুন" to "উত্তরপত্র" automatically
+  const runSync = async (notifyUser = false) => {
+    try {
+      const localTests = getStoredTests();
+      const serverTests = await fetchAllTestsFromServer();
+      let hasChanges = false;
+
+      const mergedMap = new Map<string, AssignedTest>();
+      localTests.forEach(t => {
+        const key = String(t.pin || t.id).trim();
+        mergedMap.set(key, t);
+      });
+
+      const findExistingKey = (pin?: string, id?: string): string | null => {
+        for (const [k, v] of mergedMap.entries()) {
+          if (pin && v.pin && String(v.pin).trim() === String(pin).trim()) return k;
+          if (id && v.id && String(v.id).trim() === String(id).trim()) return k;
+          if (pin && v.id && String(v.id).replace('test-', '').trim() === String(pin).trim()) return k;
+          if (id && v.pin && String(id).replace('test-', '').trim() === String(v.pin).trim()) return k;
+        }
+        return null;
+      };
+
+      // 1. Process server tests: if any test was submitted by student, update it immediately
+      serverTests.forEach(st => {
+        if (!st || (!st.pin && !st.id)) return;
+        const existingKey = findExistingKey(st.pin, st.id);
+        const local = existingKey ? mergedMap.get(existingKey) : undefined;
+        if (!local) {
+          mergedMap.set(String(st.pin || st.id).trim(), st);
+          hasChanges = true;
+        } else if (st.status === 'submitted' || st.status === 'reviewed') {
+          if (local.status !== st.status || local.score !== st.score || local.parentComment !== st.parentComment) {
+            mergedMap.set(existingKey!, {
+              ...local,
+              ...st,
+              status: st.status,
+              score: st.score ?? local.score,
+              questions: (st.questions && st.questions.length > 0) ? st.questions : local.questions,
+              proctoringFlags: st.proctoringFlags || local.proctoringFlags
+            });
+            hasChanges = true;
+          }
+        }
+      });
+
+      // 2. Also check individual pins for any test that may have been submitted directly
+      await Promise.all(localTests.map(async (t) => {
+        if (t.status === 'pending' || !t.score) {
+          let serverData = t.pin ? await fetchSubmissionFromServer(t.pin) : null;
+          if (!serverData && t.id) {
+            serverData = await fetchSubmissionFromServer(t.id);
+          }
+          if (!serverData && t.pin) {
+            serverData = await fetchTestFromServer(t.pin);
+          }
+          if (!serverData && t.id) {
+            serverData = await fetchTestFromServer(t.id);
+          }
+          if (serverData && (serverData.status === 'submitted' || serverData.status === 'reviewed')) {
+            const existingKey = findExistingKey(t.pin, t.id) || String(t.pin || t.id).trim();
+            const existing = mergedMap.get(existingKey) || t;
+            mergedMap.set(existingKey, {
+              ...existing,
+              ...serverData,
+              status: serverData.status,
+              score: serverData.score ?? existing.score,
+              questions: (serverData.questions && serverData.questions.length > 0) ? serverData.questions : existing.questions,
+              proctoringFlags: serverData.proctoringFlags || existing.proctoringFlags
+            });
+            hasChanges = true;
+          }
+        }
+      }));
+
+      if (hasChanges) {
+        const updated = Array.from(mergedMap.values());
+        setTests(updated);
+        saveStoredTests(updated);
+        if (notifyUser) {
+          showToast('✓ নতুন উত্তরপত্র সিঙ্ক সম্পন্ন! খাতা জমা পাওয়া গেছে।');
+        }
+      } else if (notifyUser) {
+        showToast('✓ সার্ভারের সাথে সিঙ্ক সম্পন্ন হয়েছে। খাতা সর্বশেষ আপডেটেড রয়েছে।');
+      }
+    } catch (err) {
+      console.warn('Error checking server updates in ParentDashboard:', err);
+    }
+  };
+
   useEffect(() => {
     let isCancelled = false;
-
-    const checkServerUpdates = async () => {
-      try {
-        const localTests = getStoredTests();
-        const serverTests = await fetchAllTestsFromServer();
-        let hasChanges = false;
-
-        const mergedMap = new Map<string, AssignedTest>();
-        localTests.forEach(t => {
-          const key = String(t.pin || t.id).trim();
-          mergedMap.set(key, t);
-        });
-
-        // 1. Process server tests: if any test was submitted by student, update it immediately
-        serverTests.forEach(st => {
-          if (!st || (!st.pin && !st.id)) return;
-          const key = String(st.pin || st.id).trim();
-          const local = mergedMap.get(key);
-          if (!local) {
-            mergedMap.set(key, st);
-            hasChanges = true;
-          } else if (st.status === 'submitted' || st.status === 'reviewed') {
-            if (local.status !== st.status || local.score !== st.score || local.parentComment !== st.parentComment) {
-              mergedMap.set(key, {
-                ...local,
-                ...st,
-                status: st.status,
-                score: st.score ?? local.score,
-                questions: (st.questions && st.questions.length > 0) ? st.questions : local.questions,
-                proctoringFlags: st.proctoringFlags || local.proctoringFlags
-              });
-              hasChanges = true;
-            }
-          }
-        });
-
-        // 2. Also check individual pins for any pending test that may have been submitted directly
-        await Promise.all(localTests.map(async (t) => {
-          if (t.status === 'pending') {
-            let serverData = await fetchSubmissionFromServer(t.pin);
-            if (!serverData) {
-              serverData = await fetchTestFromServer(t.pin);
-            }
-            if (serverData && (serverData.status === 'submitted' || serverData.status === 'reviewed')) {
-              const key = String(t.pin || t.id).trim();
-              const existing = mergedMap.get(key) || t;
-              mergedMap.set(key, {
-                ...existing,
-                ...serverData,
-                status: serverData.status,
-                score: serverData.score ?? existing.score,
-                questions: (serverData.questions && serverData.questions.length > 0) ? serverData.questions : existing.questions,
-                proctoringFlags: serverData.proctoringFlags || existing.proctoringFlags
-              });
-              hasChanges = true;
-            }
-          }
-        }));
-
-        if (hasChanges && !isCancelled) {
-          const updated = Array.from(mergedMap.values());
-          setTests(updated);
-          localStorage.setItem('dapathshala_assigned_tests_v2', JSON.stringify(updated));
-        }
-      } catch (err) {
-        console.warn('Error checking server updates in ParentDashboard:', err);
-      }
+    runSync();
+    const interval = setInterval(() => {
+      if (!isCancelled) runSync();
+    }, 1500);
+    const onFocus = () => {
+      if (!isCancelled) runSync();
     };
-
-    checkServerUpdates();
-    const interval = setInterval(checkServerUpdates, 1500);
-    window.addEventListener('focus', checkServerUpdates);
+    window.addEventListener('focus', onFocus);
 
     return () => {
       isCancelled = true;
       clearInterval(interval);
-      window.removeEventListener('focus', checkServerUpdates);
+      window.removeEventListener('focus', onFocus);
     };
   }, []);
+
+  const handleManualSync = async () => {
+    setIsSyncing(true);
+    await runSync(true);
+    setTimeout(() => setIsSyncing(false), 500);
+  };
 
   useEffect(() => {
     if (showCreateModalExternal) {
@@ -1252,7 +1285,18 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleManualSync}
+                disabled={isSyncing}
+                className="px-3.5 py-2 rounded-xl border border-sky-200 bg-sky-50/80 hover:bg-sky-100 text-sky-800 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                title="সার্ভার থেকে সদ্য জমা হওয়া উত্তরপত্র ও স্কোর তৎক্ষণাৎ রিফ্রেশ করুন"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-sky-600 ${isSyncing ? 'animate-spin' : ''}`} />
+                <span>{isSyncing ? 'সিঙ্ক হচ্ছে...' : 'খাতা রিফ্রেশ'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowCreationModeModal(true)}

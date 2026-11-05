@@ -16,9 +16,19 @@ export function getStoredTests(): AssignedTest[] {
       localStorage.setItem(TESTS_KEY, JSON.stringify([]));
       return [];
     }
-    const list: AssignedTest[] = JSON.parse(raw);
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) {
+      localStorage.setItem(TESTS_KEY, JSON.stringify([]));
+      return [];
+    }
     // Filter out previous automatic demo tests (test-101, test-102, test-103)
-    const cleaned = list.filter(t => t.id !== 'test-101' && t.id !== 'test-102' && t.id !== 'test-103');
+    const cleaned: AssignedTest[] = list
+      .filter((t: any) => t && t.id !== 'test-101' && t.id !== 'test-102' && t.id !== 'test-103')
+      .map((t: any) => ({
+        ...t,
+        questions: Array.isArray(t.questions) ? t.questions : (t.pin ? generateFallbackTestForPin(t.pin).questions : []),
+        proctoringFlags: Array.isArray(t.proctoringFlags) ? t.proctoringFlags : []
+      }));
     if (cleaned.length !== list.length) {
       localStorage.setItem(TESTS_KEY, JSON.stringify(cleaned));
     }
@@ -249,7 +259,22 @@ export async function fetchTestFromServer(pinOrId: string): Promise<AssignedTest
     const res = await fetch(`/api/tests/${pinOrId}`);
     if (res.ok) {
       const data = await res.json();
-      return data;
+      if (data) {
+        let questions = Array.isArray(data.questions) && data.questions.length > 0 ? data.questions : [];
+        if (questions.length === 0 && (data.pin || pinOrId)) {
+          const fallback = generateFallbackTestForPin(data.pin || pinOrId);
+          if (fallback && fallback.questions) {
+            questions = fallback.questions;
+          }
+        }
+        return {
+          ...data,
+          questionCount: data.questionCount ?? questions.length,
+          durationMinutes: data.durationMinutes ?? 15,
+          questions,
+          proctoringFlags: Array.isArray(data.proctoringFlags) ? data.proctoringFlags : []
+        };
+      }
     }
   } catch (err) {
     console.warn('Failed to fetch test from server:', err);
@@ -263,11 +288,22 @@ export async function fetchAllTestsFromServer(): Promise<AssignedTest[]> {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) {
-        return data.map((t: any) => ({
-          ...t,
-          questionCount: t.questionCount ?? t.questions?.length ?? 0,
-          durationMinutes: t.durationMinutes ?? 15
-        }));
+        return data.map((t: any) => {
+          let questions = Array.isArray(t.questions) && t.questions.length > 0 ? t.questions : [];
+          if (questions.length === 0 && t.pin) {
+            const fallback = generateFallbackTestForPin(t.pin);
+            if (fallback && fallback.questions) {
+              questions = fallback.questions;
+            }
+          }
+          return {
+            ...t,
+            questionCount: t.questionCount ?? questions.length,
+            durationMinutes: t.durationMinutes ?? 15,
+            questions,
+            proctoringFlags: Array.isArray(t.proctoringFlags) ? t.proctoringFlags : []
+          };
+        });
       }
     }
   } catch (err) {
