@@ -16,7 +16,9 @@ import {
   getStoredNotifications,
   saveStoredNotifications,
   getShareableTestUrl,
-  syncTestToServer
+  syncTestToServer,
+  fetchTestFromServer,
+  syncSubmissionToServer
 } from '../../lib/storage';
 import { 
   CHAPTER_QUESTION_BANK, 
@@ -114,6 +116,44 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     return () => {
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener('dapathshala_notifs_updated', handleStorage);
+    };
+  }, []);
+
+  // Background sync from server: checks if student has submitted any exam
+  // so the button flips from "প্রশ্নপত্র দেখুন" to "উত্তরপত্র" automatically
+  useEffect(() => {
+    let isCancelled = false;
+
+    const checkServerUpdates = async () => {
+      try {
+        const localTests = getStoredTests();
+        let hasChanges = false;
+        const updated = await Promise.all(localTests.map(async (t) => {
+          if (t.status === 'pending' || t.status === 'submitted') {
+            const serverTest = await fetchTestFromServer(t.pin);
+            if (serverTest && (serverTest.status !== t.status || serverTest.score !== t.score || serverTest.parentComment !== t.parentComment)) {
+              hasChanges = true;
+              return serverTest;
+            }
+          }
+          return t;
+        }));
+
+        if (hasChanges && !isCancelled) {
+          setTests(updated);
+          saveStoredTests(updated);
+        }
+      } catch {}
+    };
+
+    checkServerUpdates();
+    const interval = setInterval(checkServerUpdates, 3500);
+    window.addEventListener('focus', checkServerUpdates);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('focus', checkServerUpdates);
     };
   }, []);
 
@@ -470,6 +510,12 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
     setTests(updated);
     saveStoredTests(updated);
+
+    const reviewedItem = updated.find(t => t.id === reviewTest.id);
+    if (reviewedItem) {
+      syncTestToServer(reviewedItem);
+      syncSubmissionToServer(reviewedItem);
+    }
 
     // Remove parent submission notification for this test completely so it no longer stays in notifications
     const notifs = getStoredNotifications();
@@ -1317,8 +1363,8 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                           onClick={() => handleOpenReviewModal(test)}
                           className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs font-black shadow-xs transition-colors cursor-pointer"
                         >
-                          <Edit3 className="w-3.5 h-3.5" />
-                          <span>খাতা মূল্যায়ন করুন</span>
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>উত্তরপত্র</span>
                         </button>
                       )}
 
@@ -1330,7 +1376,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                           title="খাতা পুনরায় দেখতে বা মূল্যায়ন সম্পাদন করতে ক্লিক করুন"
                         >
                           <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>খাতা দেখা হয়েছে</span>
+                          <span>উত্তরপত্রটি দেখা হয়েছে</span>
                         </button>
                       )}
 

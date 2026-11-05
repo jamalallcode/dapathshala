@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   ArrowLeft, 
   Clock, 
@@ -14,15 +14,48 @@ import {
 } from 'lucide-react';
 import { LiveExamEngine } from './LiveExamEngine';
 import { AssignedTest } from '../../types';
+import { fetchTestFromServer, getStoredTests, saveStoredTests } from '../../lib/storage';
 
 interface StartExamScreenProps {
   test: AssignedTest;
   onExit: () => void;
 }
 
-export const StartExamScreen: React.FC<StartExamScreenProps> = ({ test, onExit }) => {
+export const StartExamScreen: React.FC<StartExamScreenProps> = ({ test: initialTest, onExit }) => {
+  const [test, setTest] = useState<AssignedTest>(initialTest);
   const [isExamStarted, setIsExamStarted] = useState(false);
   const [isReviewMode, setIsReviewMode] = useState(false);
+
+  useEffect(() => {
+    setTest(initialTest);
+  }, [initialTest]);
+
+  // Periodic check if submitted: automatically update when parent evaluates
+  useEffect(() => {
+    if (test.status !== 'submitted') return;
+
+    let isCancelled = false;
+    const checkEvaluation = async () => {
+      try {
+        const latest = await fetchTestFromServer(test.pin);
+        if (latest && latest.status === 'reviewed' && !isCancelled) {
+          setTest(latest);
+          const localTests = getStoredTests();
+          saveStoredTests(localTests.map(t => (t.id === latest.id || t.pin === latest.pin) ? latest : t));
+        }
+      } catch {}
+    };
+
+    checkEvaluation();
+    const interval = setInterval(checkEvaluation, 3500);
+    window.addEventListener('focus', checkEvaluation);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('focus', checkEvaluation);
+    };
+  }, [test.status, test.pin]);
 
   const isReviewed = test.status === 'reviewed';
   const isSubmitted = test.status === 'submitted';

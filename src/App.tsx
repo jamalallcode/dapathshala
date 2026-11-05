@@ -168,12 +168,15 @@ export function App() {
         const tests = getStoredTests();
         let matched = tests.find(t => t.pin === queryKey || t.id === queryKey);
         
-        // If opened on another device where this test isn't in local storage yet, fetch from server:
-        if (!matched && pin) {
+        // ALWAYS fetch the latest test from server to get updated review status, marks & parent comments
+        if (pin) {
           const serverTest = await fetchTestFromServer(pin);
           if (serverTest) {
             matched = serverTest;
-            saveStoredTests([serverTest, ...tests]);
+            const updated = tests.some(t => t.id === serverTest.id || t.pin === serverTest.pin)
+              ? tests.map(t => (t.id === serverTest.id || t.pin === serverTest.pin) ? serverTest : t)
+              : [serverTest, ...tests];
+            saveStoredTests(updated);
           }
         }
 

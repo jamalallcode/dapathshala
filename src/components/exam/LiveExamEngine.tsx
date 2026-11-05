@@ -11,7 +11,8 @@ import {
   getStoredNotifications, 
   saveStoredNotifications,
   getShareableSubmissionUrl,
-  syncSubmissionToServer
+  syncSubmissionToServer,
+  syncTestToServer
 } from "../../lib/storage";
 import { AssignedTest } from "../../types";
 
@@ -580,8 +581,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     };
 
     const allTests = getStoredTests();
-    const updatedList = allTests.map((t) => t.id === test.id ? updatedTest : t);
+    const exists = allTests.some(t => t.id === test.id || t.pin === test.pin);
+    const updatedList = exists 
+      ? allTests.map(t => (t.id === test.id || t.pin === test.pin) ? updatedTest : t)
+      : [updatedTest, ...allTests];
     saveStoredTests(updatedList);
+    syncTestToServer(updatedTest);
     syncSubmissionToServer(updatedTest);
 
     // Notification for Parent
