@@ -718,6 +718,70 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     return String(num).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[parseInt(d, 10)]);
   };
 
+  // Helper to format when and on what date the child submitted the khata
+  const formatSubmissionDateTime = (test: AssignedTest): string => {
+    let dateObj: Date | null = null;
+    
+    // 1. Check test.submittedAt
+    if (test.submittedAt) {
+      const parsed = new Date(test.submittedAt);
+      if (!isNaN(parsed.getTime())) {
+        dateObj = parsed;
+      } else {
+        return test.submittedAt;
+      }
+    }
+    
+    // 2. Fallback to test ID timestamp if it was submitted
+    if (!dateObj && (test.status === 'submitted' || test.status === 'reviewed')) {
+      if (test.id && test.id.startsWith('test-')) {
+        const ts = parseInt(test.id.replace('test-', ''), 10);
+        if (!isNaN(ts) && ts > 1600000000000) {
+          dateObj = new Date(ts);
+        }
+      }
+    }
+
+    // 3. Fallback to current time if status is submitted or reviewed
+    if (!dateObj && (test.status === 'submitted' || test.status === 'reviewed')) {
+      dateObj = new Date();
+    }
+
+    if (!dateObj) {
+      return 'এখনও জমা দেয়নি';
+    }
+
+    const d = dateObj;
+    const day = toBn(d.getDate().toString().padStart(2, '0'));
+    const months = [
+      'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+      'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+    ];
+    const month = months[d.getMonth()];
+    const year = toBn(d.getFullYear());
+
+    const hours24 = d.getHours();
+    const minutes = toBn(d.getMinutes().toString().padStart(2, '0'));
+    let period = 'সকাল';
+    if (hours24 >= 12 && hours24 < 15) period = 'দুপুর';
+    else if (hours24 >= 15 && hours24 < 18) period = 'বিকাল';
+    else if (hours24 >= 18 && hours24 < 20) period = 'সন্ধ্যা';
+    else if (hours24 >= 20 || hours24 < 6) period = 'রাত';
+    else period = 'সকাল';
+
+    const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+    const hoursStr = toBn(hours12);
+
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    
+    if (isToday) {
+      return `আজ (${day} ${month}, ${year}) • ${period} ${hoursStr}:${minutes} মি.`;
+    }
+
+    return `${day} ${month}, ${year} • ${period} ${hoursStr}:${minutes} মি.`;
+  };
+
   // Only count tests pending evaluation so the badge count decreases upon review
   const pendingReviewCount = tests.filter(t => t.status === 'submitted').length;
 
@@ -1471,28 +1535,27 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                         )}
                       </button>
 
-                      {/* 2. Share Option */}
-                      <button
-                        type="button"
-                        onClick={() => setShareModalTest(test)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-sky-200 bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-bold transition-all shadow-2xs cursor-pointer group"
-                        title="পরীক্ষার লিংক ও পিন হোয়াটসঅ্যাপ বা অন্যান্য মাধ্যমে শেয়ার করুন"
-                      >
-                        <Share2 className="w-3.5 h-3.5 text-sky-600 group-hover:scale-110 transition-transform" />
-                        <span>শেয়ার</span>
-                      </button>
-
-                      {/* 3. Retake Option (only for submitted / reviewed tests) */}
-                      {(test.status === 'submitted' || test.status === 'reviewed') && (
-                        <button
-                          type="button"
-                          onClick={() => setRetakeModalTest(test)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold transition-all shadow-2xs cursor-pointer group"
-                          title="সন্তানকে আবার এই পরীক্ষাটি দেওয়ার সুযোগ দিন"
+                      {/* 2. সন্তান কখন ও কবে খাতাটি জমা দিয়েছে সেই তথ্য (তারিখ ও সময়) */}
+                      {(isSubmitted || isReviewed) ? (
+                        <div
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/90 text-indigo-950 text-xs font-semibold shadow-2xs"
+                          title="সন্তানের খাতা জমার সঠিক তারিখ ও সময়"
                         >
-                          <RotateCcw className="w-3.5 h-3.5 text-amber-600 group-hover:-rotate-45 transition-transform" />
-                          <span>পুনঃপরীক্ষা</span>
-                        </button>
+                          <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                          <span>
+                            জমার সময়: <strong className="font-bold text-indigo-900 font-['Noto_Sans_Bengali']">{formatSubmissionDateTime(test)}</strong>
+                          </span>
+                        </div>
+                      ) : (
+                        <div
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs font-medium shadow-2xs"
+                          title="সন্তান এখনও পরীক্ষা সম্পন্ন করেনি"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span>
+                            খাতা জমা: <span className="text-slate-600">এখনও জমা দেয়নি (পেন্ডিং)</span>
+                          </span>
+                        </div>
                       )}
 
                       {/* 4. Delete Option */}
@@ -1805,9 +1868,15 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full border border-slate-200 shadow-2xl space-y-5 my-8">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
-                  খাতা মূল্যায়ন ও মন্তব্য
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                    খাতা মূল্যায়ন ও মন্তব্য
+                  </span>
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-900 border border-indigo-200 inline-flex items-center gap-1 font-['Noto_Sans_Bengali']">
+                    <Clock className="w-3 h-3 text-indigo-600" />
+                    <span>জমার সময়: {formatSubmissionDateTime(reviewTest)}</span>
+                  </span>
+                </div>
                 <h3 className="text-lg font-black text-slate-900 mt-1">
                   {reviewTest.title}
                 </h3>

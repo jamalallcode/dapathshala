@@ -31,6 +31,7 @@ export interface AssignedTest {
   proctoringFlags?: string[];
   parentComment?: string;
   questions: ExamQuestion[];
+  submittedAt?: string;
 }
 
 export interface StudentSubmission {

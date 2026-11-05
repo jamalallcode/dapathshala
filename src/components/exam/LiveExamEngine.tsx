@@ -573,12 +573,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       ? [`${violationCount} বার দৃষ্টি অন্যদিকে বা ট্যাবে যাওয়ার চেষ্টা সনাক্ত হয়েছে`] 
       : [];
 
+    const nowIso = new Date().toISOString();
     const updatedTest: AssignedTest = {
       ...test,
       status: "submitted",
       score: calculatedScore,
       questions: updatedQuestions,
-      proctoringFlags: finalFlags
+      proctoringFlags: finalFlags,
+      submittedAt: test.submittedAt || nowIso
     };
 
     const allTests = getStoredTests();

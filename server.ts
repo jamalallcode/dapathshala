@@ -183,6 +183,7 @@ app.post('/api/tests', (req, res) => {
     test.parentComment = existing.parentComment ?? test.parentComment;
     test.questions = (existing.questions && existing.questions.length > 0) ? existing.questions : test.questions;
     test.proctoringFlags = existing.proctoringFlags || test.proctoringFlags;
+    test.submittedAt = existing.submittedAt || test.submittedAt;
   }
   if (pinKey) testsStore[pinKey] = test;
   if (idKey) testsStore[idKey] = test;
@@ -270,12 +271,14 @@ app.post('/api/submissions', (req, res) => {
     ? sub.proctoringFlags 
     : (Array.isArray(baseRecord.proctoringFlags) ? baseRecord.proctoringFlags : []);
 
+  const nowIso = new Date().toISOString();
   const updatedRecord = { 
     ...baseRecord, 
     ...sub, 
     questions, 
     proctoringFlags,
-    status: normalizedStatus 
+    status: normalizedStatus,
+    submittedAt: sub.submittedAt || baseRecord.submittedAt || nowIso
   };
 
   if (pinKey) {
