@@ -215,21 +215,17 @@ export function decodeTestFromUrl(encodedStr: string): AssignedTest | null {
 }
 
 /**
- * Generates an ultra-reliable, self-contained shareable URL.
- * Contains both the clean 6-digit PIN and encoded exam data
- * so any browser, mobile phone, or incognito window opens the exam instantly!
+ * Generates an ultra-short, clean shareable URL containing only the 6-digit PIN.
+ * e.g. https://www.dapathshala.com/?pin=531824
+ * Clean, minimal, and fits perfectly on WhatsApp, Messenger and SMS without long text!
  */
 export function getShareableTestUrl(test: AssignedTest): string {
   const origin = window.location.origin;
-  let pathname = window.location.pathname || '/';
-  if (!pathname.startsWith('/')) {
-    pathname = '/' + pathname;
-  }
-  const encoded = encodeTestForUrl(test);
-  if (encoded) {
-    return `${origin}${pathname}?pin=${test.pin}&data=${encoded}`;
-  }
-  return `${origin}${pathname}?pin=${test.pin}`;
+  const path = window.location.pathname.endsWith('/') 
+    ? window.location.pathname 
+    : `${window.location.pathname || ''}/`;
+  const cleanPath = path.replace(/\/+/g, '/');
+  return `${origin}${cleanPath}?pin=${test.pin}`;
 }
 
 /**
@@ -380,18 +376,15 @@ export function decodeSubmissionFromUrl(encodedStr: string): AssignedTest | null
 
 /**
  * Generates the clean shareable submission URL that the child sends to the parent.
+ * e.g. https://www.dapathshala.com/?reviewPin=531824
  */
 export function getShareableSubmissionUrl(test: AssignedTest): string {
   const origin = window.location.origin;
-  let pathname = window.location.pathname || '/';
-  if (!pathname.startsWith('/')) {
-    pathname = '/' + pathname;
-  }
-  const encoded = encodeSubmissionForUrl(test);
-  if (encoded) {
-    return `${origin}${pathname}?reviewPin=${test.pin}&subData=${encoded}`;
-  }
-  return `${origin}${pathname}?reviewPin=${test.pin}`;
+  const path = window.location.pathname.endsWith('/') 
+    ? window.location.pathname 
+    : `${window.location.pathname || ''}/`;
+  const cleanPath = path.replace(/\/+/g, '/');
+  return `${origin}${cleanPath}?reviewPin=${test.pin}`;
 }
 
 /**
