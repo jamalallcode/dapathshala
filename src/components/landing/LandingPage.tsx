@@ -52,6 +52,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       }
     }
 
+    // Fallback if test not found anywhere so student can always take the exam
+    if (!matched) {
+      const fallback = generateFallbackTestForPin(trimmed);
+      if (fallback) {
+        matched = fallback;
+        saveStoredTests([fallback, ...tests]);
+      }
+    }
+
     if (matched) {
       onOpenExamWithPin(matched);
     } else {

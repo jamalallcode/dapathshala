@@ -3,7 +3,12 @@ import {
   BookOpen, Clock, GraduationCap, Flame, Zap, 
   CircleCheck, CirclePlay, FileCheck, CircleAlert, Key, ArrowRight 
 } from "lucide-react";
-import { getStoredTests } from "../../lib/storage";
+import { 
+  getStoredTests, 
+  saveStoredTests, 
+  fetchTestFromServer, 
+  generateFallbackTestForPin 
+} from "../../lib/storage";
 import { AssignedTest } from "../../types";
 
 interface StudentDashboardProps {
@@ -22,7 +27,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam 
     return () => window.removeEventListener("dapathshala_tests_updated", handleUpdate);
   }, []);
 
-  const handlePinSubmit = (e?: React.FormEvent) => {
+  const handlePinSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setPinError("");
     const trimmed = pinInput.trim();
@@ -31,9 +36,26 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam 
       return;
     }
     const currentTests = getStoredTests();
-    const matched = currentTests.find(
+    let matched = currentTests.find(
       t => t.pin === trimmed || t.id.toLowerCase() === trimmed.toLowerCase()
     );
+
+    if (!matched) {
+      const serverTest = await fetchTestFromServer(trimmed);
+      if (serverTest) {
+        matched = serverTest;
+        saveStoredTests([serverTest, ...currentTests]);
+      }
+    }
+
+    if (!matched) {
+      const fallback = generateFallbackTestForPin(trimmed);
+      if (fallback) {
+        matched = fallback;
+        saveStoredTests([fallback, ...currentTests]);
+      }
+    }
+
     if (matched) {
       onStartExam(matched);
     } else {

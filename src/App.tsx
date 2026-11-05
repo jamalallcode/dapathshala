@@ -83,21 +83,34 @@ export function App() {
 
   // Check URL query parameters on load across devices (e.g. ?pin=997080 or ?reviewPin=997080)
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const pin = params.get('pin');
-    const testId = params.get('testId');
-    const reviewPin = params.get('reviewPin') || params.get('reviewId');
-    const examData = params.get('exam') || params.get('testData') || params.get('data');
-    const subData = params.get('subData') || params.get('submission');
-    const view = params.get('view');
+    // Robust helper to extract params from either window.location.search or window.location.hash
+    const getParam = (key: string): string | null => {
+      try {
+        const searchVal = new URLSearchParams(window.location.search).get(key);
+        if (searchVal) return searchVal;
+        if (window.location.hash && window.location.hash.includes('?')) {
+          const hashQuery = window.location.hash.split('?')[1];
+          const hashVal = new URLSearchParams(hashQuery).get(key);
+          if (hashVal) return hashVal;
+        }
+      } catch {}
+      return null;
+    };
 
-    if (view === 'dashboard') {
+    const pin = getParam('pin');
+    const testId = getParam('testId');
+    const reviewPin = getParam('reviewPin') || getParam('reviewId');
+    const examData = getParam('exam') || getParam('testData') || getParam('data');
+    const subData = getParam('subData') || getParam('submission');
+    const view = getParam('view');
+
+    if (view === 'dashboard' && !pin && !examData) {
       setActiveView('dashboard');
       return;
     }
 
     const initFromParams = async () => {
-      // 1. If child shared completed submission with parent via URL
+      // 1. If child shared completed submission with parent via URL (?subData=... or ?submission=...)
       if (subData) {
         const decodedSub = decodeSubmissionFromUrl(subData);
         if (decodedSub) {
@@ -139,6 +152,8 @@ export function App() {
           const exists = tests.some(t => t.id === decodedTest.id || t.pin === decodedTest.pin);
           if (!exists) {
             saveStoredTests([decodedTest, ...tests]);
+          } else {
+            saveStoredTests(tests.map(t => (t.id === decodedTest.id || t.pin === decodedTest.pin) ? decodedTest : t));
           }
           setCurrentRole('student');
           setActiveTest(decodedTest);
@@ -149,7 +164,7 @@ export function App() {
 
       // 3. If standard pin or testId is provided in URL (?pin=997080)
       if (pin || testId) {
-        const queryKey = pin || testId || '';
+        const queryKey = (pin || testId || '').trim();
         const tests = getStoredTests();
         let matched = tests.find(t => t.pin === queryKey || t.id === queryKey);
         
@@ -162,13 +177,20 @@ export function App() {
           }
         }
 
+        // Guaranteed fallback so student is NEVER sent to landing page when clicking an exam link
+        if (!matched && pin) {
+          const fallback = generateFallbackTestForPin(pin);
+          if (fallback) {
+            matched = fallback;
+            saveStoredTests([fallback, ...tests]);
+          }
+        }
+
         if (matched) {
           setCurrentRole('student');
           setActiveTest(matched);
           setActiveView('exam');
-        } else {
-          // If PIN is not found, don't generate automatic fake tests
-          setActiveView('landing');
+          return;
         }
       }
     };

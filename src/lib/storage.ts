@@ -152,7 +152,10 @@ export function encodeTestForUrl(test: AssignedTest): string {
     for (let i = 0; i < len; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
-    return encodeURIComponent(btoa(binary));
+    const b64 = btoa(binary);
+    // Produce URL-safe base64: replace + with -, / with _, remove padding =
+    const urlSafe = b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return encodeURIComponent(urlSafe);
   } catch (err) {
     console.error('encodeTestForUrl error:', err);
     return '';
@@ -161,11 +164,21 @@ export function encodeTestForUrl(test: AssignedTest): string {
 
 /**
  * Decodes an encoded test string from URL into an AssignedTest object.
+ * Robust against URL-encoded characters, spaces, and base64 padding issues.
  */
 export function decodeTestFromUrl(encodedStr: string): AssignedTest | null {
   try {
-    const decodedUri = decodeURIComponent(encodedStr);
-    const binary = atob(decodedUri);
+    if (!encodedStr) return null;
+    let clean = encodedStr.trim();
+    try {
+      clean = decodeURIComponent(clean);
+    } catch {}
+    // Restore standard Base64: spaces/dashes to +, underscores to /
+    clean = clean.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/');
+    while (clean.length % 4 !== 0) {
+      clean += '=';
+    }
+    const binary = atob(clean);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
       bytes[i] = binary.charCodeAt(i);
@@ -202,13 +215,21 @@ export function decodeTestFromUrl(encodedStr: string): AssignedTest | null {
 }
 
 /**
- * Generates an ultra-short, clean shareable URL containing only the 6-digit PIN.
- * e.g. https://domain.com/?pin=997080
- * Fits on a single line on WhatsApp and mobile SMS!
+ * Generates an ultra-reliable, self-contained shareable URL.
+ * Contains both the clean 6-digit PIN and encoded exam data
+ * so any browser, mobile phone, or incognito window opens the exam instantly!
  */
 export function getShareableTestUrl(test: AssignedTest): string {
   const origin = window.location.origin;
-  return `${origin}?pin=${test.pin}`;
+  let pathname = window.location.pathname || '/';
+  if (!pathname.startsWith('/')) {
+    pathname = '/' + pathname;
+  }
+  const encoded = encodeTestForUrl(test);
+  if (encoded) {
+    return `${origin}${pathname}?pin=${test.pin}&data=${encoded}`;
+  }
+  return `${origin}${pathname}?pin=${test.pin}`;
 }
 
 /**
@@ -296,7 +317,9 @@ export function encodeSubmissionForUrl(test: AssignedTest): string {
     for (let i = 0; i < bytes.byteLength; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
-    return encodeURIComponent(btoa(binary));
+    const b64 = btoa(binary);
+    const urlSafe = b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return encodeURIComponent(urlSafe);
   } catch (err) {
     return '';
   }
@@ -307,8 +330,16 @@ export function encodeSubmissionForUrl(test: AssignedTest): string {
  */
 export function decodeSubmissionFromUrl(encodedStr: string): AssignedTest | null {
   try {
-    const decodedUri = decodeURIComponent(encodedStr);
-    const binary = atob(decodedUri);
+    if (!encodedStr) return null;
+    let clean = encodedStr.trim();
+    try {
+      clean = decodeURIComponent(clean);
+    } catch {}
+    clean = clean.replace(/ /g, '+').replace(/-/g, '+').replace(/_/g, '/');
+    while (clean.length % 4 !== 0) {
+      clean += '=';
+    }
+    const binary = atob(clean);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) {
       bytes[i] = binary.charCodeAt(i);
@@ -352,7 +383,15 @@ export function decodeSubmissionFromUrl(encodedStr: string): AssignedTest | null
  */
 export function getShareableSubmissionUrl(test: AssignedTest): string {
   const origin = window.location.origin;
-  return `${origin}?reviewPin=${test.pin}`;
+  let pathname = window.location.pathname || '/';
+  if (!pathname.startsWith('/')) {
+    pathname = '/' + pathname;
+  }
+  const encoded = encodeSubmissionForUrl(test);
+  if (encoded) {
+    return `${origin}${pathname}?reviewPin=${test.pin}&subData=${encoded}`;
+  }
+  return `${origin}${pathname}?reviewPin=${test.pin}`;
 }
 
 /**

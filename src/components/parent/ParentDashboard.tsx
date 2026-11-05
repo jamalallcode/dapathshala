@@ -15,7 +15,8 @@ import {
   saveStoredSubmission,
   getStoredNotifications,
   saveStoredNotifications,
-  getShareableTestUrl
+  getShareableTestUrl,
+  syncTestToServer
 } from '../../lib/storage';
 import { 
   CHAPTER_QUESTION_BANK, 
@@ -420,6 +421,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     const updated = [newTest, ...tests];
     setTests(updated);
     saveStoredTests(updated);
+    syncTestToServer(newTest);
     setCreatedTestResult(newTest);
   };
 
@@ -429,8 +431,9 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     let pin = '';
     if (typeof testOrPin === 'string') {
       pin = testOrPin;
-      const matched = tests.find(t => t.pin === pin);
-      link = matched ? getShareableTestUrl(matched) : `${window.location.origin}?pin=${pin}`;
+      const allTests = getStoredTests();
+      const matched = allTests.find(t => t.pin === pin || t.id === pin) || tests.find(t => t.pin === pin || t.id === pin);
+      link = matched ? getShareableTestUrl(matched) : `${window.location.origin}${window.location.pathname}?pin=${pin}`;
     } else {
       pin = testOrPin.pin;
       link = getShareableTestUrl(testOrPin);
