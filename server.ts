@@ -76,19 +76,32 @@ delete testsStore['test-103'];
 // API: Save Test
 app.post('/api/tests', (req, res) => {
   const test = req.body;
-  if (!test || !test.pin) {
+  if (!test || (!test.pin && !test.id)) {
     return res.status(400).json({ error: 'Invalid test payload or missing PIN' });
   }
-  testsStore[test.pin] = test;
-  if (test.id) testsStore[test.id] = test;
+  const pinKey = test.pin ? String(test.pin).trim() : '';
+  const idKey = test.id ? String(test.id).trim() : '';
+
+  // If this test was already submitted by the student, preserve submitted/reviewed status
+  const existing = (pinKey && (testsStore[pinKey] || submissionsStore[pinKey])) ||
+                   (idKey && (testsStore[idKey] || submissionsStore[idKey]));
+  if (existing && (existing.status === 'submitted' || existing.status === 'reviewed') && test.status === 'pending') {
+    test.status = existing.status;
+    test.score = existing.score ?? test.score;
+    test.parentComment = existing.parentComment ?? test.parentComment;
+    test.questions = (existing.questions && existing.questions.length > 0) ? existing.questions : test.questions;
+    test.proctoringFlags = existing.proctoringFlags || test.proctoringFlags;
+  }
+  if (pinKey) testsStore[pinKey] = test;
+  if (idKey) testsStore[idKey] = test;
   saveJson(TESTS_FILE, testsStore);
-  res.json({ success: true, pin: test.pin });
+  res.json({ success: true, pin: test.pin, status: test.status });
 });
 
-// API: Get Test by PIN or ID
+// API: Get Test by PIN or ID (falls back to submissionsStore if found there)
 app.get('/api/tests/:pin', (req, res) => {
-  const { pin } = req.params;
-  const test = testsStore[pin];
+  const pin = String(req.params.pin).trim();
+  const test = testsStore[pin] || submissionsStore[pin];
   if (test) {
     return res.json(test);
   }
@@ -97,20 +110,20 @@ app.get('/api/tests/:pin', (req, res) => {
 
 // API: Delete Test by PIN or ID
 app.delete('/api/tests/:pinOrId', (req, res) => {
-  const { pinOrId } = req.params;
+  const pinOrId = String(req.params.pinOrId).trim();
   let deleted = false;
   if (testsStore[pinOrId]) {
     const test = testsStore[pinOrId];
     delete testsStore[pinOrId];
-    if (test.pin) delete testsStore[test.pin];
-    if (test.id) delete testsStore[test.id];
+    if (test.pin) delete testsStore[String(test.pin).trim()];
+    if (test.id) delete testsStore[String(test.id).trim()];
     deleted = true;
   }
   if (submissionsStore[pinOrId]) {
     const sub = submissionsStore[pinOrId];
     delete submissionsStore[pinOrId];
-    if (sub.pin) delete submissionsStore[sub.pin];
-    if (sub.id) delete submissionsStore[sub.id];
+    if (sub.pin) delete submissionsStore[String(sub.pin).trim()];
+    if (sub.id) delete submissionsStore[String(sub.id).trim()];
   }
   if (deleted) {
     saveJson(TESTS_FILE, testsStore);
@@ -119,24 +132,37 @@ app.delete('/api/tests/:pinOrId', (req, res) => {
   res.json({ success: true, message: 'Test deleted successfully' });
 });
 
-// API: Save Student Submission
+// API: Save Student Submission (updates both submissionsStore and testsStore)
 app.post('/api/submissions', (req, res) => {
   const sub = req.body;
   if (!sub || (!sub.pin && !sub.id)) {
     return res.status(400).json({ error: 'Invalid submission' });
   }
-  const key = sub.pin || sub.id;
-  submissionsStore[key] = sub;
-  if (sub.id) submissionsStore[sub.id] = sub;
-  if (sub.pin) submissionsStore[sub.pin] = sub;
+  const pinKey = sub.pin ? String(sub.pin).trim() : '';
+  const idKey = sub.id ? String(sub.id).trim() : '';
+  const normalizedStatus = sub.status || 'submitted';
+
+  const baseRecord = (pinKey && testsStore[pinKey]) || (idKey && testsStore[idKey]) || {};
+  const updatedRecord = { ...baseRecord, ...sub, status: normalizedStatus };
+
+  if (pinKey) {
+    submissionsStore[pinKey] = updatedRecord;
+    testsStore[pinKey] = updatedRecord;
+  }
+  if (idKey) {
+    submissionsStore[idKey] = updatedRecord;
+    testsStore[idKey] = updatedRecord;
+  }
   saveJson(SUBMISSIONS_FILE, submissionsStore);
-  res.json({ success: true, key });
+  saveJson(TESTS_FILE, testsStore);
+
+  res.json({ success: true, pin: pinKey || idKey, status: normalizedStatus });
 });
 
 // API: Get Student Submission
 app.get('/api/submissions/:pin', (req, res) => {
-  const { pin } = req.params;
-  const sub = submissionsStore[pin];
+  const pin = String(req.params.pin).trim();
+  const sub = submissionsStore[pin] || (testsStore[pin] && (testsStore[pin].status === 'submitted' || testsStore[pin].status === 'reviewed') ? testsStore[pin] : null);
   if (sub) {
     return res.json(sub);
   }

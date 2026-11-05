@@ -168,9 +168,15 @@ export function App() {
         const tests = getStoredTests();
         let matched = tests.find(t => t.pin === queryKey || t.id === queryKey);
         
-        // ALWAYS fetch the latest test from server to get updated review status, marks & parent comments
+        // ALWAYS fetch the latest test or submission from server to get updated review status, marks & parent comments
         if (pin) {
-          const serverTest = await fetchTestFromServer(pin);
+          let serverTest = await fetchTestFromServer(pin);
+          if (!serverTest || (serverTest.status !== 'submitted' && serverTest.status !== 'reviewed')) {
+            const subData = await fetchSubmissionFromServer(pin);
+            if (subData && (subData.status === 'submitted' || subData.status === 'reviewed')) {
+              serverTest = subData;
+            }
+          }
           if (serverTest) {
             matched = serverTest;
             const updated = tests.some(t => t.id === serverTest.id || t.pin === serverTest.pin)

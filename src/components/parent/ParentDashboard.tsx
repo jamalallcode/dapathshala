@@ -18,6 +18,7 @@ import {
   getShareableTestUrl,
   syncTestToServer,
   fetchTestFromServer,
+  fetchSubmissionFromServer,
   syncSubmissionToServer
 } from '../../lib/storage';
 import { 
@@ -110,11 +111,22 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
   useEffect(() => {
     loadTests();
+    // Ensure all locally stored tests are pushed to the backend server
+    // so students on any device or tab can immediately fetch and take them
+    const stored = getStoredTests();
+    stored.forEach(t => {
+      syncTestToServer(t);
+    });
+
     const handleStorage = () => loadTests();
     window.addEventListener('storage', handleStorage);
+    window.addEventListener('dapathshala_tests_updated', handleStorage);
+    window.addEventListener('dapathshala_submissions_updated', handleStorage);
     window.addEventListener('dapathshala_notifs_updated', handleStorage);
     return () => {
       window.removeEventListener('storage', handleStorage);
+      window.removeEventListener('dapathshala_tests_updated', handleStorage);
+      window.removeEventListener('dapathshala_submissions_updated', handleStorage);
       window.removeEventListener('dapathshala_notifs_updated', handleStorage);
     };
   }, []);
@@ -130,10 +142,27 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         let hasChanges = false;
         const updated = await Promise.all(localTests.map(async (t) => {
           if (t.status === 'pending' || t.status === 'submitted') {
-            const serverTest = await fetchTestFromServer(t.pin);
-            if (serverTest && (serverTest.status !== t.status || serverTest.score !== t.score || serverTest.parentComment !== t.parentComment)) {
+            let serverData = await fetchTestFromServer(t.pin);
+            // If test endpoint didn't show submission, check submissions endpoint
+            if (!serverData || (serverData.status !== 'submitted' && serverData.status !== 'reviewed')) {
+              const subData = await fetchSubmissionFromServer(t.pin);
+              if (subData && (subData.status === 'submitted' || subData.status === 'reviewed')) {
+                serverData = subData;
+              }
+            }
+
+            if (serverData && (serverData.status !== t.status || serverData.score !== t.score || serverData.parentComment !== t.parentComment)) {
               hasChanges = true;
-              return serverTest;
+              return {
+                ...t,
+                ...serverData,
+                id: t.id,
+                status: serverData.status,
+                score: serverData.score ?? t.score,
+                parentComment: serverData.parentComment ?? t.parentComment,
+                questions: (serverData.questions && serverData.questions.length > 0) ? serverData.questions : t.questions,
+                proctoringFlags: serverData.proctoringFlags || t.proctoringFlags
+              };
             }
           }
           return t;
@@ -143,11 +172,13 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           setTests(updated);
           saveStoredTests(updated);
         }
-      } catch {}
+      } catch (err) {
+        console.warn('Error checking server updates in ParentDashboard:', err);
+      }
     };
 
     checkServerUpdates();
-    const interval = setInterval(checkServerUpdates, 3500);
+    const interval = setInterval(checkServerUpdates, 2000);
     window.addEventListener('focus', checkServerUpdates);
 
     return () => {

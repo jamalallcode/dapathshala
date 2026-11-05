@@ -605,6 +605,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     // Dispatch update event
     try {
       window.dispatchEvent(new Event('dapathshala_notifs_updated'));
+      window.dispatchEvent(new Event('dapathshala_tests_updated'));
+      window.dispatchEvent(new Event('dapathshala_submissions_updated'));
       confetti({
         particleCount: 80,
         spread: 60,
