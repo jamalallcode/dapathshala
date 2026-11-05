@@ -12,7 +12,6 @@ import {
   saveStoredTests, 
   decodeTestFromUrl, 
   decodeSubmissionFromUrl, 
-  generateFallbackTestForPin,
   fetchTestFromServer,
   fetchSubmissionFromServer 
 } from './lib/storage';
@@ -183,15 +182,6 @@ export function App() {
               ? tests.map(t => (t.id === serverTest.id || t.pin === serverTest.pin) ? serverTest : t)
               : [serverTest, ...tests];
             saveStoredTests(updated);
-          }
-        }
-
-        // Guaranteed fallback so student is NEVER sent to landing page when clicking an exam link
-        if (!matched && pin) {
-          const fallback = generateFallbackTestForPin(pin);
-          if (fallback) {
-            matched = fallback;
-            saveStoredTests([fallback, ...tests]);
           }
         }
 

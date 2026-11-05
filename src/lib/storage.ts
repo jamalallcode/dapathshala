@@ -27,7 +27,7 @@ export function getStoredTests(): AssignedTest[] {
       .filter((t: any) => t && t.id !== 'test-101' && t.id !== 'test-102' && t.id !== 'test-103')
       .map((t: any) => ({
         ...t,
-        questions: Array.isArray(t.questions) ? t.questions : (t.pin ? generateFallbackTestForPin(t.pin).questions : []),
+        questions: Array.isArray(t.questions) ? t.questions : [],
         proctoringFlags: Array.isArray(t.proctoringFlags) ? t.proctoringFlags : []
       }));
     if (cleaned.length !== list.length) {
@@ -39,18 +39,96 @@ export function getStoredTests(): AssignedTest[] {
   }
 }
 
-export function clearAllStoredTests(): void {
+const DELETED_PINS_KEY = "dapathshala_deleted_pins_v2";
+const CLEARED_ALL_KEY = "dapathshala_all_tests_cleared_at";
+
+export function getDeletedPins(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DELETED_PINS_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+}
+
+export function addDeletedPin(pinOrId: string): void {
+  try {
+    const set = getDeletedPins();
+    set.add(String(pinOrId).trim());
+    localStorage.setItem(DELETED_PINS_KEY, JSON.stringify(Array.from(set)));
+  } catch {}
+}
+
+export function isPinDeleted(pin?: string, id?: string): boolean {
+  if (!pin && !id) return false;
+  const set = getDeletedPins();
+  if (pin && set.has(String(pin).trim())) return true;
+  if (id && set.has(String(id).trim())) return true;
+  return false;
+}
+
+export async function clearAllStoredTests(): Promise<void> {
   try {
     localStorage.setItem(TESTS_KEY, JSON.stringify([]));
+    localStorage.setItem(SUBMISSIONS_KEY, JSON.stringify([]));
+    localStorage.setItem(CLEARED_ALL_KEY, Date.now().toString());
+
     window.dispatchEvent(new Event("dapathshala_tests_updated"));
+    window.dispatchEvent(new Event("dapathshala_submissions_updated"));
+
+    // 1. Delete all from server
+    try {
+      await fetch('/api/tests', { method: 'DELETE' });
+    } catch (e) {
+      console.warn('Failed to clear server tests:', e);
+    }
+
+    // 2. Delete all from Supabase (using reliable PostgREST filters)
+    if (supabase) {
+      try {
+        await supabase.from('assigned_tests').delete().neq('id', '___dummy___');
+        await supabase.from('exam_submissions').delete().neq('id', '___dummy___');
+        await supabase.from('assigned_tests').delete().gte('pin', '0');
+        await supabase.from('exam_submissions').delete().gte('pin', '0');
+      } catch (e) {
+        console.warn('Failed to clear Supabase tests:', e);
+      }
+    }
   } catch (e) {
     console.error("Error clearing tests", e);
+  }
+}
+
+export async function deleteStoredTest(pinOrId: string): Promise<void> {
+  const pin = String(pinOrId).trim();
+  addDeletedPin(pin);
+
+  const list = getStoredTests().filter(t => t.pin !== pin && t.id !== pin);
+  localStorage.setItem(TESTS_KEY, JSON.stringify(list));
+  window.dispatchEvent(new Event("dapathshala_tests_updated"));
+
+  // 1. Server delete
+  try {
+    await fetch(`/api/tests/${pin}`, { method: 'DELETE' });
+  } catch (e) {}
+
+  // 2. Supabase delete
+  if (supabase) {
+    try {
+      await supabase.from('assigned_tests').delete().eq('pin', pin);
+      await supabase.from('assigned_tests').delete().eq('id', pin);
+      await supabase.from('exam_submissions').delete().eq('pin', pin);
+      await supabase.from('exam_submissions').delete().eq('test_id', pin);
+    } catch (e) {}
   }
 }
 
 export function saveStoredTests(tests: AssignedTest[]): void {
   try {
     localStorage.setItem(TESTS_KEY, JSON.stringify(tests));
+    if (tests.length > 0) {
+      localStorage.removeItem(CLEARED_ALL_KEY);
+    }
     window.dispatchEvent(new Event("dapathshala_tests_updated"));
     // Sync to backend API in background for cross-device support
     tests.forEach(t => {
@@ -295,15 +373,9 @@ export async function fetchTestFromServer(pinOrId: string): Promise<AssignedTest
       if (data && data.length > 0) {
         const item = data[0];
         const payload = item.payload || {};
-        let questions = (Array.isArray(item.questions) && item.questions.length > 0)
+        const questions = (Array.isArray(item.questions) && item.questions.length > 0)
           ? item.questions
           : (Array.isArray(payload.questions) && payload.questions.length > 0 ? payload.questions : []);
-        if (questions.length === 0 && (item.pin || pin)) {
-          const fallback = generateFallbackTestForPin(item.pin || pin);
-          if (fallback && fallback.questions) {
-            questions = fallback.questions;
-          }
-        }
         return {
           ...payload,
           id: item.id || payload.id,
@@ -331,13 +403,7 @@ export async function fetchTestFromServer(pinOrId: string): Promise<AssignedTest
     if (res.ok) {
       const data = await res.json();
       if (data) {
-        let questions = Array.isArray(data.questions) && data.questions.length > 0 ? data.questions : [];
-        if (questions.length === 0 && (data.pin || pin)) {
-          const fallback = generateFallbackTestForPin(data.pin || pin);
-          if (fallback && fallback.questions) {
-            questions = fallback.questions;
-          }
-        }
+        const questions = Array.isArray(data.questions) ? data.questions : [];
         return {
           ...data,
           questionCount: data.questionCount ?? questions.length,
@@ -363,33 +429,29 @@ export async function fetchAllTestsFromServer(): Promise<AssignedTest[]> {
         .order('updated_at', { ascending: false });
 
       if (Array.isArray(data) && data.length > 0) {
-        return data.map((item: any) => {
-          const payload = item.payload || {};
-          let questions = (Array.isArray(item.questions) && item.questions.length > 0)
-            ? item.questions
-            : (Array.isArray(payload.questions) && payload.questions.length > 0 ? payload.questions : []);
-          if (questions.length === 0 && item.pin) {
-            const fallback = generateFallbackTestForPin(item.pin);
-            if (fallback && fallback.questions) {
-              questions = fallback.questions;
-            }
-          }
-          return {
-            ...payload,
-            id: item.id || payload.id,
-            pin: item.pin || payload.pin,
-            title: item.title || payload.title,
-            subject: item.subject || payload.subject,
-            chapter: item.chapter || payload.chapter,
-            status: item.status || payload.status,
-            score: item.score ?? payload.score,
-            parentComment: item.parent_comment || payload.parentComment,
-            questionCount: item.question_count ?? payload.questionCount ?? questions.length,
-            durationMinutes: item.duration_minutes ?? payload.durationMinutes ?? 15,
-            questions,
-            proctoringFlags: item.proctoring_flags || payload.proctoringFlags || []
-          };
-        });
+        return data
+          .filter((item: any) => !isPinDeleted(item.pin, item.id))
+          .map((item: any) => {
+            const payload = item.payload || {};
+            let questions = (Array.isArray(item.questions) && item.questions.length > 0)
+              ? item.questions
+              : (Array.isArray(payload.questions) && payload.questions.length > 0 ? payload.questions : []);
+            return {
+              ...payload,
+              id: item.id || payload.id,
+              pin: item.pin || payload.pin,
+              title: item.title || payload.title,
+              subject: item.subject || payload.subject,
+              chapter: item.chapter || payload.chapter,
+              status: item.status || payload.status,
+              score: item.score ?? payload.score,
+              parentComment: item.parent_comment || payload.parentComment,
+              questionCount: item.question_count ?? payload.questionCount ?? questions.length,
+              durationMinutes: item.duration_minutes ?? payload.durationMinutes ?? 15,
+              questions,
+              proctoringFlags: item.proctoring_flags || payload.proctoringFlags || []
+            };
+          });
       }
     } catch (sbErr) {
       // Fallback to Express API
@@ -402,22 +464,18 @@ export async function fetchAllTestsFromServer(): Promise<AssignedTest[]> {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) {
-        return data.map((t: any) => {
-          let questions = Array.isArray(t.questions) && t.questions.length > 0 ? t.questions : [];
-          if (questions.length === 0 && t.pin) {
-            const fallback = generateFallbackTestForPin(t.pin);
-            if (fallback && fallback.questions) {
-              questions = fallback.questions;
-            }
-          }
-          return {
-            ...t,
-            questionCount: t.questionCount ?? questions.length,
-            durationMinutes: t.durationMinutes ?? 15,
-            questions,
-            proctoringFlags: Array.isArray(t.proctoringFlags) ? t.proctoringFlags : []
-          };
-        });
+        return data
+          .filter((t: any) => !isPinDeleted(t.pin, t.id))
+          .map((t: any) => {
+            let questions = Array.isArray(t.questions) && t.questions.length > 0 ? t.questions : [];
+            return {
+              ...t,
+              questionCount: t.questionCount ?? questions.length,
+              durationMinutes: t.durationMinutes ?? 15,
+              questions,
+              proctoringFlags: Array.isArray(t.proctoringFlags) ? t.proctoringFlags : []
+            };
+          });
       }
     }
   } catch (err) {

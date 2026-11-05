@@ -6,8 +6,7 @@ import {
 import { 
   getStoredTests, 
   saveStoredTests, 
-  fetchTestFromServer, 
-  generateFallbackTestForPin 
+  fetchTestFromServer 
 } from "../../lib/storage";
 import { AssignedTest } from "../../types";
 
@@ -48,18 +47,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam 
       }
     }
 
-    if (!matched) {
-      const fallback = generateFallbackTestForPin(trimmed);
-      if (fallback) {
-        matched = fallback;
-        saveStoredTests([fallback, ...currentTests]);
-      }
-    }
-
     if (matched) {
       onStartExam(matched);
     } else {
-      setPinError("এই পিনের কোনো পরীক্ষা পাওয়া যায়নি। সঠিক পিন (যেমন: 787193) দিন।");
+      setPinError("এই পিনের কোনো পরীক্ষা পাওয়া যায়নি অথবা এটি মুছে ফেলা হয়েছে। সঠিক পিন দিন অথবা অভিভাবককে পরীক্ষা তৈরি করতে বলুন।");
     }
   };
 

@@ -210,6 +210,16 @@ app.get('/api/tests/:pin', (req, res) => {
   res.status(404).json({ error: 'Test not found' });
 });
 
+// API: Delete All Tests and Submissions (Complete Clean Slate)
+app.delete('/api/tests', (_req, res) => {
+  testsStore = {};
+  submissionsStore = {};
+  saveJson(TESTS_FILE, {});
+  saveJson(SUBMISSIONS_FILE, {});
+  console.log('[All Tests Cleared] testsStore and submissionsStore reset to empty');
+  res.json({ success: true, message: 'All tests and submissions cleared successfully' });
+});
+
 // API: Delete Test by PIN or ID
 app.delete('/api/tests/:pinOrId', (req, res) => {
   const pinOrId = String(req.params.pinOrId).trim();

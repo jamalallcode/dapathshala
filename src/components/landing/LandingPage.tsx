@@ -14,7 +14,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { AssignedTest, UserRole } from '../../types';
-import { getStoredTests, saveStoredTests, generateFallbackTestForPin, fetchTestFromServer } from '../../lib/storage';
+import { getStoredTests, saveStoredTests, fetchTestFromServer } from '../../lib/storage';
 
 interface LandingPageProps {
   onSelectRole: (role: UserRole) => void;
@@ -52,19 +52,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       }
     }
 
-    // Fallback if test not found anywhere so student can always take the exam
-    if (!matched) {
-      const fallback = generateFallbackTestForPin(trimmed);
-      if (fallback) {
-        matched = fallback;
-        saveStoredTests([fallback, ...tests]);
-      }
-    }
-
     if (matched) {
       onOpenExamWithPin(matched);
     } else {
-      setPinError('এই পিনের কোনো পরীক্ষা পাওয়া যায়নি। সঠিক পিন দিন অথবা অভিভাবক প্যানেল থেকে নতুন পরীক্ষা তৈরি করুন।');
+      setPinError('এই পিনের কোনো পরীক্ষা পাওয়া যায়নি অথবা এটি মুছে ফেলা হয়েছে। অভিভাবক ড্যাশবোর্ড থেকে নতুন পরীক্ষা তৈরি করুন।');
     }
   };
 

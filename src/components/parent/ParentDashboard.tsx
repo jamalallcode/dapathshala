@@ -11,6 +11,8 @@ import {
   getStoredTests, 
   saveStoredTests, 
   clearAllStoredTests, 
+  deleteStoredTest,
+  isPinDeleted,
   getStoredSubmissions, 
   saveStoredSubmission,
   getStoredNotifications,
@@ -20,8 +22,7 @@ import {
   fetchTestFromServer,
   fetchSubmissionFromServer,
   fetchAllTestsFromServer,
-  syncSubmissionToServer,
-  generateFallbackTestForPin
+  syncSubmissionToServer
 } from '../../lib/storage';
 import { 
   CHAPTER_QUESTION_BANK, 
@@ -104,6 +105,8 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [testToDelete, setTestToDelete] = useState<AssignedTest | null>(null);
   const [shareModalTest, setShareModalTest] = useState<AssignedTest | null>(null);
   const [retakeModalTest, setRetakeModalTest] = useState<AssignedTest | null>(null);
+  const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
+  const [isClearingAll, setIsClearingAll] = useState(false);
 
   // Load tests on mount and listen to updates
   const loadTests = () => {
@@ -162,6 +165,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       // 1. Process server tests: if any test was submitted by student, update it immediately
       serverTests.forEach(st => {
         if (!st || (!st.pin && !st.id)) return;
+        if (isPinDeleted(st.pin, st.id)) return;
         const existingKey = findExistingKey(st.pin, st.id);
         const local = existingKey ? mergedMap.get(existingKey) : undefined;
         if (!local) {
@@ -184,6 +188,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
       // 2. Also check individual pins for any test that may have been submitted directly
       await Promise.all(localTests.map(async (t) => {
+        if (isPinDeleted(t.pin, t.id)) return;
         if (t.status === 'pending' || !t.score) {
           let serverData = t.pin ? await fetchSubmissionFromServer(t.pin) : null;
           if (!serverData && t.id) {
@@ -491,13 +496,9 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
 
 
-  // Clear all previous / demo tests completely
+  // Clear all previous / demo tests completely - opens clean in-app confirmation modal
   const handleClearAllTests = () => {
-    if (window.confirm('আপনি কি নিশ্চিত যে সকল ডামি ও পূর্ববর্তী পরীক্ষা মুছে সম্পূর্ণ ফ্রেশ শুরু করতে চান?')) {
-      clearAllStoredTests();
-      setTests([]);
-      showToast('🗑️ সকল ডামি ও পূর্বের পরীক্ষা মুছে ফ্রেশ ড্যাশবোর্ড করা হয়েছে।');
-    }
+    setShowClearConfirmModal(true);
   };
 
   // Finalize Exam & Generate Link + PIN
@@ -579,15 +580,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
   // Open Review Modal for a submitted test
   const handleOpenReviewModal = (test: AssignedTest) => {
-    let safeQuestions = Array.isArray(test.questions) && test.questions.length > 0 
-      ? test.questions 
-      : [];
-    if (safeQuestions.length === 0 && (test.pin || test.id)) {
-      const fallback = generateFallbackTestForPin(test.pin || test.id);
-      if (fallback && fallback.questions) {
-        safeQuestions = fallback.questions;
-      }
-    }
+    const safeQuestions = Array.isArray(test.questions) ? test.questions : [];
     const safeTest: AssignedTest = {
       ...test,
       questions: safeQuestions,
@@ -651,7 +644,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     // Remove from state
     const updated = tests.filter(t => t.id !== id && t.pin !== pin);
     setTests(updated);
-    saveStoredTests(updated);
+    await deleteStoredTest(pin || id);
 
     // Clean up notifications for this test
     const notifs = getStoredNotifications().filter(
@@ -659,13 +652,6 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     );
     saveStoredNotifications(notifs);
     window.dispatchEvent(new Event('dapathshala_notifs_updated'));
-
-    // Send DELETE to server API
-    try {
-      await fetch(`/api/tests/${pin}`, { method: 'DELETE' });
-    } catch (e) {
-      console.error('Failed to delete on server:', e);
-    }
 
     setTestToDelete(null);
     showToast('✓ পরীক্ষাটি তালিকা থেকে সফলভাবে মুছে ফেলা হয়েছে।');
@@ -684,10 +670,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           score: undefined,
           parentComment: undefined,
           proctoringFlags: [],
-          questions: (Array.isArray(t.questions) && t.questions.length > 0 
-            ? t.questions 
-            : generateFallbackTestForPin(t.pin).questions
-          ).map(q => ({
+          questions: (Array.isArray(t.questions) ? t.questions : []).map(q => ({
             ...q,
             studentAnswer: undefined,
             isCorrect: undefined
@@ -1842,6 +1825,72 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>হ্যাঁ, মুছে ফেলুন</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 3B: CLEAR ALL TESTS CONFIRMATION                   */}
+      {/* ======================================================== */}
+      {showClearConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full border border-rose-100 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900">
+                  সকল পরীক্ষা ও খাতা মুছে ফেলবেন?
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  এই কাজটি স্থায়ী এবং আর ফিরিয়ে আনা যাবে না
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-rose-700 bg-rose-50 p-3.5 rounded-2xl border border-rose-200 leading-relaxed font-medium">
+              ⚠️ সতর্কতা: এটি নিশ্চিত করলে আপনার তৈরি করা সমস্ত প্রশ্নপত্র, শিক্ষার্থীর জমা দেওয়া উত্তরপত্র এবং সুপাবেজ ক্লাউড ডাটাবেজের সকল রেকর্ড সম্পূর্ণ মুছে ফ্রেশ ও খালি ড্যাশবোর্ড হয়ে যাবে।
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isClearingAll}
+                onClick={() => setShowClearConfirmModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+              >
+                বাতিল
+              </button>
+              <button
+                type="button"
+                disabled={isClearingAll}
+                onClick={async () => {
+                  setIsClearingAll(true);
+                  try {
+                    setTests([]);
+                    await clearAllStoredTests();
+                    setShowClearConfirmModal(false);
+                    showToast('🗑️ সকল পরীক্ষা ও ক্লাউড ডাটাবেজ সম্পূর্ণ মুছে ফেলা হয়েছে।');
+                  } finally {
+                    setIsClearingAll(false);
+                  }
+                }}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold transition-all shadow-md shadow-rose-600/20 flex items-center gap-1.5 cursor-pointer"
+              >
+                {isClearingAll ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>মুছে ফেলা হচ্ছে...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>হ্যাঁ, সম্পূর্ণ মুছে ফেলুন</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
