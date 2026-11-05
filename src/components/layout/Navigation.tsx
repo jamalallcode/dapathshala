@@ -10,9 +10,7 @@ import {
   X, 
   Shield, 
   User, 
-  Menu,
-  Award,
-  BookMarked
+  Menu
 } from 'lucide-react';
 import { AppNotification, UserRole } from '../../types';
 import { getStoredNotifications, saveStoredNotifications, addDismissedNotifId, clearAllNotifications } from '../../lib/storage';
@@ -23,13 +21,9 @@ interface NavigationProps {
   onNavigateToReview?: (testId?: string) => void;
   onNavigateHome?: () => void;
   onNavigateDashboard?: () => void;
-  onNavigateCompetitive?: () => void;
-  onNavigateSyllabus?: () => void;
   onOpenCreateExam?: () => void;
   onSelectTab?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report') => void;
   isHomeActive?: boolean;
-  isCompetitiveActive?: boolean;
-  isSyllabusActive?: boolean;
   onToggleSidebar?: () => void;
   isSidebarOpen?: boolean;
 }
@@ -40,13 +34,9 @@ export const Navigation: React.FC<NavigationProps> = ({
   onNavigateToReview,
   onNavigateHome,
   onNavigateDashboard,
-  onNavigateCompetitive,
-  onNavigateSyllabus,
   onOpenCreateExam,
   onSelectTab,
   isHomeActive,
-  isCompetitiveActive,
-  isSyllabusActive,
   onToggleSidebar,
   isSidebarOpen
 }) => {
@@ -120,17 +110,17 @@ export const Navigation: React.FC<NavigationProps> = ({
 
   return (
     <header className="sticky top-0 z-40 bg-[#0c1322] border-b border-slate-800 text-slate-200 w-full select-none shadow-sm">
-      <div className="w-full flex items-center justify-between h-13 px-2.5 sm:px-4 gap-2">
+      <div className="w-full flex items-center justify-between h-13 px-3 sm:px-4">
         
         {/* Left Section: Mobile Menu + Blue Home Square + Header Menu Links */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 min-w-0">
+        <div className="flex items-center gap-1 sm:gap-2">
           
           {/* Mobile Sidebar Hamburger */}
           {onToggleSidebar && (
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="lg:hidden p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800 transition-colors shrink-0"
+              className="lg:hidden p-1.5 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
               aria-label="Toggle Sidebar"
             >
               <Menu className="w-5 h-5" />
@@ -152,104 +142,69 @@ export const Navigation: React.FC<NavigationProps> = ({
             <Home className="w-4.5 h-4.5 pointer-events-none" />
           </button>
 
-          {/* Responsive Header Menu Items (Always single-line, never wraps or deforms) */}
-          <div className="flex items-center gap-1 sm:gap-1.5 text-xs sm:text-sm font-semibold text-slate-200 min-w-0">
-            {/* Primary Action: নতুন পরীক্ষা (Always accessible) */}
+          {/* Clean Menu Items */}
+          <div className="hidden sm:flex items-center gap-1.5 ml-3 text-sm font-semibold text-slate-200">
             <button
               type="button"
               onClick={() => {
                 onSelectTab?.('assigned');
                 onOpenCreateExam?.();
               }}
-              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white transition-colors border border-emerald-500/30 cursor-pointer whitespace-nowrap shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white transition-colors border border-emerald-500/30 cursor-pointer"
               title="কাস্টম পরীক্ষা তৈরি করুন"
             >
-              <PlusCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span className="hidden sm:inline">নতুন পরীক্ষা</span>
-              <span className="sm:hidden">+ পরীক্ষা</span>
+              <PlusCircle className="w-4 h-4 text-emerald-400" />
+              <span>নতুন পরীক্ষা</span>
             </button>
 
-            {/* ভর্তি ও বিসিএস পরীক্ষা (Compact on tablet, full on desktop) */}
-            <button
-              type="button"
-              onClick={() => onNavigateCompetitive?.()}
-              className={`hidden md:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                isCompetitiveActive
-                  ? 'bg-blue-600 text-white font-bold'
-                  : 'bg-blue-900/40 hover:bg-blue-800/60 text-blue-300 hover:text-white border border-blue-500/30'
-              }`}
-              title="বিসিএস, মেডিকেল ও বিশ্ববিদ্যালয় ভর্তি পোর্টাল"
-            >
-              <Award className="w-4 h-4 text-amber-300 shrink-0" />
-              <span className="whitespace-nowrap">ভর্তি ও বিসিএস</span>
-            </button>
-
-            {/* সিলেবাস ও প্রশ্নব্যাংক (Adaptive label on medium, full on wide) */}
-            <button
-              type="button"
-              onClick={() => onNavigateSyllabus?.()}
-              className={`hidden sm:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                isSyllabusActive
-                  ? 'bg-cyan-600 text-white font-bold'
-                  : 'bg-cyan-950/40 hover:bg-cyan-900/60 text-cyan-300 hover:text-white border border-cyan-500/30'
-              }`}
-              title="এনসিটিবি কারিকুলাম, ২০২৫ সালের বোর্ড প্রশ্ন ও ভর্তি প্রশ্নব্যাংক"
-            >
-              <BookMarked className="w-4 h-4 text-cyan-400 shrink-0" />
-              <span className="whitespace-nowrap hidden lg:inline">সিলেবাস ও প্রশ্নব্যাংক</span>
-              <span className="whitespace-nowrap lg:hidden">সিলেবাস</span>
-            </button>
-
-            {/* Secondary: লাইভ প্রক্টরিং (Displayed on large desktop screens where space permits) */}
             <button
               type="button"
               onClick={() => onSelectTab?.('proctoring')}
-              className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors whitespace-nowrap shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
             >
-              <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
-              <span className="whitespace-nowrap">লাইভ প্রক্টরিং</span>
+              <ShieldCheck className="w-4 h-4 text-purple-400" />
+              <span>লাইভ প্রক্টরিং</span>
             </button>
 
-            {/* Secondary: নির্ধারিত পরীক্ষা (Displayed on large desktop screens where space permits) */}
             <button
               type="button"
               onClick={() => onSelectTab?.('assigned')}
-              className="hidden xl:flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors whitespace-nowrap shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
             >
-              <FileText className="w-4 h-4 text-blue-400 shrink-0" />
-              <span className="whitespace-nowrap">নির্ধারিত পরীক্ষা</span>
+              <FileText className="w-4 h-4 text-blue-400" />
+              <span>নির্ধারিত পরীক্ষা</span>
             </button>
           </div>
 
         </div>
 
-        {/* Right Section: Role Switcher, Notifications */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+        {/* Right Section: Role Switcher, Notifications, Landing Link */}
+        <div className="flex items-center gap-2 sm:gap-3">
           
-          {/* Role Switcher (Compact on mobile, full on desktop) */}
-          <div className="flex items-center bg-slate-900 border border-slate-700/80 p-0.5 rounded-lg text-xs sm:text-sm font-bold shrink-0">
+          {/* Role Switcher */}
+          <div className="flex items-center bg-slate-900 border border-slate-700/80 p-0.5 rounded-lg text-xs sm:text-sm font-bold">
             <button
               type="button"
               onClick={() => onRoleChange('parent')}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
                 currentRole === 'parent'
                   ? 'bg-blue-600 text-white font-black shadow-xs'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <Shield className="w-3.5 h-3.5 shrink-0" />
+              <Shield className="w-3.5 h-3.5" />
               <span>অভিভাবক</span>
             </button>
             <button
               type="button"
               onClick={() => onRoleChange('student')}
-              className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors whitespace-nowrap shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
                 currentRole === 'student'
                   ? 'bg-emerald-600 text-white font-black shadow-xs'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              <User className="w-3.5 h-3.5 shrink-0" />
+              <User className="w-3.5 h-3.5" />
               <span>শিক্ষার্থী</span>
             </button>
           </div>

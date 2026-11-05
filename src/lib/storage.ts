@@ -1,4 +1,4 @@
-import { AssignedTest, AppNotification, StudentSubmission, ExamQuestion } from '../types';
+import { AssignedTest, AppNotification, StudentSubmission } from '../types';
 import { getQuestionsForChapter } from './curriculumQuestions';
 
 const TESTS_KEY = "dapathshala_assigned_tests_v2";
@@ -353,62 +353,6 @@ export function decodeSubmissionFromUrl(encodedStr: string): AssignedTest | null
 export function getShareableSubmissionUrl(test: AssignedTest): string {
   const origin = window.location.origin;
   return `${origin}?reviewPin=${test.pin}`;
-}
-
-/**
- * Custom Question Bank helpers for user-saved & bulk-imported questions
- */
-const CUSTOM_QUESTIONS_KEY = "dapathshala_custom_questions_v2";
-
-export function getStoredCustomQuestions(): ExamQuestion[] {
-  try {
-    const raw = localStorage.getItem(CUSTOM_QUESTIONS_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-export function saveStoredCustomQuestion(question: ExamQuestion): void {
-  try {
-    const existing = getStoredCustomQuestions();
-    const filtered = existing.filter(q => q.id !== question.id);
-    const updated = [question, ...filtered];
-    localStorage.setItem(CUSTOM_QUESTIONS_KEY, JSON.stringify(updated));
-    window.dispatchEvent(new Event("dapathshala_custom_questions_updated"));
-  } catch (e) {
-    console.error("Error saving custom question", e);
-  }
-}
-
-export function saveBulkStoredCustomQuestions(newQuestions: ExamQuestion[]): void {
-  try {
-    const existing = getStoredCustomQuestions();
-    const existingIds = new Set(existing.map(q => q.id));
-    const merged = [...existing];
-    for (const q of newQuestions) {
-      if (!existingIds.has(q.id)) {
-        merged.unshift(q);
-        existingIds.add(q.id);
-      }
-    }
-    localStorage.setItem(CUSTOM_QUESTIONS_KEY, JSON.stringify(merged));
-    window.dispatchEvent(new Event("dapathshala_custom_questions_updated"));
-  } catch (e) {
-    console.error("Error saving bulk custom questions", e);
-  }
-}
-
-export function deleteStoredCustomQuestion(id: string): void {
-  try {
-    const existing = getStoredCustomQuestions();
-    const updated = existing.filter(q => q.id !== id);
-    localStorage.setItem(CUSTOM_QUESTIONS_KEY, JSON.stringify(updated));
-    window.dispatchEvent(new Event("dapathshala_custom_questions_updated"));
-  } catch (e) {
-    console.error("Error deleting custom question", e);
-  }
 }
 
 /**

@@ -24,11 +24,9 @@ export interface SidebarProps {
   isResizing?: boolean;
   currentRole: UserRole;
   onRoleChange: (role: UserRole) => void;
-  activeView: 'landing' | 'dashboard' | 'exam' | 'review' | 'competitive' | 'syllabus';
+  activeView: 'landing' | 'dashboard' | 'exam' | 'review';
   onNavigateHome: () => void;
   onNavigateDashboard: () => void;
-  onNavigateCompetitive?: () => void;
-  onNavigateSyllabus?: () => void;
   parentTab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report';
   onSelectParentTab: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report') => void;
   onOpenCreateExam: () => void;
@@ -46,8 +44,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeView,
   onNavigateHome,
   onNavigateDashboard,
-  onNavigateCompetitive,
-  onNavigateSyllabus,
   parentTab,
   onSelectParentTab,
   onOpenCreateExam
@@ -71,14 +67,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {isOpen && (
         <div 
           onClick={onClose}
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-40 lg:hidden"
+          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 lg:hidden"
           aria-hidden="true"
         />
       )}
 
       {/* Sidebar Container with Resizable Drag Handle */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 bg-[#0c1322] text-slate-300 border-r border-slate-800/90 flex flex-col select-none w-64 max-w-[85vw] lg:w-[var(--sidebar-width)] ${
+        className={`fixed top-0 bottom-0 left-0 z-40 bg-[#0c1322] text-slate-300 border-r border-slate-800/90 flex flex-col select-none w-64 lg:w-[var(--sidebar-width)] ${
           isResizing ? '' : 'transition-[width] duration-75'
         } ${
           // Mobile drawer slide
@@ -167,28 +163,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center gap-2.5 truncate min-w-0">
                 <BookOpen className="w-4.5 h-4.5 text-blue-400 shrink-0" />
                 <span className="truncate">পরীক্ষাসমূহ ও খাতা</span>
-              </div>
-            </button>
-          </div>
-
-          {/* Menu 2.5: ভর্তি ও বিসিএস পরীক্ষা (Competitive Exams) */}
-          <div>
-            <button
-              type="button"
-              onClick={() => {
-                handleLinkClick(() => {
-                  onNavigateCompetitive?.();
-                });
-              }}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
-                activeView === 'competitive'
-                  ? 'bg-blue-600/40 text-white font-bold border-l-2 border-amber-400'
-                  : 'hover:bg-slate-800/60 text-amber-300/90 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 truncate min-w-0">
-                <GraduationCap className="w-4.5 h-4.5 text-amber-400 shrink-0" />
-                <span className="truncate font-bold">ভর্তি ও বিসিএস পরীক্ষা</span>
               </div>
             </button>
           </div>
@@ -304,27 +278,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               type="button"
               onClick={() => handleLinkClick(() => {
-                if (onNavigateSyllabus) {
-                  onNavigateSyllabus();
-                } else {
-                  onRoleChange('parent');
-                  onNavigateDashboard();
-                  onSelectParentTab('assigned');
-                }
+                onRoleChange('parent');
+                onNavigateDashboard();
+                onSelectParentTab('assigned');
               })}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
-                activeView === 'syllabus'
-                  ? 'bg-cyan-600/40 text-white font-bold border-l-2 border-cyan-400'
-                  : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
-              }`}
+              className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white"
             >
               <div className="flex items-center gap-2.5 truncate min-w-0">
                 <BookMarked className="w-4.5 h-4.5 text-cyan-400 shrink-0" />
                 <span className="truncate">সিলেবাস ও প্রশ্নব্যাংক</span>
               </div>
-              {activeView === 'syllabus' && (
-                <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-xs shadow-cyan-400 shrink-0"></span>
-              )}
             </button>
           </div>
 
