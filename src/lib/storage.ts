@@ -59,7 +59,9 @@ export function getStoredTests(): AssignedTest[] {
       .filter((t: any) => {
         if (!t) return false;
         if (t.id === 'test-101' || t.id === 'test-102' || t.id === 'test-103') return false;
-        if (t.pin === '235071' || t.pin === '997080' || t.pin === '729463') return false;
+        const ghostPins = ['235071', '997080', '729463', '268649', '723310', '369270', '398679', '264459', '334824', '189893', '330904'];
+        if (t.pin && ghostPins.includes(String(t.pin).trim())) return false;
+        if (t.id && ghostPins.includes(String(t.id).trim())) return false;
         if (isPinDeleted(t.pin, t.id)) return false;
         if (clearedAt > 0 && t.id && String(t.id).startsWith('test-')) {
           const time = parseInt(String(t.id).replace('test-', ''), 10);

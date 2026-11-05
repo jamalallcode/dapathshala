@@ -4,7 +4,7 @@ import {
   Clock, Shield, AlertTriangle, MessageSquare, ChevronRight, Share2,
   TrendingUp, Award, BookOpen, Sparkles, RefreshCw, Edit3, X,
   Save, AlertCircle, Camera, ExternalLink, HelpCircle, GraduationCap, ArrowRight, ArrowLeft,
-  RotateCcw, MessageCircle, Lightbulb, ChevronDown
+  RotateCcw, MessageCircle, Lightbulb, ChevronDown, Printer
 } from 'lucide-react';
 import { AssignedTest, StudentSubmission, ExamQuestion } from '../../types';
 import { 
@@ -57,7 +57,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [selectedClass, setSelectedClass] = useState('৮ম শ্রেণি');
   const [selectedSubject, setSelectedSubject] = useState('সাধারণ গণিত');
   const [selectedChapter, setSelectedChapter] = useState('বীজগণিত ও সমীকরণ');
-  const [questionCount, setQuestionCount] = useState(5);
+  const [questionCount, setQuestionCount] = useState(1);
   const [durationMinutes, setDurationMinutes] = useState(15);
   const [proctoringEnabled, setProctoringEnabled] = useState(true);
 
@@ -95,6 +95,9 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   // Success Link Generation Modal & Finalized State
   const [createdTestResult, setCreatedTestResult] = useState<AssignedTest | null>(null);
   const [isFinalized, setIsFinalized] = useState(false);
+
+  // Question Paper Preview Modal (clean view without starting exam or auto-submitting)
+  const [previewPaperTest, setPreviewPaperTest] = useState<AssignedTest | null>(null);
 
   // Review & Evaluation Modal
   const [reviewTest, setReviewTest] = useState<AssignedTest | null>(null);
@@ -137,7 +140,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const runSync = async (notifyUser = false) => {
     try {
       const localTests = getStoredTests();
-      const serverTests = await fetchAllTestsFromServer();
+      if (!localTests || localTests.length === 0) return;
       let hasChanges = false;
 
       const mergedMap = new Map<string, AssignedTest>();
@@ -146,58 +149,18 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         mergedMap.set(key, t);
       });
 
-      const findExistingKey = (pin?: string, id?: string): string | null => {
-        for (const [k, v] of mergedMap.entries()) {
-          if (pin && v.pin && String(v.pin).trim() === String(pin).trim()) return k;
-          if (id && v.id && String(v.id).trim() === String(id).trim()) return k;
-          if (pin && v.id && String(v.id).replace('test-', '').trim() === String(pin).trim()) return k;
-          if (id && v.pin && String(id).replace('test-', '').trim() === String(v.pin).trim()) return k;
-        }
-        return null;
-      };
-
-      // 1. Process server tests: ONLY update existing tests that belong to this parent!
-      // NEVER inject foreign or uncreated tests into the parent's dashboard!
-      serverTests.forEach(st => {
-        if (!st || (!st.pin && !st.id)) return;
-        if (isPinDeleted(st.pin, st.id)) return;
-        const existingKey = findExistingKey(st.pin, st.id);
-        const local = existingKey ? mergedMap.get(existingKey) : undefined;
-        
-        // Only if the parent already created this test locally, update its submission status
-        if (local && (st.status === 'submitted' || st.status === 'reviewed')) {
-          if (local.status !== st.status || local.score !== st.score || local.parentComment !== st.parentComment) {
-            mergedMap.set(existingKey!, {
-              ...local,
-              ...st,
-              status: st.status,
-              score: st.score ?? local.score,
-              questions: (st.questions && st.questions.length > 0) ? st.questions : local.questions,
-              proctoringFlags: st.proctoringFlags || local.proctoringFlags
-            });
-            hasChanges = true;
-          }
-        }
-      });
-
-      // 2. Also check individual pins for any test that may have been submitted directly
+      // ONLY check if the student has submitted answers for any of THIS parent's own pending tests:
       await Promise.all(localTests.map(async (t) => {
         if (isPinDeleted(t.pin, t.id)) return;
-        if (t.status === 'pending' || !t.score) {
+        if (t.status === 'pending') {
           let serverData = t.pin ? await fetchSubmissionFromServer(t.pin) : null;
           if (!serverData && t.id) {
             serverData = await fetchSubmissionFromServer(t.id);
           }
-          if (!serverData && t.pin) {
-            serverData = await fetchTestFromServer(t.pin);
-          }
-          if (!serverData && t.id) {
-            serverData = await fetchTestFromServer(t.id);
-          }
           if (serverData && (serverData.status === 'submitted' || serverData.status === 'reviewed')) {
-            const existingKey = findExistingKey(t.pin, t.id) || String(t.pin || t.id).trim();
-            const existing = mergedMap.get(existingKey) || t;
-            mergedMap.set(existingKey, {
+            const key = String(t.pin || t.id).trim();
+            const existing = mergedMap.get(key) || t;
+            mergedMap.set(key, {
               ...existing,
               ...serverData,
               status: serverData.status,
@@ -949,9 +912,29 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                   <span className="text-xs font-bold text-slate-700">এআই প্রশ্নের সংখ্যা:</span>
                   <select
                     value={questionCount}
-                    onChange={(e) => setQuestionCount(Number(e.target.value))}
-                    className="bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    onChange={(e) => {
+                      const newCount = Number(e.target.value);
+                      setQuestionCount(newCount);
+                      const questions = getQuestionsForChapter(selectedSubject, selectedChapter, newCount);
+                      const mapped: ExamQuestion[] = questions.map((q, idx) => {
+                        const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
+                        return {
+                          id: q.id || `ai_q_${Date.now()}_${idx}`,
+                          question: q.question,
+                          options: [...q.options],
+                          correctAnswer: q.correctAnswer,
+                          correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
+                          explanation: q.explanation || '',
+                          solutions: q.solutions || generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation)
+                        };
+                      });
+                      setGeneratedQuestions(mapped);
+                    }}
+                    className="bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
                   >
+                    <option value={1}>১টি প্রশ্ন</option>
+                    <option value={2}>২টি প্রশ্ন</option>
+                    <option value={3}>৩টি প্রশ্ন</option>
                     <option value={5}>৫টি প্রশ্ন</option>
                     <option value={10}>১০টি প্রশ্ন</option>
                     <option value={15}>১৫টি প্রশ্ন</option>
@@ -1485,7 +1468,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                       {isPending && (
                         <button
                           type="button"
-                          onClick={() => onOpenTest(test)}
+                          onClick={() => setPreviewPaperTest(test)}
                           className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl border border-blue-300 bg-blue-50/70 hover:bg-blue-100 text-blue-700 text-xs font-bold transition-colors cursor-pointer"
                         >
                           <Eye className="w-3.5 h-3.5" />
@@ -1499,6 +1482,130 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 0: QUESTION PAPER PREVIEW (নিরাপদ প্রিভিউ ও প্রিন্ট)   */}
+      {/* (পরীক্ষা শুরু না করেই সম্পূর্ণ প্রশ্নপত্র ও সঠিক উত্তর দেখার সুবিধা) */}
+      {/* ======================================================== */}
+      {previewPaperTest && (
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] flex flex-col border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95">
+            
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                      প্রশ্নপত্র প্রিভিউ
+                    </span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-800">
+                      পিন: {previewPaperTest.pin}
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 mt-1">
+                    {previewPaperTest.title}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    অধ্যায়: {previewPaperTest.chapter} • মোট প্রশ্ন: {toBn(previewPaperTest.questions?.length ?? previewPaperTest.questionCount)}টি • সময়: {toBn(previewPaperTest.durationMinutes)} মিনিট
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
+                  title="প্রশ্নপত্র প্রিন্ট বা PDF হিসেবে সংরক্ষণ করুন"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>প্রিন্ট</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewPaperTest(null)}
+                  className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Questions List Body */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+              {(previewPaperTest.questions || []).map((q, idx) => (
+                <div key={q.id || idx} className="bg-slate-50/80 rounded-2xl p-4 sm:p-5 border border-slate-200/90 space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {toBn(idx + 1)}
+                    </span>
+                    <p className="text-sm font-bold text-slate-900 leading-relaxed">
+                      {q.question}
+                    </p>
+                  </div>
+
+                  {/* Options Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-8">
+                    {(q.options || []).map((opt, optIdx) => {
+                      const isCorrect = opt.trim() === q.correctAnswer?.trim();
+                      return (
+                        <div
+                          key={optIdx}
+                          className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-between gap-2 transition-all ${
+                            isCorrect 
+                              ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-bold shadow-2xs' 
+                              : 'bg-white border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold flex items-center justify-center">
+                              {['ক', 'খ', 'গ', 'ঘ'][optIdx] || optIdx + 1}
+                            </span>
+                            <span>{opt}</span>
+                          </div>
+                          {isCorrect && (
+                            <span className="text-[11px] text-emerald-700 font-black flex items-center gap-1 shrink-0">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>সঠিক উত্তর</span>
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Explanation if available */}
+                  {q.explanation && (
+                    <div className="ml-8 mt-2 p-2.5 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-900 leading-relaxed font-medium">
+                      <span className="font-bold">ব্যাখ্যা: </span>
+                      <span>{q.explanation}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
+              <span className="text-xs text-slate-500 font-medium">
+                সন্তানের সাথে ৬-সংখ্যার পিনটি (<strong className="text-blue-700 font-black">{previewPaperTest.pin}</strong>) শেয়ার করুন।
+              </span>
+              <button
+                type="button"
+                onClick={() => setPreviewPaperTest(null)}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                বন্ধ করুন
+              </button>
+            </div>
+
+          </div>
         </div>
       )}
 

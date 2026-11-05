@@ -90,12 +90,12 @@ function getMergedTests(): Record<string, any> {
     }
   }
   // Remove legacy automatic demo placeholder IDs if present
-  delete merged['test-101'];
-  delete merged['test-102'];
-  delete merged['test-103'];
-  delete merged['235071'];
-  delete merged['997080'];
-  delete merged['729463'];
+  const ghostList = ['test-101', 'test-102', 'test-103', '235071', '997080', '729463', '268649', '723310', '369270', '398679', '264459', '334824', '189893', '330904'];
+  ghostList.forEach(p => {
+    delete merged[p];
+    delete testsStore[p];
+    delete submissionsStore[p];
+  });
   testsStore = merged;
   return merged;
 }
