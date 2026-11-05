@@ -257,6 +257,21 @@ export async function fetchTestFromServer(pinOrId: string): Promise<AssignedTest
   return null;
 }
 
+export async function fetchAllTestsFromServer(): Promise<AssignedTest[]> {
+  try {
+    const res = await fetch('/api/tests');
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        return data;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch all tests from server:', err);
+  }
+  return [];
+}
+
 export async function syncSubmissionToServer(submission: any): Promise<boolean> {
   try {
     const res = await fetch('/api/submissions', {

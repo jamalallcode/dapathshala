@@ -836,10 +836,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-300 text-xs font-bold">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>{isReviewed ? "খাতা দেখা হয়েছে" : "মূল্যায়ন সম্পন্ন"}</span>
-            {test.score !== undefined && (
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold ${
+            isReviewed 
+              ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+              : "bg-blue-50 text-blue-800 border-blue-200"
+          }`}>
+            <CheckCircle2 className={`w-4 h-4 ${isReviewed ? "text-emerald-600" : "text-blue-600"}`} />
+            <span>{isReviewed ? "মূল্যায়ন সম্পন্ন ও অনুমোদিত" : "উত্তরপত্র জমা সম্পন্ন"}</span>
+            {isReviewed && test.score !== undefined && (
               <span className="ml-1 pl-1.5 border-l border-emerald-300 font-black text-emerald-900">
                 {test.score}%
               </span>
@@ -849,7 +853,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       </div>
 
       {/* Parent Feedback & Approved Score Banner (When Reviewed) */}
-      {(isReviewOnly || isSubmitted) && test.parentComment && (
+      {(isReviewOnly || isReviewed) && test.parentComment && (
         <div className="bg-indigo-50/80 border border-indigo-200 rounded-2xl p-4 sm:p-5 space-y-2 text-indigo-950 shadow-xs">
           <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-indigo-900">
             <MessageSquare className="w-4 h-4 text-indigo-600" />
@@ -865,72 +869,44 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         </div>
       )}
 
-      {/* Post-Submission Success Notice for Student */}
-      {isSubmitted && !isReviewOnly && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-3xl p-6 text-center space-y-3 shadow-xs">
-          <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-xs">
-            <Check className="w-6 h-6 stroke-[3]" />
+      {/* Post-Submission Clean Screen for Student: Job is done, no clutter! */}
+      {isSubmitted && !isReviewOnly && !isReviewed && (
+        <div className="bg-white border-2 border-emerald-500 rounded-3xl p-6 sm:p-8 text-center space-y-4 shadow-xl">
+          <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-xs">
+            <Check className="w-9 h-9 stroke-[3]" />
           </div>
-          <h3 className="text-lg font-black text-emerald-900">
-            উত্তরপত্র সফলভাবে জমা হয়েছে!
-          </h3>
-          <p className="text-xs sm:text-sm text-emerald-800 max-w-md mx-auto leading-relaxed">
-            আপনার উত্তরপত্রটি অভিভাবকের কাছে পৌঁছেছে। অভিভাবক খাতা যাচাই ও দিকনির্দেশনামূলক মন্তব্য দিলে আপনি পূর্ণাঙ্গ ফলাফল ও মার্কস দেখতে পাবেন।
-          </p>
-          <div className="pt-3 flex flex-wrap items-center justify-center gap-2">
+          <div className="space-y-1.5">
+            <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
+              ✓ পরীক্ষা সম্পন্ন
+            </span>
+            <h3 className="text-xl sm:text-2xl font-black text-slate-900 pt-1">
+              উত্তরপত্র সফলভাবে জমা হয়েছে!
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-600 max-w-lg mx-auto leading-relaxed">
+              তোমার উত্তরপত্রটি অপর প্রান্তে অভিভাবকের কাছে পৌঁছে গেছে। অভিভাবক খাতা যাচাই ও মূল্যায়ন সম্পন্ন করলে তুমি পূর্ণাঙ্গ ফলাফল ও দিকনির্দেশনা দেখতে পাবে।
+            </p>
+          </div>
+
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl max-w-sm mx-auto text-xs text-slate-600 flex items-center justify-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span className="font-semibold text-slate-800">তোমার কাজ শেষ! এখন তুমি ফিরে যেতে পারো।</span>
+          </div>
+
+          <div className="pt-2 flex justify-center">
             <button
               type="button"
               onClick={onExit}
-              className="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold shadow-xs cursor-pointer transition-colors"
+              className="px-8 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-sm font-bold shadow-md shadow-emerald-600/30 cursor-pointer transition-all flex items-center gap-2"
             >
-              মূল পাতায় ফিরে যান
+              <span>মূল পাতায় ফিরে যান</span>
+              <ArrowLeft className="w-4 h-4 rotate-180" />
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                const updatedTest: AssignedTest = {
-                  ...test,
-                  status: 'submitted',
-                  score: Math.round((test.questions.filter(q => (answers[q.id] || '') === q.correctAnswer).length / test.questions.length) * 100),
-                  questions: test.questions.map(q => ({
-                    ...q,
-                    studentAnswer: answers[q.id] || '',
-                    isCorrect: (answers[q.id] || '') === q.correctAnswer
-                  }))
-                };
-                const url = getShareableSubmissionUrl(updatedTest);
-                navigator.clipboard.writeText(url);
-                alert('✓ খাতা জমার ফলাফল লিংক কপি হয়েছে! এটি অভিভাবককে পাঠিয়ে খাতা দেখতে বলুন।');
-              }}
-              className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors"
-            >
-              <Copy className="w-4 h-4" />
-              <span>ফলাফল লিংক কপি</span>
-            </button>
-            <a
-              href={`https://wa.me/?text=${encodeURIComponent(
-                `আমি "${test.title}" পরীক্ষা সফলভাবে সম্পন্ন করে খাতা জমা দিয়েছি।\nখাতা দেখতে ও মূল্যায়ন করতে এই লিংকে ক্লিক করুন:\n${getShareableSubmissionUrl({
-                  ...test,
-                  status: 'submitted',
-                  score: Math.round((test.questions.filter(q => (answers[q.id] || '') === q.correctAnswer).length / test.questions.length) * 100),
-                  questions: test.questions.map(q => ({
-                    ...q,
-                    studentAnswer: answers[q.id] || '',
-                    isCorrect: (answers[q.id] || '') === q.correctAnswer
-                  }))
-                })}`
-              )}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-xs flex items-center gap-1.5 transition-colors"
-            >
-              <span>হোয়াটসঅ্যাপে অভিভাবককে জানান</span>
-            </a>
           </div>
         </div>
       )}
 
-      {/* Questions Answering Sheet */}
+      {/* Questions Answering Sheet - hidden for student right after submission until reviewed */}
+      {(!isSubmitted || isReviewOnly || isReviewed) && (
       <div className="space-y-4">
         {test.questions.map((q, idx) => {
           const chosenAnswer = answers[q.id];
@@ -1043,6 +1019,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           );
         })}
       </div>
+      )}
 
       {/* Bottom Submit Action Strip - High z-index, clean padding, completely unobstructed */}
       {!isReviewOnly && !isSubmitted && (

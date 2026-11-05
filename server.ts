@@ -66,12 +66,41 @@ function saveJson(filePath: string, data: any) {
 
 // Convert if it was an array previously
 const initialSubmissions = loadJson(SUBMISSIONS_FILE, {});
-let submissionsStore: Record<string, any> = Array.isArray(initialSubmissions) ? {} : initialSubmissions;
-let testsStore: Record<string, any> = loadJson(TESTS_FILE, {});
+let submissionsStore: Record<string, any> = (initialSubmissions && typeof initialSubmissions === 'object' && !Array.isArray(initialSubmissions)) ? initialSubmissions : {};
+const initialTests = loadJson(TESTS_FILE, {});
+let testsStore: Record<string, any> = (initialTests && typeof initialTests === 'object' && !Array.isArray(initialTests)) ? initialTests : {};
 // Remove legacy automatic demo placeholder IDs if present
 delete testsStore['test-101'];
 delete testsStore['test-102'];
 delete testsStore['test-103'];
+
+// API: Get All Tests & Submissions for Parent Dashboard
+app.get('/api/tests', (_req, res) => {
+  const mergedMap = new Map<string, any>();
+
+  // Add tests first
+  Object.values(testsStore).forEach((t: any) => {
+    if (t && (t.pin || t.id)) {
+      const key = String(t.pin || t.id).trim();
+      mergedMap.set(key, t);
+    }
+  });
+
+  // Override with submissions (submitted or reviewed always wins!)
+  Object.values(submissionsStore).forEach((s: any) => {
+    if (s && (s.pin || s.id)) {
+      const key = String(s.pin || s.id).trim();
+      const existing = mergedMap.get(key) || {};
+      mergedMap.set(key, { ...existing, ...s });
+    }
+  });
+
+  const uniqueTests = Array.from(mergedMap.values()).filter((item, index, self) => 
+    index === self.findIndex(t => (t.pin && t.pin === item.pin) || (t.id && t.id === item.id))
+  );
+
+  res.json(uniqueTests);
+});
 
 // API: Save Test
 app.post('/api/tests', (req, res) => {
@@ -82,10 +111,12 @@ app.post('/api/tests', (req, res) => {
   const pinKey = test.pin ? String(test.pin).trim() : '';
   const idKey = test.id ? String(test.id).trim() : '';
 
-  // If this test was already submitted by the student, preserve submitted/reviewed status
-  const existing = (pinKey && (testsStore[pinKey] || submissionsStore[pinKey])) ||
-                   (idKey && (testsStore[idKey] || submissionsStore[idKey]));
-  if (existing && (existing.status === 'submitted' || existing.status === 'reviewed') && test.status === 'pending') {
+  // If this test was already submitted by the student, ALWAYS preserve submitted/reviewed status
+  const existingSub = (pinKey && submissionsStore[pinKey]) || (idKey && submissionsStore[idKey]);
+  const existingTest = (pinKey && testsStore[pinKey]) || (idKey && testsStore[idKey]);
+  const existing = existingSub || existingTest;
+
+  if (existing && (existing.status === 'submitted' || existing.status === 'reviewed')) {
     test.status = existing.status;
     test.score = existing.score ?? test.score;
     test.parentComment = existing.parentComment ?? test.parentComment;
@@ -98,12 +129,22 @@ app.post('/api/tests', (req, res) => {
   res.json({ success: true, pin: test.pin, status: test.status });
 });
 
-// API: Get Test by PIN or ID (falls back to submissionsStore if found there)
+// API: Get Test by PIN or ID (prioritizes submitted answer sheets so parent instantly gets "উত্তরপত্র")
 app.get('/api/tests/:pin', (req, res) => {
   const pin = String(req.params.pin).trim();
-  const test = testsStore[pin] || submissionsStore[pin];
+  const sub = submissionsStore[pin];
+  if (sub && (sub.status === 'submitted' || sub.status === 'reviewed')) {
+    return res.json(sub);
+  }
+  const test = testsStore[pin];
   if (test) {
+    if (sub) {
+      return res.json({ ...test, ...sub });
+    }
     return res.json(test);
+  }
+  if (sub) {
+    return res.json(sub);
   }
   res.status(404).json({ error: 'Test not found' });
 });
@@ -132,7 +173,7 @@ app.delete('/api/tests/:pinOrId', (req, res) => {
   res.json({ success: true, message: 'Test deleted successfully' });
 });
 
-// API: Save Student Submission (updates both submissionsStore and testsStore)
+// API: Save Student Submission (updates both submissionsStore and testsStore with "submitted" status)
 app.post('/api/submissions', (req, res) => {
   const sub = req.body;
   if (!sub || (!sub.pin && !sub.id)) {
@@ -156,6 +197,7 @@ app.post('/api/submissions', (req, res) => {
   saveJson(SUBMISSIONS_FILE, submissionsStore);
   saveJson(TESTS_FILE, testsStore);
 
+  console.log(`[Submission Saved] PIN: ${pinKey || idKey}, Status: ${normalizedStatus}, Score: ${updatedRecord.score}`);
   res.json({ success: true, pin: pinKey || idKey, status: normalizedStatus });
 });
 
@@ -175,14 +217,34 @@ async function startServer() {
     const vite = await createViteServer({
       server: { 
         middlewareMode: true,
-        hmr: false 
+        hmr: false,
+        ws: false,
       },
       appType: 'spa',
     });
     app.use(vite.middlewares);
+
+    // Explicit fallback for client-side navigation in dev mode
+    app.use(async (req, res, next) => {
+      if (req.originalUrl.startsWith('/api/')) {
+        return next();
+      }
+      try {
+        const indexHtmlPath = path.resolve(process.cwd(), 'index.html');
+        if (fs.existsSync(indexHtmlPath)) {
+          let template = fs.readFileSync(indexHtmlPath, 'utf-8');
+          template = await vite.transformIndexHtml(req.originalUrl, template);
+          return res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+        }
+        next();
+      } catch (e: any) {
+        vite?.ssrFixStacktrace?.(e);
+        next(e);
+      }
+    });
   } else {
     app.use(express.static(path.resolve(process.cwd(), 'dist')));
-    app.get('*', (_req, res) => {
+    app.get('/{*splat}', (_req, res) => {
       res.sendFile(path.resolve(process.cwd(), 'dist', 'index.html'));
     });
   }
@@ -194,6 +256,15 @@ async function startServer() {
   server.on('error', (err: any) => {
     console.error('Server listen error:', err?.message || err);
   });
+
+  const gracefulShutdown = () => {
+    server.close(() => {
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', gracefulShutdown);
+  process.on('SIGINT', gracefulShutdown);
 }
 
 startServer();

@@ -19,6 +19,7 @@ import {
   syncTestToServer,
   fetchTestFromServer,
   fetchSubmissionFromServer,
+  fetchAllTestsFromServer,
   syncSubmissionToServer
 } from '../../lib/storage';
 import { 
@@ -139,38 +140,65 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     const checkServerUpdates = async () => {
       try {
         const localTests = getStoredTests();
+        const serverTests = await fetchAllTestsFromServer();
         let hasChanges = false;
-        const updated = await Promise.all(localTests.map(async (t) => {
-          if (t.status === 'pending' || t.status === 'submitted') {
-            let serverData = await fetchTestFromServer(t.pin);
-            // If test endpoint didn't show submission, check submissions endpoint
-            if (!serverData || (serverData.status !== 'submitted' && serverData.status !== 'reviewed')) {
-              const subData = await fetchSubmissionFromServer(t.pin);
-              if (subData && (subData.status === 'submitted' || subData.status === 'reviewed')) {
-                serverData = subData;
-              }
-            }
 
-            if (serverData && (serverData.status !== t.status || serverData.score !== t.score || serverData.parentComment !== t.parentComment)) {
+        const mergedMap = new Map<string, AssignedTest>();
+        localTests.forEach(t => {
+          const key = String(t.pin || t.id).trim();
+          mergedMap.set(key, t);
+        });
+
+        // 1. Process server tests: if any test was submitted by student, update it immediately
+        serverTests.forEach(st => {
+          if (!st || (!st.pin && !st.id)) return;
+          const key = String(st.pin || st.id).trim();
+          const local = mergedMap.get(key);
+          if (!local) {
+            mergedMap.set(key, st);
+            hasChanges = true;
+          } else if (st.status === 'submitted' || st.status === 'reviewed') {
+            if (local.status !== st.status || local.score !== st.score || local.parentComment !== st.parentComment) {
+              mergedMap.set(key, {
+                ...local,
+                ...st,
+                status: st.status,
+                score: st.score ?? local.score,
+                questions: (st.questions && st.questions.length > 0) ? st.questions : local.questions,
+                proctoringFlags: st.proctoringFlags || local.proctoringFlags
+              });
               hasChanges = true;
-              return {
-                ...t,
-                ...serverData,
-                id: t.id,
-                status: serverData.status,
-                score: serverData.score ?? t.score,
-                parentComment: serverData.parentComment ?? t.parentComment,
-                questions: (serverData.questions && serverData.questions.length > 0) ? serverData.questions : t.questions,
-                proctoringFlags: serverData.proctoringFlags || t.proctoringFlags
-              };
             }
           }
-          return t;
+        });
+
+        // 2. Also check individual pins for any pending test that may have been submitted directly
+        await Promise.all(localTests.map(async (t) => {
+          if (t.status === 'pending') {
+            let serverData = await fetchSubmissionFromServer(t.pin);
+            if (!serverData) {
+              serverData = await fetchTestFromServer(t.pin);
+            }
+            if (serverData && (serverData.status === 'submitted' || serverData.status === 'reviewed')) {
+              const key = String(t.pin || t.id).trim();
+              const existing = mergedMap.get(key) || t;
+              mergedMap.set(key, {
+                ...existing,
+                ...serverData,
+                status: serverData.status,
+                score: serverData.score ?? existing.score,
+                questions: (serverData.questions && serverData.questions.length > 0) ? serverData.questions : existing.questions,
+                proctoringFlags: serverData.proctoringFlags || existing.proctoringFlags
+              });
+              hasChanges = true;
+            }
+          }
         }));
 
         if (hasChanges && !isCancelled) {
+          const updated = Array.from(mergedMap.values());
           setTests(updated);
-          saveStoredTests(updated);
+          localStorage.setItem('dapathshala_assigned_tests_v2', JSON.stringify(updated));
         }
       } catch (err) {
         console.warn('Error checking server updates in ParentDashboard:', err);
@@ -178,7 +206,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     };
 
     checkServerUpdates();
-    const interval = setInterval(checkServerUpdates, 2000);
+    const interval = setInterval(checkServerUpdates, 1500);
     window.addEventListener('focus', checkServerUpdates);
 
     return () => {
@@ -1392,9 +1420,10 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                         <button
                           type="button"
                           onClick={() => handleOpenReviewModal(test)}
-                          className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs font-black shadow-xs transition-colors cursor-pointer"
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs sm:text-sm font-black shadow-md shadow-amber-500/30 transition-all cursor-pointer ring-2 ring-amber-400 ring-offset-1 animate-pulse"
+                          title="সন্তান পরীক্ষা দিয়েছে! উত্তরপত্র দেখতে ও মূল্যায়ন করতে ক্লিক করুন"
                         >
-                          <FileText className="w-3.5 h-3.5" />
+                          <FileText className="w-4 h-4" />
                           <span>উত্তরপত্র</span>
                         </button>
                       )}
