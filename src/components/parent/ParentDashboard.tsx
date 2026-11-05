@@ -234,11 +234,64 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     'আইসিটি / তথ্য ও যোগাযোগ প্রযুক্তি': ['তথ্য ও যোগাযোগ প্রযুক্তি পরিচিতি', 'কম্পিউটার নেটওয়ার্ক ও সাইবার নিরাপত্তা']
   };
 
-  // When subject changes, set default chapter
+  // Helper to automatically update exam title whenever Class, Subject, or Chapter is selected
+  const updateExamTitle = (cls: string, sub: string, chap: string) => {
+    setExamTitleInput(`${cls} - ${sub}: ${chap} মূল্যায়ন`);
+  };
+
+  // When class changes, auto-update exam title
+  const handleClassChange = (cls: string) => {
+    setSelectedClass(cls);
+    updateExamTitle(cls, selectedSubject, selectedChapter);
+  };
+
+  // When subject changes, set default chapter and auto-update title & questions
   const handleSubjectChange = (sub: string) => {
     setSelectedSubject(sub);
     const chaps = subjectChapters[sub] || ['সাধারণ অধ্যায়'];
-    setSelectedChapter(chaps[0]);
+    const newChap = chaps[0];
+    setSelectedChapter(newChap);
+    updateExamTitle(selectedClass, sub, newChap);
+
+    if (creationMode === 'ai') {
+      const questions = getQuestionsForChapter(sub, newChap, questionCount);
+      const mapped: ExamQuestion[] = questions.map((q, idx) => {
+        const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
+        return {
+          id: q.id || `ai_q_${Date.now()}_${idx}`,
+          question: q.question,
+          options: [...q.options],
+          correctAnswer: q.correctAnswer,
+          correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
+          explanation: q.explanation || '',
+          solutions: q.solutions || generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation)
+        };
+      });
+      setGeneratedQuestions(mapped);
+    }
+  };
+
+  // When chapter changes, auto-update title & questions
+  const handleChapterChange = (chap: string) => {
+    setSelectedChapter(chap);
+    updateExamTitle(selectedClass, selectedSubject, chap);
+
+    if (creationMode === 'ai') {
+      const questions = getQuestionsForChapter(selectedSubject, chap, questionCount);
+      const mapped: ExamQuestion[] = questions.map((q, idx) => {
+        const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
+        return {
+          id: q.id || `ai_q_${Date.now()}_${idx}`,
+          question: q.question,
+          options: [...q.options],
+          correctAnswer: q.correctAnswer,
+          correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
+          explanation: q.explanation || '',
+          solutions: q.solutions || generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation)
+        };
+      });
+      setGeneratedQuestions(mapped);
+    }
   };
 
   // Add a new question: blank format for manual mode, or curriculum bank for AI mode
@@ -842,7 +895,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 </label>
                 <select
                   value={selectedClass}
-                  onChange={(e) => setSelectedClass(e.target.value)}
+                  onChange={(e) => handleClassChange(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {['১ম শ্রেণি', '২য় শ্রেণি', '৩য় শ্রেণি', '৪র্থ শ্রেণি', '৫ম শ্রেণি', '৬ষ্ঠ শ্রেণি', '৭ম শ্রেণি', '৮ম শ্রেণি', '৯ম শ্রেণি', '১০ম শ্রেণি'].map(cls => (
@@ -874,7 +927,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 </label>
                 <select
                   value={selectedChapter}
-                  onChange={(e) => setSelectedChapter(e.target.value)}
+                  onChange={(e) => handleChapterChange(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {(subjectChapters[selectedSubject] || []).map(chap => (
@@ -899,7 +952,10 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                   <option value={20}>২০ মিনিট</option>
                   <option value={30}>৩০ মিনিট</option>
                   <option value={45}>৪৫ মিনিট</option>
-                  <option value={60}>৬০ মিনিট</option>
+                  <option value={60}>৬০ মিনিট (১ ঘণ্টা)</option>
+                  <option value={90}>৯০ মিনিট (দেড় ঘণ্টা)</option>
+                  <option value={100}>১০০ মিনিট</option>
+                  <option value={120}>১২০ মিনিট (২ ঘণ্টা)</option>
                 </select>
               </div>
 
@@ -939,6 +995,16 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                     <option value={10}>১০টি প্রশ্ন</option>
                     <option value={15}>১৫টি প্রশ্ন</option>
                     <option value={20}>২০টি প্রশ্ন</option>
+                    <option value={25}>২৫টি প্রশ্ন</option>
+                    <option value={30}>৩০টি প্রশ্ন</option>
+                    <option value={40}>৪০টি প্রশ্ন</option>
+                    <option value={50}>৫০টি প্রশ্ন</option>
+                    <option value={60}>৬০টি প্রশ্ন</option>
+                    <option value={70}>৭০টি প্রশ্ন</option>
+                    <option value={75}>৭৫টি প্রশ্ন</option>
+                    <option value={80}>৮০টি প্রশ্ন</option>
+                    <option value={90}>৯০টি প্রশ্ন</option>
+                    <option value={100}>১০০টি প্রশ্ন (মডেল টেস্ট)</option>
                   </select>
                 </div>
 
