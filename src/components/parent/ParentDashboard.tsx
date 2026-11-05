@@ -156,16 +156,16 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         return null;
       };
 
-      // 1. Process server tests: if any test was submitted by student, update it immediately
+      // 1. Process server tests: ONLY update existing tests that belong to this parent!
+      // NEVER inject foreign or uncreated tests into the parent's dashboard!
       serverTests.forEach(st => {
         if (!st || (!st.pin && !st.id)) return;
         if (isPinDeleted(st.pin, st.id)) return;
         const existingKey = findExistingKey(st.pin, st.id);
         const local = existingKey ? mergedMap.get(existingKey) : undefined;
-        if (!local) {
-          mergedMap.set(String(st.pin || st.id).trim(), st);
-          hasChanges = true;
-        } else if (st.status === 'submitted' || st.status === 'reviewed') {
+        
+        // Only if the parent already created this test locally, update its submission status
+        if (local && (st.status === 'submitted' || st.status === 'reviewed')) {
           if (local.status !== st.status || local.score !== st.score || local.parentComment !== st.parentComment) {
             mergedMap.set(existingKey!, {
               ...local,

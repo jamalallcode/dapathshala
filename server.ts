@@ -93,6 +93,9 @@ function getMergedTests(): Record<string, any> {
   delete merged['test-101'];
   delete merged['test-102'];
   delete merged['test-103'];
+  delete merged['235071'];
+  delete merged['997080'];
+  delete merged['729463'];
   testsStore = merged;
   return merged;
 }
