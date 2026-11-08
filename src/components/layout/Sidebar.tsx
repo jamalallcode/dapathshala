@@ -1,21 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
-  LayoutDashboard, 
-  BookOpen, 
-  PlusCircle, 
-  FileCheck, 
-  ShieldCheck, 
+  PlusCircle,
   Award, 
-  Layers, 
   Brain, 
-  ChevronDown, 
-  ChevronRight, 
   X,
-  GraduationCap,
-  BookMarked,
-  Settings
+  Camera
 } from 'lucide-react';
 import { UserRole, AssignedTest } from '../../types';
+import { getCurrentParent, ParentUser, updateParentProfile } from '../../lib/parentAuth';
 
 export interface SidebarProps {
   isOpen: boolean;
@@ -28,8 +20,8 @@ export interface SidebarProps {
   activeView: 'landing' | 'dashboard' | 'exam' | 'review';
   onNavigateHome: () => void;
   onNavigateDashboard: () => void;
-  parentTab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings';
-  onSelectParentTab: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings') => void;
+  parentTab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games';
+  onSelectParentTab: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games') => void;
   onOpenCreateExam: () => void;
   onOpenSettings?: () => void;
   onDirectStartExam?: (test: AssignedTest) => void;
@@ -51,11 +43,63 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenCreateExam,
   onOpenSettings
 }) => {
-  const [openSubmenu, setOpenSubmenu] = useState<string | null>('exams');
+  const [parentUser, setParentUser] = useState<ParentUser | null>(() => getCurrentParent());
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const toggleSubmenu = (menu: string) => {
-    setOpenSubmenu(prev => prev === menu ? null : menu);
+  const getFirstLetter = (name?: string): string => {
+    if (!name || !name.trim()) return 'অ';
+    const trimmed = name.trim();
+    return trimmed.charAt(0).toUpperCase();
   };
+
+  const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 256;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        updateParentProfile({ avatar: compressedDataUrl });
+        setParentUser(getCurrentParent());
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setParentUser(getCurrentParent());
+    };
+    window.addEventListener('dapathshala_parent_auth_changed', handleAuthChange);
+    window.addEventListener('storage', handleAuthChange);
+    return () => {
+      window.removeEventListener('dapathshala_parent_auth_changed', handleAuthChange);
+      window.removeEventListener('storage', handleAuthChange);
+    };
+  }, []);
 
   const handleLinkClick = (action: () => void) => {
     action();
@@ -85,30 +129,67 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }`}
       >
         {/* ======================================================== */}
-        {/* 1. TOP HEADER: Logo + Title (Collapse icon removed)       */}
+        {/* 1. TOP HEADER: Parent Photo + Name & Mobile Number       */}
         {/* ======================================================== */}
-        <div className="h-13 border-b border-slate-800/90 flex items-center justify-between px-3 bg-[#090e1a] shrink-0">
-          <div 
-            onClick={() => handleLinkClick(onNavigateHome)}
-            className="flex items-center gap-2 cursor-pointer overflow-hidden min-w-0 group"
-            title="মূল ওয়েবসাইট / ল্যান্ডিং পেজে যান"
-          >
-            {/* Square Blue Emblem Icon */}
-            <div className="w-8 h-8 rounded-lg bg-blue-600 group-hover:bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-xs transition-colors">
-              <GraduationCap className="w-4.5 h-4.5" />
+        <div className="h-14 border-b border-slate-800/90 flex items-center justify-between px-3 bg-[#090e1a] shrink-0">
+          <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
+            
+            {/* Hidden File Input for Avatar Upload from Computer */}
+            <input 
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarFileSelect}
+              className="hidden"
+            />
+
+            {/* Parent Profile Avatar / Initial Letter - Click to upload from computer */}
+            <div 
+              onClick={() => fileInputRef.current?.click()}
+              className="relative w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-700 border-2 border-blue-400/60 flex items-center justify-center shrink-0 shadow-xs cursor-pointer group/avatar transition-transform hover:scale-105"
+              title="কম্পিউটার থেকে ছবি সেট করতে ক্লিক করুন"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  fileInputRef.current?.click();
+                }
+              }}
+            >
+              {parentUser?.avatar ? (
+                <img 
+                  src={parentUser.avatar} 
+                  alt={parentUser?.name || 'অভিভাবক'} 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-white font-black text-sm select-none">
+                  {getFirstLetter(parentUser?.name)}
+                </span>
+              )}
+
+              {/* Hover overlay with Camera Icon */}
+              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity rounded-full">
+                <Camera className="w-4 h-4 text-white" />
+              </div>
             </div>
             
-            <div className="truncate min-w-0">
-              <span className="font-black text-white text-base tracking-tight block truncate group-hover:text-blue-300 transition-colors">
-                দাপাঠশালা
+            {/* Name & Mobile Number */}
+            <div 
+              onClick={() => handleLinkClick(onNavigateHome)}
+              className="truncate min-w-0 cursor-pointer group"
+              title="মূল ওয়েবসাইট / ল্যান্ডিং পেজে যান"
+            >
+              <span className="font-bold text-white text-sm tracking-tight block truncate group-hover:text-blue-300 transition-colors">
+                {parentUser?.name || 'অভিভাবক'}
               </span>
               <span className="text-xs text-slate-400 font-semibold block truncate">
-                একাডেমিক পোর্টাল
+                {parentUser?.phone || '০১৭৮৯৫৩৯৪৯৪'}
               </span>
             </div>
           </div>
 
-          {/* Mobile Close Button only (Collapse button removed completely) */}
+          {/* Mobile Close Button only */}
           <button
             type="button"
             onClick={onClose}
@@ -124,29 +205,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* ======================================================== */}
         <div className="flex-1 overflow-y-auto py-3 space-y-1 text-sm font-semibold">
           
-          {/* Menu 1: ড্যাশবোর্ড হোম */}
-          <div>
-            <button
-              type="button"
-              onClick={() => handleLinkClick(() => {
-                onRoleChange('parent');
-                onNavigateDashboard();
-                onSelectParentTab('overview');
-              })}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
-                parentTab === 'overview' && activeView === 'dashboard'
-                  ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
-                  : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 truncate min-w-0">
-                <LayoutDashboard className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
-                <span className="truncate">ড্যাশবোর্ড হোম</span>
-              </div>
-            </button>
-          </div>
-
-          {/* Menu 2: পরীক্ষাসমূহ ও খাতা (Exams) */}
+          {/* Menu: প্রশ্নপত্র তৈরি */}
           <div>
             <button
               type="button"
@@ -155,6 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onRoleChange('parent');
                   onNavigateDashboard();
                   onSelectParentTab('assigned');
+                  onOpenCreateExam();
                 });
               }}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
@@ -164,52 +224,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }`}
             >
               <div className="flex items-center gap-2.5 truncate min-w-0">
-                <BookOpen className="w-4.5 h-4.5 text-blue-400 shrink-0" />
-                <span className="truncate">পরীক্ষাসমূহ ও খাতা</span>
-              </div>
-            </button>
-          </div>
-
-          {/* Menu 3: খাতা মূল্যায়ন (Grading & Review) */}
-          <div>
-            <button
-              type="button"
-              onClick={() => handleLinkClick(() => {
-                onRoleChange('parent');
-                onNavigateDashboard();
-                onSelectParentTab('review');
-              })}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
-                parentTab === 'review' && activeView === 'dashboard'
-                  ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
-                  : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 truncate min-w-0">
-                <FileCheck className="w-4.5 h-4.5 text-amber-400 shrink-0" />
-                <span className="truncate">খাতা মূল্যায়ন</span>
-              </div>
-            </button>
-          </div>
-
-          {/* Menu 4: লাইভ প্রক্টরিং (Live Proctoring & Integrity) */}
-          <div>
-            <button
-              type="button"
-              onClick={() => handleLinkClick(() => {
-                onRoleChange('parent');
-                onNavigateDashboard();
-                onSelectParentTab('proctoring');
-              })}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
-                parentTab === 'proctoring' && activeView === 'dashboard'
-                  ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
-                  : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 truncate min-w-0">
-                <ShieldCheck className="w-4.5 h-4.5 text-purple-400 shrink-0" />
-                <span className="truncate">লাইভ প্রক্টরিং</span>
+                <PlusCircle className="w-4.5 h-4.5 text-blue-400 shrink-0" />
+                <span className="truncate">প্রশ্নপত্র তৈরি</span>
               </div>
             </button>
           </div>
@@ -236,86 +252,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
-          {/* Menu 6: ওয়ার্কশিট জেনারেটর */}
-          <div>
-            <button
-              type="button"
-              onClick={() => handleLinkClick(() => {
-                onNavigateHome();
-                setTimeout(() => {
-                  const el = document.getElementById('worksheet-section');
-                  el?.scrollIntoView({ behavior: 'smooth' });
-                }, 100);
-              })}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white"
-            >
-              <div className="flex items-center gap-2.5 truncate min-w-0">
-                <Layers className="w-4.5 h-4.5 text-teal-400 shrink-0" />
-                <span className="truncate">ওয়ার্কশিট জেনারেটর</span>
-              </div>
-            </button>
-          </div>
-
-          {/* Menu 7: কুইজ ও ব্রেইন গেমস */}
-          <div>
-            <button
-              type="button"
-              onClick={() => handleLinkClick(() => {
-                onNavigateHome();
-                setTimeout(() => {
-                  const el = document.getElementById('generators-section');
-                  el?.scrollIntoView({ behavior: 'smooth' });
-                }, 100);
-              })}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white"
-            >
-              <div className="flex items-center gap-2.5 truncate min-w-0">
-                <Brain className="w-4.5 h-4.5 text-rose-400 shrink-0" />
-                <span className="truncate">কুইজ ও ব্রেইন গেমস</span>
-              </div>
-            </button>
-          </div>
-
-          {/* Menu 8: সিলেবাস ও প্রশ্নব্যাংক */}
+          {/* Menu: কুইজ ও ব্রেইন গেমস */}
           <div>
             <button
               type="button"
               onClick={() => handleLinkClick(() => {
                 onRoleChange('parent');
                 onNavigateDashboard();
-                onSelectParentTab('assigned');
-              })}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white"
-            >
-              <div className="flex items-center gap-2.5 truncate min-w-0">
-                <BookMarked className="w-4.5 h-4.5 text-cyan-400 shrink-0" />
-                <span className="truncate">সিলেবাস ও প্রশ্নব্যাংক</span>
-              </div>
-            </button>
-          </div>
-
-          {/* Menu 9: সেটিংস ও প্রোফাইল */}
-          <div>
-            <button
-              type="button"
-              onClick={() => handleLinkClick(() => {
-                onRoleChange('parent');
-                onNavigateDashboard();
-                if (onOpenSettings) {
-                  onOpenSettings();
-                } else {
-                  onSelectParentTab('settings');
-                }
+                onSelectParentTab('games');
               })}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
-                parentTab === 'settings' && activeView === 'dashboard'
+                parentTab === 'games' && activeView === 'dashboard'
                   ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
                   : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
               }`}
             >
               <div className="flex items-center gap-2.5 truncate min-w-0">
-                <Settings className="w-4.5 h-4.5 text-amber-400 shrink-0" />
-                <span className="truncate">সেটিংস ও প্রোফাইল</span>
+                <Brain className="w-4.5 h-4.5 text-rose-400 shrink-0" />
+                <span className="truncate">কুইজ ও ব্রেইন গেমস</span>
               </div>
             </button>
           </div>

@@ -322,9 +322,9 @@ app.get('/api/submissions/:pin', (req, res) => {
   res.status(404).json({ error: 'Submission not found' });
 });
 
-// API: Parent Registration (Phone & Password)
+// API: Parent Registration (Phone, Password & Name)
 app.post('/api/auth/parent-register', (req, res) => {
-  const { phone, password, id } = req.body || {};
+  const { phone, password, name, id } = req.body || {};
   if (!phone || !password) {
     return res.status(400).json({ error: 'মোবাইল নম্বর ও পাসওয়ার্ড আবশ্যক' });
   }
@@ -337,6 +337,7 @@ app.post('/api/auth/parent-register', (req, res) => {
   const newParent = {
     id: id || `parent_${cleanPhone}_${Date.now()}`,
     phone: cleanPhone,
+    name: name ? String(name).trim() : '',
     password: String(password).trim(),
     createdAt: new Date().toISOString()
   };
@@ -350,6 +351,7 @@ app.post('/api/auth/parent-register', (req, res) => {
     user: {
       id: newParent.id,
       phone: newParent.phone,
+      name: newParent.name,
       role: 'parent',
       createdAt: newParent.createdAt
     }
@@ -378,6 +380,9 @@ app.post('/api/auth/parent-login', (req, res) => {
     user: {
       id: parent.id,
       phone: parent.phone,
+      name: parent.name || '',
+      childName: parent.childName || '',
+      childClass: parent.childClass || '',
       role: 'parent',
       createdAt: parent.createdAt
     }
@@ -434,10 +439,19 @@ async function startServer() {
 
   server.on('error', (err: any) => {
     console.error('Server listen error:', err?.message || err);
+    if (err?.code === 'EADDRINUSE') {
+      console.warn(`[Port Conflict] Port ${PORT} is currently occupied. Retrying in 1.5s...`);
+      setTimeout(() => {
+        try {
+          server.close();
+        } catch {}
+        server.listen(PORT, '0.0.0.0');
+      }, 1500);
+    }
   });
 
   const gracefulShutdown = (signal: string) => {
-    console.log(`Received ${signal}, closing server...`);
+    console.log(`Received ${signal}, closing server gracefully...`);
     server.close(() => {
       console.log('Server stopped cleanly.');
       process.exit(0);

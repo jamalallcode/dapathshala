@@ -9,7 +9,8 @@ import {
   ArrowRight, 
   Sparkles, 
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  User
 } from 'lucide-react';
 import { loginParent, registerParent, ParentUser, normalizePhone } from '../../lib/parentAuth';
 
@@ -29,6 +30,7 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
   promptMessage
 }) => {
   const [mode, setMode] = useState<'login' | 'register'>(initialMode);
+  const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -39,6 +41,7 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
     if (isOpen) {
       setMode(initialMode);
       setError(null);
+      setName('');
       setPassword('');
       setLoading(false);
     }
@@ -53,7 +56,13 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
 
     try {
       if (mode === 'register') {
-        const result = await registerParent(phone, password);
+        const cleanName = name.trim();
+        if (!cleanName) {
+          setError('দয়া করে অভিভাবকের পূর্ণ নাম লিখুন');
+          setLoading(false);
+          return;
+        }
+        const result = await registerParent(phone, password, cleanName);
         if (!result.success || !result.user) {
           setError(result.error || 'রেজিস্ট্রেশন ব্যর্থ হয়েছে');
           setLoading(false);
@@ -112,7 +121,7 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
             <p className="text-xs text-slate-500 font-medium">
               {promptMessage || (mode === 'login' 
                 ? 'আপনার মোবাইল নম্বর ও পাসওয়ার্ড দিয়ে সহজে প্রবেশ করুন' 
-                : 'শুধু মোবাইল নম্বর ও পাসওয়ার্ড দিয়ে নিমেষেই রেজিস্টার করুন')}
+                : 'নাম, মোবাইল নম্বর ও পাসওয়ার্ড দিয়ে নিমেষেই রেজিস্টার করুন')}
             </p>
           </div>
 
@@ -159,6 +168,33 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4" autoComplete="off">
             
+            {/* Parent Name Input (Register Mode Only) */}
+            {mode === 'register' && (
+              <div className="space-y-1 sm:space-y-1.5 animate-in fade-in duration-150">
+                <label htmlFor="parent_auth_name" className="block text-xs font-bold text-slate-700">
+                  অভিভাবকের নাম <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative flex items-center">
+                  <div className="absolute left-3.5 text-slate-400 pointer-events-none">
+                    <User className="w-4 h-4 text-blue-600" />
+                  </div>
+                  <input
+                    id="parent_auth_name"
+                    name="name"
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      if (error) setError(null);
+                    }}
+                    placeholder="যেমন: জামাল উদ্দিন"
+                    className="w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-xl border border-slate-300 bg-slate-50/70 focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-100 text-sm font-semibold outline-hidden text-slate-900 transition-all"
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Mobile Number Input */}
             <div className="space-y-1 sm:space-y-1.5">
               <label htmlFor="parent_mobile_phone" className="block text-xs font-bold text-slate-700">

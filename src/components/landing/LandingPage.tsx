@@ -141,11 +141,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="flex items-center gap-2 sm:gap-2.5 text-xs font-bold">
 
             {currentParent ? (
-              <div className="flex items-center gap-1.5">
-                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-emerald-400 text-xs font-bold">
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>{currentParent.phone}</span>
-                </span>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/90 border border-slate-700/80 shadow-2xs">
+                  <span className="text-white text-xs font-bold truncate max-w-[130px] sm:max-w-[170px]">
+                    {currentParent.name || 'অভিভাবক'}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-bold pl-2 border-l border-slate-700">
+                    <Phone className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span>{currentParent.phone}</span>
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={handleLogout}

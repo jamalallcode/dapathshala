@@ -12,7 +12,9 @@ import {
   AlertCircle,
   Save,
   KeyRound,
-  Sliders
+  Sliders,
+  Camera,
+  Trash2
 } from 'lucide-react';
 import { 
   getCurrentParent, 
@@ -39,6 +41,7 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
 
   // Form states - Profile
   const [parentName, setParentName] = useState('');
+  const [avatar, setAvatar] = useState<string | undefined>(undefined);
   const [childName, setChildName] = useState('');
   const [childClass, setChildClass] = useState('৮ম শ্রেণি');
   
@@ -62,6 +65,7 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
       setParent(current);
       if (current) {
         setParentName(current.name || '');
+        setAvatar(current.avatar);
         setChildName(current.childName || '');
         setChildClass(current.childClass || '৮ম শ্রেণি');
         setDefaultDuration(current.defaultDurationMinutes || 15);
@@ -83,6 +87,7 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
 
     const res = updateParentProfile({
       name: parentName.trim(),
+      avatar: avatar,
       childName: childName.trim(),
       childClass: childClass
     });
@@ -92,7 +97,10 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
       setParent(res.user);
       onProfileUpdated?.(res.user);
       setMessage({ type: 'success', text: 'প্রোফাইল তথ্য সফলভাবে সংরক্ষিত হয়েছে!' });
-      setTimeout(() => setMessage(null), 3000);
+      setTimeout(() => {
+        setMessage(null);
+        onClose();
+      }, 700);
     } else {
       setMessage({ type: 'error', text: res.error || 'সংরক্ষণ ব্যর্থ হয়েছে' });
     }
@@ -111,7 +119,10 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
       setMessage({ type: 'success', text: 'পাসওয়ার্ড সফলভাবে পরিবর্তিত হয়েছে!' });
       setCurrentPassword('');
       setNewPassword('');
-      setTimeout(() => setMessage(null), 3500);
+      setTimeout(() => {
+        setMessage(null);
+        onClose();
+      }, 700);
     } else {
       setMessage({ type: 'error', text: res.error || 'পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে' });
     }
@@ -133,7 +144,10 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
       setParent(res.user);
       onProfileUpdated?.(res.user);
       setMessage({ type: 'success', text: 'পরীক্ষা প্রেফারেন্স সফলভাবে সংরক্ষিত হয়েছে!' });
-      setTimeout(() => setMessage(null), 3000);
+      setTimeout(() => {
+        setMessage(null);
+        onClose();
+      }, 700);
     } else {
       setMessage({ type: 'error', text: res.error || 'সংরক্ষণ ব্যর্থ হয়েছে' });
     }
@@ -247,6 +261,79 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
           {activeTab === 'profile' && (
             <form onSubmit={handleSaveProfile} className="space-y-4">
               
+              {/* Profile Photo Upload */}
+              <div className="space-y-1.5 pb-1">
+                <label className="block text-xs font-bold text-slate-700">
+                  অভিভাবকের প্রোফাইল ছবি
+                </label>
+                <div className="flex items-center gap-3">
+                  <div className="relative w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-700 border-2 border-blue-400/60 flex items-center justify-center shrink-0 shadow-xs">
+                    {avatar ? (
+                      <img src={avatar} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-white font-black text-base select-none">
+                        {parentName.trim() ? parentName.trim().charAt(0).toUpperCase() : 'অ'}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs">
+                      <Camera className="w-3.5 h-3.5" />
+                      <span>{avatar ? 'ছবি পরিবর্তন' : 'কম্পিউটার থেকে ছবি দিন'}</span>
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const img = new Image();
+                            img.onload = () => {
+                              const canvas = document.createElement('canvas');
+                              const maxDim = 256;
+                              let width = img.width;
+                              let height = img.height;
+                              if (width > height) {
+                                if (width > maxDim) {
+                                  height = Math.round((height * maxDim) / width);
+                                  width = maxDim;
+                                }
+                              } else {
+                                if (height > maxDim) {
+                                  width = Math.round((width * maxDim) / height);
+                                  height = maxDim;
+                                }
+                              }
+                              canvas.width = width;
+                              canvas.height = height;
+                              const ctx = canvas.getContext('2d');
+                              ctx?.drawImage(img, 0, 0, width, height);
+                              const compressed = canvas.toDataURL('image/jpeg', 0.85);
+                              setAvatar(compressed);
+                            };
+                            img.src = event.target?.result as string;
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                    </label>
+                    {avatar && (
+                      <button
+                        type="button"
+                        onClick={() => setAvatar(undefined)}
+                        className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                        title="ছবি মুছে ফেলুন"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>মুছুন</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Account Phone (Read Only with badge) */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-slate-600">

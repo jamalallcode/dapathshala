@@ -4,6 +4,7 @@ export interface ParentUser {
   id: string;
   phone: string;
   name?: string;
+  avatar?: string;
   childName?: string;
   childClass?: string;
   defaultDurationMinutes?: number;
@@ -16,6 +17,7 @@ interface StoredParentAccount {
   id: string;
   phone: string;
   name?: string;
+  avatar?: string;
   childName?: string;
   childClass?: string;
   defaultDurationMinutes?: number;
@@ -176,12 +178,17 @@ export function changeParentPassword(currentPasswordRaw: string, newPasswordRaw:
   }
 }
 
-// Register Parent (Only Mobile & Password)
-export async function registerParent(phoneRaw: string, passwordRaw: string): Promise<{ success: boolean; user?: ParentUser; error?: string }> {
+// Register Parent (Mobile, Password & Name)
+export async function registerParent(phoneRaw: string, passwordRaw: string, nameRaw?: string): Promise<{ success: boolean; user?: ParentUser; error?: string }> {
   const phone = normalizePhone(phoneRaw);
   const phoneValidation = validatePhone(phone);
   if (!phoneValidation.valid) {
     return { success: false, error: phoneValidation.message };
+  }
+
+  const name = (nameRaw || '').trim();
+  if (!name) {
+    return { success: false, error: 'দয়া করে অভিভাবকের পূর্ণ নাম লিখুন' };
   }
 
   const password = passwordRaw.trim();
@@ -200,6 +207,7 @@ export async function registerParent(phoneRaw: string, passwordRaw: string): Pro
   const newAccount: StoredParentAccount = {
     id: `parent_${phone}_${Date.now()}`,
     phone,
+    name,
     passwordHash: password, // client storage
     createdAt: new Date().toISOString()
   };
@@ -210,6 +218,7 @@ export async function registerParent(phoneRaw: string, passwordRaw: string): Pro
   const user: ParentUser = {
     id: newAccount.id,
     phone: newAccount.phone,
+    name: newAccount.name,
     role: 'parent',
     createdAt: newAccount.createdAt
   };
@@ -221,7 +230,7 @@ export async function registerParent(phoneRaw: string, passwordRaw: string): Pro
     fetch('/api/auth/parent-register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, password, id: newAccount.id })
+      body: JSON.stringify({ phone, password, name, id: newAccount.id })
     }).catch(() => {});
   } catch {}
 
@@ -258,6 +267,9 @@ export async function loginParent(phoneRaw: string, passwordRaw: string): Promis
           accounts[phone] = {
             id: data.user.id,
             phone: data.user.phone,
+            name: data.user.name || '',
+            childName: data.user.childName,
+            childClass: data.user.childClass,
             passwordHash: password,
             createdAt: data.user.createdAt || new Date().toISOString()
           };
@@ -265,6 +277,9 @@ export async function loginParent(phoneRaw: string, passwordRaw: string): Promis
           const user: ParentUser = {
             id: data.user.id,
             phone: data.user.phone,
+            name: data.user.name || '',
+            childName: data.user.childName,
+            childClass: data.user.childClass,
             role: 'parent',
             createdAt: accounts[phone].createdAt
           };
@@ -287,6 +302,12 @@ export async function loginParent(phoneRaw: string, passwordRaw: string): Promis
   const user: ParentUser = {
     id: account.id,
     phone: account.phone,
+    name: account.name || '',
+    avatar: account.avatar,
+    childName: account.childName,
+    childClass: account.childClass,
+    defaultDurationMinutes: account.defaultDurationMinutes,
+    proctoringStrictness: account.proctoringStrictness,
     role: 'parent',
     createdAt: account.createdAt
   };

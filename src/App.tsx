@@ -77,7 +77,7 @@ export function App() {
   }, [isResizingSidebar, sidebarWidth]);
   
   // Coordinated Dashboard state for sidebar control
-  const [parentActiveTab, setParentActiveTab] = useState<'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings'>('assigned');
+  const [parentActiveTab, setParentActiveTab] = useState<'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games'>('assigned');
   const [showCreateModalExternal, setShowCreateModalExternal] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 

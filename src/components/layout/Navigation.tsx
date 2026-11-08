@@ -24,7 +24,7 @@ interface NavigationProps {
   onNavigateHome?: () => void;
   onNavigateDashboard?: () => void;
   onOpenCreateExam?: () => void;
-  onSelectTab?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings') => void;
+  onSelectTab?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games') => void;
   onOpenSettings?: () => void;
   isHomeActive?: boolean;
   onToggleSidebar?: () => void;
@@ -157,28 +157,6 @@ export const Navigation: React.FC<NavigationProps> = ({
           <div className="hidden sm:flex items-center gap-1.5 ml-3 text-sm font-semibold text-slate-200">
             <button
               type="button"
-              onClick={() => {
-                onSelectTab?.('assigned');
-                onOpenCreateExam?.();
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 hover:text-white transition-colors border border-emerald-500/30 cursor-pointer"
-              title="কাস্টম পরীক্ষা তৈরি করুন"
-            >
-              <PlusCircle className="w-4 h-4 text-emerald-400" />
-              <span>নতুন পরীক্ষা</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => onSelectTab?.('proctoring')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
-            >
-              <ShieldCheck className="w-4 h-4 text-purple-400" />
-              <span>লাইভ প্রক্টরিং</span>
-            </button>
-
-            <button
-              type="button"
               onClick={() => onSelectTab?.('assigned')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
             >
@@ -189,36 +167,8 @@ export const Navigation: React.FC<NavigationProps> = ({
 
         </div>
 
-        {/* Right Section: Role Switcher, Notifications, Landing Link */}
+        {/* Right Section: Notifications & Settings Link */}
         <div className="flex items-center gap-2 sm:gap-3">
-          
-          {/* Role Switcher */}
-          <div className="flex items-center bg-slate-900 border border-slate-700/80 p-0.5 rounded-lg text-xs sm:text-sm font-bold">
-            <button
-              type="button"
-              onClick={() => onRoleChange('parent')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
-                currentRole === 'parent'
-                  ? 'bg-blue-600 text-white font-black shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>অভিভাবক</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onRoleChange('student')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
-                currentRole === 'student'
-                  ? 'bg-emerald-600 text-white font-black shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <User className="w-3.5 h-3.5" />
-              <span>শিক্ষার্থী</span>
-            </button>
-          </div>
 
           {/* Notifications Bell */}
           <div className="relative shrink-0" ref={notifContainerRef}>

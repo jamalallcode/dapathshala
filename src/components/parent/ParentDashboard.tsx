@@ -4,8 +4,10 @@ import {
   Clock, Shield, AlertTriangle, MessageSquare, ChevronRight, Share2,
   TrendingUp, Award, BookOpen, Sparkles, RefreshCw, Edit3, X,
   Save, AlertCircle, Camera, ExternalLink, HelpCircle, GraduationCap, ArrowRight, ArrowLeft,
-  RotateCcw, MessageCircle, Lightbulb, ChevronDown, Printer, Settings
+  RotateCcw, MessageCircle, Lightbulb, ChevronDown, Printer, Settings,
+  Brain, Trophy, Target, Zap
 } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { AssignedTest, StudentSubmission, ExamQuestion } from '../../types';
 import { 
   getStoredTests, 
@@ -37,8 +39,8 @@ interface ParentDashboardProps {
   onOpenTest: (test: AssignedTest) => void;
   onOpenReview: (test: AssignedTest) => void;
   onNavigateHome?: () => void;
-  activeTab?: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings';
-  onTabChange?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings') => void;
+  activeTab?: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games';
+  onTabChange?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games') => void;
   showCreateModalExternal?: boolean;
   onCloseCreateModalExternal?: () => void;
   isSettingsOpenExternal?: boolean;
@@ -123,12 +125,11 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [parentComment, setParentComment] = useState('');
   const [approvedScore, setApprovedScore] = useState<number>(0);
 
-  // Controlling Action Modals (Delete, Share, Retake)
-  const [testToDelete, setTestToDelete] = useState<AssignedTest | null>(null);
+  // Controlling Action States (Delete, Share, Retake)
+  const [deletingTestId, setDeletingTestId] = useState<string | null>(null);
+  const [isDeletingAllInline, setIsDeletingAllInline] = useState(false);
   const [shareModalTest, setShareModalTest] = useState<AssignedTest | null>(null);
   const [retakeModalTest, setRetakeModalTest] = useState<AssignedTest | null>(null);
-  const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
-  const [isClearingAll, setIsClearingAll] = useState(false);
 
   const [currentParent, setCurrentParent] = useState<ParentUser | null>(() => getCurrentParent());
 
@@ -166,6 +167,140 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       window.removeEventListener('dapathshala_notifs_updated', handleStorage);
     };
   }, []);
+
+  // Tab-based view routing from Sidebar options
+  useEffect(() => {
+    if (activeTab === 'assigned') {
+      setActiveViewMode('tests');
+      setFilterMode('all');
+    } else if (activeTab === 'review') {
+      setActiveViewMode('tests');
+      setFilterMode('unreviewed');
+    }
+  }, [activeTab]);
+
+  // Quiz & Brain Games State
+  const [gamesTab, setGamesTab] = useState<'math' | 'gk'>('math');
+  const [mathNum1, setMathNum1] = useState(14);
+  const [mathNum2, setMathNum2] = useState(8);
+  const [mathOp, setMathOp] = useState<'+' | '-' | '×'>('+');
+  const [mathOptions, setMathOptions] = useState<number[]>([22, 20, 24, 21]);
+  const [mathScore, setMathScore] = useState(0);
+  const [mathStreak, setMathStreak] = useState(0);
+  const [mathFeedback, setMathFeedback] = useState<'correct' | 'wrong' | null>(null);
+
+  const generateNewMathProblem = () => {
+    const ops: ('+' | '-' | '×')[] = ['+', '-', '×'];
+    const chosenOp = ops[Math.floor(Math.random() * ops.length)];
+    let n1 = Math.floor(Math.random() * 20) + 2;
+    let n2 = Math.floor(Math.random() * 15) + 1;
+    if (chosenOp === '-' && n1 < n2) {
+      const temp = n1;
+      n1 = n2;
+      n2 = temp;
+    }
+    if (chosenOp === '×') {
+      n1 = Math.floor(Math.random() * 10) + 2;
+      n2 = Math.floor(Math.random() * 9) + 2;
+    }
+    const ans = chosenOp === '+' ? n1 + n2 : chosenOp === '-' ? n1 - n2 : n1 * n2;
+    setMathNum1(n1);
+    setMathNum2(n2);
+    setMathOp(chosenOp);
+
+    const opts = new Set<number>([ans]);
+    while (opts.size < 4) {
+      const offset = (Math.floor(Math.random() * 6) + 1) * (Math.random() > 0.5 ? 1 : -1);
+      const fake = Math.max(0, ans + offset);
+      if (fake !== ans) opts.add(fake);
+    }
+    setMathOptions(Array.from(opts).sort(() => Math.random() - 0.5));
+    setMathFeedback(null);
+  };
+
+  const handleMathAnswer = (val: number) => {
+    const correctAns = mathOp === '+' ? mathNum1 + mathNum2 : mathOp === '-' ? mathNum1 - mathNum2 : mathNum1 * mathNum2;
+    if (val === correctAns) {
+      setMathFeedback('correct');
+      setMathScore(prev => prev + 10);
+      setMathStreak(prev => prev + 1);
+      try {
+        confetti({ particleCount: 30, spread: 60, origin: { y: 0.7 } });
+      } catch {}
+      setTimeout(() => {
+        generateNewMathProblem();
+      }, 700);
+    } else {
+      setMathFeedback('wrong');
+      setMathStreak(0);
+    }
+  };
+
+  // GK Trivia State
+  const [currentGkIndex, setCurrentGkIndex] = useState(0);
+  const [gkSelectedOption, setGkSelectedOption] = useState<number | null>(null);
+  const [gkScore, setGkScore] = useState(0);
+  const [isGkFinished, setIsGkFinished] = useState(false);
+
+  const gkQuestions = [
+    {
+      q: 'বাংলাদেশের জাতীয় স্মৃতিসৌধের প্রধান স্থপতি কে?',
+      options: ['সৈয়দ মাইনুল হোসেন', 'মাজহারুল ইসলাম', 'হামিদুর রহমান', 'মুস্তাফা মনোয়ার'],
+      correct: 0,
+      exp: 'জাতীয় স্মৃতিসৌধ সাভারে অবস্থিত এবং এর স্থপতি সৈয়দ মাইনুল হোসেন।'
+    },
+    {
+      q: 'সৌরজগতের সবচেয়ে বড় গ্রহ কোনটি?',
+      options: ['মঙ্গল', 'বৃহস্পতি', 'শনি', 'পৃথিবী'],
+      correct: 1,
+      exp: 'বৃহস্পতি (Jupiter) সৌরজগতের বৃহত্তম গ্রহ।'
+    },
+    {
+      q: 'পানির রাসায়নিক সংকেত কোনটি?',
+      options: ['CO2', 'NaCl', 'H2O', 'O2'],
+      correct: 2,
+      exp: 'পানির রাসায়নিক সংকেত হলো H2O (দুইটি হাইড্রোজেন ও একটি অক্সিজেন পরমাণু)।'
+    },
+    {
+      q: 'আন্তর্জাতিক মাতৃভাষা দিবস কোন তারিখে পালিত হয়?',
+      options: ['২৬শে মার্চ', '১৬ই ডিসেম্বর', '২১শে ফেব্রুয়ারি', '৭ই মার্চ'],
+      correct: 2,
+      exp: 'ইউনেস্কোর ঘোষণার পর প্রতি বছর ২১শে ফেব্রুয়ারি আন্তর্জাতিক মাতৃভাষা দিবস হিসেবে পালিত হয়।'
+    },
+    {
+      q: 'গাছের পাতা সবুজ দেখায় কোন উপাদানের কারণে?',
+      options: ['ক্লোরোফিল', 'ক্যারোটিন', 'নাইট্রোজেন', 'হিমোগ্লোবিন'],
+      correct: 0,
+      exp: 'পাতায় ক্লোরোফিল নামক রঞ্জক পদার্থ থাকার কারণে গাছের পাতা সবুজ দেখায়।'
+    }
+  ];
+
+  const handleGkAnswer = (optionIdx: number) => {
+    if (gkSelectedOption !== null) return;
+    setGkSelectedOption(optionIdx);
+    if (optionIdx === gkQuestions[currentGkIndex].correct) {
+      setGkScore(prev => prev + 20);
+      try {
+        confetti({ particleCount: 25, spread: 50, origin: { y: 0.7 } });
+      } catch {}
+    }
+  };
+
+  const handleNextGkQuestion = () => {
+    if (currentGkIndex < gkQuestions.length - 1) {
+      setCurrentGkIndex(prev => prev + 1);
+      setGkSelectedOption(null);
+    } else {
+      setIsGkFinished(true);
+    }
+  };
+
+  const handleRestartGk = () => {
+    setCurrentGkIndex(0);
+    setGkSelectedOption(null);
+    setGkScore(0);
+    setIsGkFinished(false);
+  };
 
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -540,9 +675,14 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
 
 
-  // Clear all previous / demo tests completely - opens clean in-app confirmation modal
-  const handleClearAllTests = () => {
-    setShowClearConfirmModal(true);
+  // Clear all previous / demo tests completely with inline confirmation
+  const handleClearAllTestsDirect = async () => {
+    setIsDeletingAllInline(false);
+    setTests([]);
+    await clearAllStoredTests();
+    saveStoredNotifications([]);
+    window.dispatchEvent(new Event('dapathshala_notifs_updated'));
+    showToast('✓ সকল পরীক্ষা ও ডাটা সফলভাবে মুছে ফেলা হয়েছে।');
   };
 
   // Finalize Exam & Generate Link + PIN
@@ -682,9 +822,8 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   };
 
   // Delete Test completely from state, localStorage, and server
-  const handleConfirmDeleteTest = async () => {
-    if (!testToDelete) return;
-    const { id, pin } = testToDelete;
+  const handleDeleteSingleTest = async (test: AssignedTest) => {
+    const { id, pin } = test;
 
     // Remove from state
     const updated = tests.filter(t => t.id !== id && t.pin !== pin);
@@ -698,7 +837,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     saveStoredNotifications(notifs);
     window.dispatchEvent(new Event('dapathshala_notifs_updated'));
 
-    setTestToDelete(null);
+    setDeletingTestId(null);
     showToast('✓ পরীক্ষাটি তালিকা থেকে সফলভাবে মুছে ফেলা হয়েছে।');
   };
 
@@ -842,52 +981,87 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
-            <GraduationCap className="w-6 h-6" />
+            {activeTab === 'report' ? (
+              <Award className="w-6 h-6 text-amber-300" />
+            ) : activeTab === 'games' ? (
+              <Brain className="w-6 h-6 text-rose-300" />
+            ) : activeTab === 'review' ? (
+              <FileCheck className="w-6 h-6 text-emerald-300" />
+            ) : (
+              <GraduationCap className="w-6 h-6" />
+            )}
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                দাপাঠশালা অভিভাবক পোর্টাল
+                {activeTab === 'report' 
+                  ? 'ফলাফল ও সার্বিক রিপোর্ট' 
+                  : activeTab === 'games' 
+                  ? 'কুইজ ও ব্রেইন গেমস' 
+                  : activeTab === 'review'
+                  ? 'খাতা মূল্যায়ন ও পরীক্ষণ'
+                  : 'অভিভাবক পোর্টাল'}
               </h1>
-              {currentParent?.phone && (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span>অ্যাকাউন্ট: {currentParent.phone}</span>
-                </span>
-              )}
             </div>
             <p className="text-xs sm:text-sm text-slate-500 font-semibold">
-              এআই প্রশ্নপত্র তৈরি, লিংক শেয়ার ও ফ্রন্ট ক্যামেরা লাইভ খাতা মূল্যায়ন
+              {activeTab === 'report'
+                ? 'সন্তানের সম্পন্ন পরীক্ষার ফলাফল, অর্জিত গ্রেড ও বিস্তারিত মূল্যায়ন রিপোর্ট'
+                : activeTab === 'games'
+                ? 'দ্রুত মেধা বিকাশ, সাধারণ জ্ঞান ও গণিত চ্যালেঞ্জের ইন্টারেক্টিভ প্ল্যাটফর্ম'
+                : activeTab === 'review'
+                ? 'সন্তানের জমা দেওয়া উত্তরপত্র যাচাই, প্রতিটি প্রশ্নে নম্বর প্রদান ও ফিডব্যাক'
+                : 'এআই প্রশ্নপত্র তৈরি, লিংক শেয়ার ও ফ্রন্ট ক্যামেরা লাইভ খাতা মূল্যায়ন'}
             </p>
           </div>
         </div>
 
         {/* Header Right Status / Back Button */}
-        {activeViewMode === 'builder' ? (
+        {activeTab === 'report' || activeTab === 'games' ? (
+          <button
+            type="button"
+            onClick={() => onTabChange?.('assigned')}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs sm:text-sm font-bold transition-all cursor-pointer border border-blue-200 shadow-2xs"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>← ড্যাশবোর্ডে ফিরে যান</span>
+          </button>
+        ) : activeViewMode === 'builder' ? (
           <button
             type="button"
             onClick={() => setActiveViewMode('tests')}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold transition-all cursor-pointer border border-slate-200 shadow-2xs"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>← পরীক্ষাসমূহ ও খাতায় ফিরে যান</span>
+            <span>← ড্যাশবোর্ডে ফিরে যান</span>
           </button>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
+            {/* নতুন প্রশ্ন তৈরি করুন (স্থানান্তরিত: উপরে ব্যানার কার্ডে) */}
+            <button
+              type="button"
+              onClick={() => setShowCreationModeModal(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs active:scale-98"
+              title="নতুন প্রশ্নপত্র বা পরীক্ষা তৈরি করুন"
+            >
+              <Plus className="w-4 h-4 text-white" />
+              <span>নতুন প্রশ্ন তৈরি করুন</span>
+            </button>
+
             <button
               type="button"
               onClick={() => {
                 setActiveViewMode('tests');
                 setFilterMode('all');
+                onTabChange?.('assigned');
               }}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs ${
-                filterMode === 'all'
+                activeTab !== 'review' && filterMode === 'all'
                   ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
                   : 'bg-blue-50 border-blue-200 text-blue-900 hover:bg-blue-100 hover:border-blue-300'
               }`}
               title="সকল নির্ধারিত পরীক্ষা দেখুন"
             >
-              <FileText className={`w-4 h-4 ${filterMode === 'all' ? 'text-white' : 'text-blue-600'}`} />
+              <FileText className={`w-4 h-4 ${activeTab !== 'review' && filterMode === 'all' ? 'text-white' : 'text-blue-600'}`} />
               <span>নির্ধারিত পরীক্ষা: {toBn(tests.length)}টি</span>
             </button>
 
@@ -895,36 +1069,368 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               type="button"
               onClick={() => {
                 setActiveViewMode('tests');
-                setFilterMode(prev => prev === 'unreviewed' ? 'all' : 'unreviewed');
+                setFilterMode('unreviewed');
+                onTabChange?.('review');
               }}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs ${
-                filterMode === 'unreviewed'
+                activeTab === 'review' || filterMode === 'unreviewed'
                   ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
                   : 'bg-blue-50 border-blue-200 text-blue-900 hover:bg-blue-100 hover:border-blue-300'
               }`}
               title="যেসব উত্তরপত্র এখনো দেখা হয়নি সব সামনে আনুন"
             >
-              <FileCheck className={`w-4 h-4 ${filterMode === 'unreviewed' ? 'text-white' : 'text-blue-600'}`} />
+              <FileCheck className={`w-4 h-4 ${activeTab === 'review' || filterMode === 'unreviewed' ? 'text-white' : 'text-blue-600'}`} />
               <span>সকল উত্তরপত্র</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsSettingsOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs group"
-              title="অভিভাবক অ্যাকাউন্ট সেটিংস ও প্রোফাইল এডিট"
-            >
-              <Settings className="w-4 h-4 text-amber-500 group-hover:rotate-45 transition-transform duration-200" />
-              <span>সেটিংস</span>
             </button>
           </div>
         )}
       </div>
 
       {/* ======================================================== */}
+      {/* VIEW 3: ফলাফল ও সার্বিক রিপোর্ট কার্ড (REPORT CARD)        */}
+      {/* ======================================================== */}
+      {activeTab === 'report' && (
+        <div className="space-y-6">
+          {/* Overview Stat Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-bold">মোট পরীক্ষা</span>
+                <BookOpen className="w-4 h-4 text-blue-500" />
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-slate-900">{toBn(tests.length)}টি</p>
+              <p className="text-[11px] text-slate-500 font-semibold mt-1">নির্ধারিত সকল প্রশ্নপত্র</p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-bold">জমা দেওয়া খাতা</span>
+                <FileCheck className="w-4 h-4 text-emerald-500" />
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-slate-900">
+                {toBn(tests.filter(t => t.status === 'submitted' || t.status === 'reviewed').length)}টি
+              </p>
+              <p className="text-[11px] text-emerald-600 font-semibold mt-1">পরীক্ষা সম্পন্ন ও জমা</p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-bold">গড় সাফল্য হার</span>
+                <TrendingUp className="w-4 h-4 text-indigo-500" />
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-slate-900">
+                {(() => {
+                  const ev = tests.filter(t => t.status === 'submitted' || t.status === 'reviewed');
+                  if (ev.length === 0) return '০%';
+                  const totalSc = ev.reduce((a, b) => a + (b.score || 0), 0);
+                  const totalPos = ev.reduce((a, b) => a + (b.questionCount || b.questions?.length || 1), 0);
+                  const pct = totalPos > 0 ? Math.round((totalSc / totalPos) * 100) : 0;
+                  return `${toBn(pct)}%`;
+                })()}
+              </p>
+              <p className="text-[11px] text-indigo-600 font-semibold mt-1">সামগ্রিক পারফরম্যান্স</p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/90 shadow-xs">
+              <div className="flex items-center justify-between text-slate-500 mb-2">
+                <span className="text-xs font-bold">সর্বোচ্চ স্কোর</span>
+                <Award className="w-4 h-4 text-amber-500" />
+              </div>
+              <p className="text-2xl sm:text-3xl font-black text-slate-900">
+                {(() => {
+                  const ev = tests.filter(t => t.status === 'submitted' || t.status === 'reviewed');
+                  if (ev.length === 0) return '০';
+                  const maxSc = Math.max(...ev.map(t => t.score || 0));
+                  return toBn(maxSc);
+                })()}
+              </p>
+              <p className="text-[11px] text-amber-600 font-semibold mt-1">সেরা প্রাপ্ত নম্বর</p>
+            </div>
+          </div>
+
+          {/* Results Table & Performance Breakdown */}
+          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-slate-900">
+                  পরীক্ষা ভিত্তিক ফলাফল ও গ্রেড তালিকা
+                </h2>
+                <p className="text-xs text-slate-500 font-medium">
+                  সন্তানের প্রতিটি পরীক্ষার প্রাপ্ত নম্বর, শতাংশ ও অভিভাবকের দেওয়া মন্তব্য
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-slate-200"
+                  title="রিপোর্ট প্রিন্ট করুন"
+                >
+                  <Printer className="w-4 h-4 text-slate-600" />
+                  <span>প্রিন্ট রিপোর্ট</span>
+                </button>
+              </div>
+            </div>
+
+            {/* List of Results */}
+            {(() => {
+              const evaluated = tests.filter(t => t.status === 'submitted' || t.status === 'reviewed');
+              if (evaluated.length === 0) {
+                return (
+                  <div className="py-12 text-center text-slate-400 space-y-2">
+                    <Award className="w-10 h-10 text-slate-300 mx-auto" />
+                    <p className="text-sm font-bold text-slate-600">এখনো কোনো পরীক্ষার খাতা জমা পড়েনি</p>
+                    <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                      সন্তান পরীক্ষা সম্পন্ন করে উত্তরপত্র জমা দিলে এখানে তার স্বয়ংক্রিয় রেজাল্ট ও গ্রেড শিট দেখতে পারবেন।
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="divide-y divide-slate-100 overflow-hidden">
+                  {evaluated.map((test) => {
+                    const totalQ = test.questionCount || (test.questions?.length || 1);
+                    const score = test.score || 0;
+                    const pct = totalQ > 0 ? Math.round((score / totalQ) * 100) : 0;
+                    let grade = 'F';
+                    let gradeColor = 'bg-rose-50 text-rose-700 border-rose-200';
+                    if (pct >= 80) { grade = 'A+'; gradeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200'; }
+                    else if (pct >= 70) { grade = 'A'; gradeColor = 'bg-blue-50 text-blue-700 border-blue-200'; }
+                    else if (pct >= 60) { grade = 'A-'; gradeColor = 'bg-indigo-50 text-indigo-700 border-indigo-200'; }
+                    else if (pct >= 50) { grade = 'B'; gradeColor = 'bg-amber-50 text-amber-700 border-amber-200'; }
+                    else if (pct >= 40) { grade = 'C'; gradeColor = 'bg-orange-50 text-orange-700 border-orange-200'; }
+
+                    return (
+                      <div key={test.id} className="py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 p-2.5 rounded-2xl transition-colors">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-sm text-slate-900 truncate">
+                              {test.title || `${test.subject} - ${test.chapter}`}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-md text-[11px] font-black border ${gradeColor}`}>
+                              গ্রেড: {grade} ({toBn(pct)}%)
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-slate-500 font-semibold">
+                            <span>বিষয়: {test.subject}</span>
+                            <span>•</span>
+                            <span>অধ্যায়: {test.chapter}</span>
+                            <span>•</span>
+                            <span>পিন: {toBn(test.pin)}</span>
+                          </div>
+                          {test.parentComment && (
+                            <p className="text-xs text-blue-700 bg-blue-50/70 p-1.5 rounded-lg border border-blue-100 font-medium mt-1">
+                              💬 অভিভাবকের মন্তব্য: {test.parentComment}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <span className="text-base font-black text-slate-900">
+                              {toBn(score)} / {toBn(totalQ)}
+                            </span>
+                            <span className="block text-[11px] text-slate-400 font-medium">প্রাপ্ত নম্বর</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => onOpenReview(test)}
+                            className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                          >
+                            <FileCheck className="w-3.5 h-3.5" />
+                            <span>উত্তরপত্র দেখুন</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* VIEW 4: কুইজ ও ব্রেইন গেমস হাব (QUIZ & BRAIN GAMES)       */}
+      {/* ======================================================== */}
+      {activeTab === 'games' && (
+        <div className="space-y-6">
+          {/* Game Switcher Tabs */}
+          <div className="flex border-b border-slate-200 bg-white p-2 rounded-2xl shadow-xs gap-2">
+            <button
+              type="button"
+              onClick={() => setGamesTab('math')}
+              className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                gamesTab === 'math'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <Zap className="w-4 h-4 text-amber-300" />
+              <span>১. গণিত স্পিড চ্যালেঞ্জ</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setGamesTab('gk')}
+              className={`flex-1 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                gamesTab === 'gk'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <Brain className="w-4 h-4 text-rose-300" />
+              <span>২. সাধারণ জ্ঞান ও বিজ্ঞান কুইজ</span>
+            </button>
+          </div>
+
+          {/* GAME 1: MATH SPEED CHALLENGE */}
+          {gamesTab === 'math' && (
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs max-w-xl mx-auto text-center space-y-6">
+              <div className="flex items-center justify-between text-xs font-bold text-slate-500 pb-3 border-b border-slate-100">
+                <span className="flex items-center gap-1.5 text-blue-600 font-bold">
+                  <Trophy className="w-4 h-4 text-amber-500" />
+                  <span>স্কোর: {toBn(mathScore)}</span>
+                </span>
+                <span className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-bold">
+                  <span>স্ট্রিক: {toBn(mathStreak)} 🔥</span>
+                </span>
+              </div>
+
+              <div>
+                <span className="text-xs uppercase font-bold text-slate-400 tracking-wider">দ্রুত সঠিক উত্তরে ক্লিক করুন</span>
+                <div className="text-4xl sm:text-5xl font-black text-slate-900 mt-3 tracking-wider font-mono">
+                  {toBn(mathNum1)} {mathOp} {toBn(mathNum2)} = ?
+                </div>
+              </div>
+
+              {/* Feedback indicator */}
+              {mathFeedback && (
+                <div className={`text-sm font-black animate-in zoom-in-95 duration-150 ${
+                  mathFeedback === 'correct' ? 'text-emerald-600' : 'text-rose-600'
+                }`}>
+                  {mathFeedback === 'correct' ? '✓ দারুণ! সঠিক উত্তর!' : '✕ ভুল উত্তর! আবার চেষ্টা করুন'}
+                </div>
+              )}
+
+              {/* 4 Answer Choice Buttons */}
+              <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
+                {mathOptions.map((opt, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleMathAnswer(opt)}
+                    className="py-4 px-3 rounded-2xl bg-slate-50 hover:bg-blue-50 border-2 border-slate-200 hover:border-blue-500 text-slate-900 hover:text-blue-700 text-2xl font-black transition-all active:scale-95 cursor-pointer shadow-2xs"
+                  >
+                    {toBn(opt)}
+                  </button>
+                ))}
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={generateNewMathProblem}
+                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition-colors cursor-pointer"
+                >
+                  প্রশ্ন পরিবর্তন করুন →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* GAME 2: GK TRIVIA */}
+          {gamesTab === 'gk' && (
+            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs max-w-xl mx-auto space-y-6">
+              {!isGkFinished ? (
+                <>
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-500 pb-3 border-b border-slate-100">
+                    <span>প্রশ্ন নম্বর: {toBn(currentGkIndex + 1)} / {toBn(gkQuestions.length)}</span>
+                    <span className="text-blue-600 font-bold">স্কোর: {toBn(gkScore)}</span>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg sm:text-xl font-black text-slate-900 leading-snug">
+                      {gkQuestions[currentGkIndex].q}
+                    </h3>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    {gkQuestions[currentGkIndex].options.map((opt, idx) => {
+                      const isSelected = gkSelectedOption === idx;
+                      const isCorrect = idx === gkQuestions[currentGkIndex].correct;
+                      let btnStyle = 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-800';
+
+                      if (gkSelectedOption !== null) {
+                        if (isCorrect) {
+                          btnStyle = 'bg-emerald-50 border-emerald-500 text-emerald-900 font-black';
+                        } else if (isSelected) {
+                          btnStyle = 'bg-rose-50 border-rose-500 text-rose-900 font-black';
+                        }
+                      }
+
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          disabled={gkSelectedOption !== null}
+                          onClick={() => handleGkAnswer(idx)}
+                          className={`w-full p-3.5 rounded-xl border-2 text-left text-sm font-bold transition-all cursor-pointer flex items-center justify-between ${btnStyle}`}
+                        >
+                          <span>{opt}</span>
+                          {gkSelectedOption !== null && isCorrect && (
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                          )}
+                          {gkSelectedOption !== null && isSelected && !isCorrect && (
+                            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {gkSelectedOption !== null && (
+                    <div className="p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-2 animate-in fade-in">
+                      <p className="font-bold">💡 তথ্য: {gkQuestions[currentGkIndex].exp}</p>
+                      <button
+                        type="button"
+                        onClick={handleNextGkQuestion}
+                        className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-black transition-colors cursor-pointer"
+                      >
+                        {currentGkIndex < gkQuestions.length - 1 ? 'পরবর্তী প্রশ্ন →' : 'ফলাফল দেখুন 🏁'}
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-6 space-y-4">
+                  <Trophy className="w-14 h-14 text-amber-500 mx-auto animate-bounce" />
+                  <h3 className="text-2xl font-black text-slate-900">কুইজ সম্পন্ন হয়েছে!</h3>
+                  <p className="text-sm font-bold text-slate-600">
+                    আপনার মোট স্কোর: <span className="text-blue-600 text-lg font-black">{toBn(gkScore)} / ১০০</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleRestartGk}
+                    className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition-all shadow-xs cursor-pointer"
+                  >
+                    পুনরায় খেলুন 🔄
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================== */}
       {/* VIEW 1: DUAL-MODE BUILDER: MANUAL OR AI                  */}
       {/* ======================================================== */}
-      {activeViewMode === 'builder' && (
+      {activeTab !== 'report' && activeTab !== 'games' && activeViewMode === 'builder' && (
         <div className="space-y-6">
           
           {/* Top Mode Switcher Bar */}
@@ -1445,7 +1951,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* ======================================================== */}
       {/* VIEW 2: TESTS LIST & EVALUATION (SUBMITTED EXAMS)        */}
       {/* ======================================================== */}
-      {activeViewMode === 'tests' && (
+      {activeTab !== 'report' && activeTab !== 'games' && activeViewMode === 'tests' && (
         <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
@@ -1496,15 +2002,41 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               </button>
 
               {tests.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleClearAllTests}
-                  className="px-3.5 py-2 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                  title="সকল ডামি ও পূর্ববর্তী পরীক্ষা মুছে সম্পূর্ণ ফ্রেশ ড্যাশবোর্ড করুন"
-                >
-                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                  <span>সকল পরীক্ষা মুছুন</span>
-                </button>
+                <div className="relative inline-block">
+                  <button
+                    type="button"
+                    onClick={() => setIsDeletingAllInline(!isDeletingAllInline)}
+                    className="px-3.5 py-2 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="সকল ডামি ও পূর্ববর্তী পরীক্ষা মুছে সম্পূর্ণ ফ্রেশ ড্যাশবোর্ড করুন"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>সকল পরীক্ষা মুছুন</span>
+                  </button>
+
+                  {isDeletingAllInline && (
+                    <div className="absolute top-full right-0 mt-1.5 z-30 bg-white border border-rose-200 rounded-xl p-3 shadow-xl min-w-[240px] animate-in fade-in slide-in-from-top-1 text-left">
+                      <p className="text-[11px] font-bold text-rose-800 mb-2 leading-tight">
+                        ⚠️ সকল পরীক্ষা মুছে ফেলতে চান?
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={handleClearAllTestsDirect}
+                          className="flex-1 px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold transition-colors cursor-pointer text-center"
+                        >
+                          ওকে
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsDeletingAllInline(false)}
+                          className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold transition-colors cursor-pointer"
+                        >
+                          বাতিল
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -1645,65 +2177,45 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                         )}
                       </button>
 
-                      {/* 2. সন্তান কখন ও কবে খাতাটি জমা দিয়েছে সেই তথ্য (তারিখ ও সময়) */}
-                      {(isSubmitted || isReviewed) ? (
-                        <div
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/90 text-indigo-950 text-xs font-semibold shadow-2xs"
-                          title="সন্তানের খাতা জমার সঠিক তারিখ ও সময়"
-                        >
-                          <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                          <span>
-                            জমার সময়: <strong className="font-bold text-indigo-900 font-['Noto_Sans_Bengali']">{formatSubmissionDateTime(test)}</strong>
-                          </span>
-                        </div>
-                      ) : (
-                        <div
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs font-medium shadow-2xs"
-                          title="সন্তান এখনও পরীক্ষা সম্পন্ন করেনি"
-                        >
-                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span>
-                            খাতা জমা: <span className="text-slate-600">এখনও জমা দেয়নি (পেন্ডিং)</span>
-                          </span>
-                        </div>
-                      )}
-
-                      {/* 4. Delete Option */}
-                      <button
-                        type="button"
-                        onClick={() => setTestToDelete(test)}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 hover:text-rose-700 text-xs font-bold transition-all shadow-2xs cursor-pointer group"
-                        title="পরীক্ষাটি তালিকা থেকে মুছে ফেলুন"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-rose-500 group-hover:scale-110 transition-transform" />
-                        <span>মুছুন</span>
-                      </button>
-
-                      {/* 5. Primary Action Button (Grading / Review / View Questions) */}
-                      {isSubmitted && (
+                      {/* 2. Delete Option with Inline Warning */}
+                      <div className="relative inline-block">
                         <button
                           type="button"
-                          onClick={() => handleOpenReviewModal(test)}
-                          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs sm:text-sm font-black shadow-md shadow-amber-500/30 transition-all cursor-pointer ring-2 ring-amber-400 ring-offset-1 animate-pulse"
-                          title="সন্তান পরীক্ষা দিয়েছে! উত্তরপত্র দেখতে ও মূল্যায়ন করতে ক্লিক করুন"
+                          onClick={() => setDeletingTestId(deletingTestId === test.id ? null : test.id)}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-600 hover:text-rose-700 text-xs font-bold transition-all shadow-2xs cursor-pointer group"
+                          title="পরীক্ষাটি তালিকা থেকে মুছে ফেলুন"
                         >
-                          <FileText className="w-4 h-4" />
-                          <span>উত্তরপত্র</span>
+                          <Trash2 className="w-3.5 h-3.5 text-rose-500 group-hover:scale-110 transition-transform" />
+                          <span>মুছুন</span>
                         </button>
-                      )}
 
-                      {isReviewed && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenReviewModal(test)}
-                          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-400 text-emerald-800 text-xs font-bold transition-all shadow-xs cursor-pointer group"
-                          title="খাতা পুনরায় দেখতে বা মূল্যায়ন সম্পাদন করতে ক্লিক করুন"
-                        >
-                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span>উত্তরপত্রটি দেখা হয়েছে</span>
-                        </button>
-                      )}
+                        {/* Inline Warning Message right beneath delete button */}
+                        {deletingTestId === test.id && (
+                          <div className="absolute top-full left-0 mt-1.5 z-30 bg-white border border-rose-200 rounded-xl p-2.5 shadow-lg min-w-[210px] animate-in fade-in slide-in-from-top-1 text-left">
+                            <p className="text-[11px] font-bold text-rose-800 mb-2 leading-tight">
+                              ⚠️ নিশ্চিত মুছে ফেলতে চান?
+                            </p>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSingleTest(test)}
+                                className="flex-1 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold transition-colors cursor-pointer text-center"
+                              >
+                                ওকে
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeletingTestId(null)}
+                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold transition-colors cursor-pointer"
+                              >
+                                বাতিল
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
+                      {/* 3. Action Button: প্রশ্নপত্র দেখুন (যদি এখনও জমা না দেয় - এর পাশে কোন সময় থাকবে না) */}
                       {isPending && (
                         <button
                           type="button"
@@ -1715,23 +2227,36 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                         </button>
                       )}
 
+                      {/* 4. Action Button: উত্তরপত্র (খাতা জমা হওয়ার পর) এবং ঠিক এর ডান পাশে জমার দিনক্ষণ */}
+                      {(isSubmitted || isReviewed) && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenReviewModal(test)}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer ring-2 ring-amber-400 ring-offset-1"
+                            title="উত্তরপত্র দেখতে ও মূল্যায়ন করতে ক্লিক করুন"
+                          >
+                            <FileText className="w-4 h-4" />
+                            <span>উত্তরপত্র</span>
+                          </button>
+
+                          {/* উত্তরপত্রের ঠিক ডান পাশে খাতা জমা হওয়ার দিনক্ষণ */}
+                          <div
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/90 text-indigo-950 text-xs font-semibold shadow-2xs"
+                            title="সন্তানের খাতা জমার সঠিক তারিখ ও সময়"
+                          >
+                            <Clock className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                            <span>
+                              জমার সময়: <strong className="font-bold text-indigo-900 font-['Noto_Sans_Bengali']">{formatSubmissionDateTime(test)}</strong>
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
                     </div>
                   </div>
                 );
               })}
-
-              {filterMode !== 'unreviewed' && (
-                <div className="pt-2 flex justify-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowCreationModeModal(true)}
-                    className="px-6 py-2.5 sm:py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold shadow-md cursor-pointer inline-flex items-center gap-2 transition-transform active:scale-95"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>নতুন পরীক্ষা তৈরি করুন</span>
-                  </button>
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -2134,127 +2659,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* MODAL 3: DELETE TEST CONFIRMATION                        */}
-      {/* ======================================================== */}
-      {testToDelete && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full border border-rose-100 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                <Trash2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-black text-slate-900">
-                  পরীক্ষাটি মুছে ফেলতে চান?
-                </h3>
-                <p className="text-xs text-slate-500 font-medium">
-                  এই কাজটি পূর্বাবস্থায় ফিরিয়ে আনা যাবে না
-                </p>
-              </div>
-            </div>
 
-            <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">পরীক্ষার নাম:</span>
-                <span className="font-bold text-slate-800 text-right">{testToDelete.title}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500 font-medium">পরীক্ষার পিন:</span>
-                <span className="font-mono font-bold text-blue-600">{testToDelete.pin}</span>
-              </div>
-            </div>
-
-            <p className="text-xs text-rose-700 bg-rose-50 p-3 rounded-xl border border-rose-200 leading-relaxed">
-              সতর্কতা: এটি নিশ্চিত করলে প্রশ্নপত্র এবং এর সাথে সম্পর্কিত খাতা ও মূল্যায়নের সকল রেকর্ড তালিকা থেকে সম্পূর্ণ মুছে যাবে।
-            </p>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setTestToDelete(null)}
-                className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
-              >
-                বাতিল
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDeleteTest}
-                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>হ্যাঁ, মুছে ফেলুন</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================== */}
-      {/* MODAL 3B: CLEAR ALL TESTS CONFIRMATION                   */}
-      {/* ======================================================== */}
-      {showClearConfirmModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full border border-rose-100 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
-                <Trash2 className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900">
-                  সকল পরীক্ষা ও খাতা মুছে ফেলবেন?
-                </h3>
-                <p className="text-xs text-slate-500 font-medium">
-                  এই কাজটি স্থায়ী এবং আর ফিরিয়ে আনা যাবে না
-                </p>
-              </div>
-            </div>
-
-            <p className="text-xs text-rose-700 bg-rose-50 p-3.5 rounded-2xl border border-rose-200 leading-relaxed font-medium">
-              ⚠️ সতর্কতা: এটি নিশ্চিত করলে আপনার তৈরি করা সমস্ত প্রশ্নপত্র, শিক্ষার্থীর জমা দেওয়া উত্তরপত্র এবং সুপাবেজ ক্লাউড ডাটাবেজের সকল রেকর্ড সম্পূর্ণ মুছে ফ্রেশ ও খালি ড্যাশবোর্ড হয়ে যাবে।
-            </p>
-
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                disabled={isClearingAll}
-                onClick={() => setShowClearConfirmModal(false)}
-                className="px-4 py-2 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
-              >
-                বাতিল
-              </button>
-              <button
-                type="button"
-                disabled={isClearingAll}
-                onClick={async () => {
-                  setIsClearingAll(true);
-                  try {
-                    setTests([]);
-                    await clearAllStoredTests();
-                    setShowClearConfirmModal(false);
-                    showToast('🗑️ সকল পরীক্ষা ও ক্লাউড ডাটাবেজ সম্পূর্ণ মুছে ফেলা হয়েছে।');
-                  } finally {
-                    setIsClearingAll(false);
-                  }
-                }}
-                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 active:bg-rose-800 text-white text-xs font-bold transition-all shadow-md shadow-rose-600/20 flex items-center gap-1.5 cursor-pointer"
-              >
-                {isClearingAll ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>মুছে ফেলা হচ্ছে...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>হ্যাঁ, সম্পূর্ণ মুছে ফেলুন</span>
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ======================================================== */}
       {/* MODAL 4: SHARE TEST MODAL (WHATSAPP, SHORT URL, PIN)     */}
