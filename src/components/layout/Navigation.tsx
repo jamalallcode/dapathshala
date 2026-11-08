@@ -14,6 +14,7 @@ import {
 import { AppNotification, UserRole } from '../../types';
 import { getStoredNotifications, saveStoredNotifications, addDismissedNotifId, clearAllNotifications } from '../../lib/storage';
 import { logoutParent } from '../../lib/parentAuth';
+import { logoutStudent } from '../../lib/studentAuth';
 
 interface NavigationProps {
   currentRole: UserRole;
@@ -335,6 +336,22 @@ export const Navigation: React.FC<NavigationProps> = ({
                 </div>
               )}
             </div>
+          )}
+
+          {/* Student Logout Action */}
+          {currentRole === 'student' && (
+            <button
+              type="button"
+              onClick={() => {
+                logoutStudent();
+                if (onNavigateHome) onNavigateHome();
+                else window.location.reload();
+              }}
+              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-200 hover:text-rose-200 text-xs font-bold transition-all cursor-pointer border border-slate-700 hover:border-rose-500/50"
+              title="শিক্ষার্থী অ্যাকাউন্ট থেকে লগআউট করুন"
+            >
+              লগআউট
+            </button>
           )}
 
         </div>

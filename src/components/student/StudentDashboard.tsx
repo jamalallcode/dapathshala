@@ -9,21 +9,31 @@ import {
   fetchTestFromServer 
 } from "../../lib/storage";
 import { AssignedTest } from "../../types";
+import { getCurrentStudent, logoutStudent, StudentUser } from "../../lib/studentAuth";
 
 interface StudentDashboardProps {
   onStartExam: (test: AssignedTest) => void;
+  onLogout?: () => void;
 }
 
-export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam }) => {
+export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam, onLogout }) => {
+  const [student, setStudent] = useState<StudentUser | null>(() => getCurrentStudent());
   const [tests, setTests] = useState<AssignedTest[]>([]);
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
 
   useEffect(() => {
     setTests(getStoredTests());
-    const handleUpdate = () => setTests(getStoredTests());
+    const handleUpdate = () => {
+      setTests(getStoredTests());
+      setStudent(getCurrentStudent());
+    };
     window.addEventListener("dapathshala_tests_updated", handleUpdate);
-    return () => window.removeEventListener("dapathshala_tests_updated", handleUpdate);
+    window.addEventListener("dapathshala_student_auth_changed", handleUpdate);
+    return () => {
+      window.removeEventListener("dapathshala_tests_updated", handleUpdate);
+      window.removeEventListener("dapathshala_student_auth_changed", handleUpdate);
+    };
   }, []);
 
   const handlePinSubmit = async (e?: React.FormEvent) => {
@@ -63,28 +73,43 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam 
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-bold mb-2">
               <GraduationCap className="w-4 h-4" />
-              <span>শিক্ষার্থী কর্নার</span>
+              <span>শিক্ষার্থী কর্নার {student?.studentClass ? `• ${student.studentClass}` : ''}</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">শিক্ষার্থী কর্নারে স্বাগতম!</h1>
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
+              {student ? `স্বাগতম, ${student.name}!` : 'শিক্ষার্থী কর্নারে স্বাগতম!'}
+            </h1>
             <p className="mt-1 text-emerald-100 text-xs sm:text-sm">
-              অভিভাবকের নির্ধারিত পরীক্ষাগুলো সম্পন্ন করুন এবং নিজের দক্ষতা বৃদ্ধি করুন।
+              {student?.phone ? `মোবাইল: ${student.phone} • ` : ''}অভিভাবকের নির্ধারিত পরীক্ষাগুলো সম্পন্ন করুন এবং নিজের দক্ষতা বৃদ্ধি করুন।
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/20">
+          <div className="flex items-center flex-wrap gap-2.5">
+            <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/20">
               <Flame className="w-5 h-5 text-amber-300" />
               <div>
-                <p className="text-xs text-emerald-100 uppercase font-bold">ধারাবাহিকতা</p>
-                <p className="text-base font-black">৭ দিন</p>
+                <p className="text-[10px] text-emerald-100 uppercase font-bold">ধারাবাহিকতা</p>
+                <p className="text-sm font-black">৭ দিন</p>
               </div>
             </div>
-            <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/20">
+            <div className="flex items-center gap-2.5 bg-white/10 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/20">
               <Zap className="w-5 h-5 text-amber-300 fill-amber-300" />
               <div>
-                <p className="text-xs text-emerald-100 uppercase font-bold">পয়েন্টস</p>
-                <p className="text-base font-black">২৪৫০ XP</p>
+                <p className="text-[10px] text-emerald-100 uppercase font-bold">পয়েন্টস</p>
+                <p className="text-sm font-black">২৪৫০ XP</p>
               </div>
             </div>
+            {student && (
+              <button
+                type="button"
+                onClick={() => {
+                  logoutStudent();
+                  if (onLogout) onLogout();
+                }}
+                className="flex items-center gap-1.5 bg-white/15 hover:bg-rose-600 text-white px-3.5 py-2 rounded-2xl text-xs font-bold border border-white/25 transition-all cursor-pointer"
+                title="শিক্ষার্থী অ্যাকাউন্ট থেকে লগআউট করুন"
+              >
+                <span>লগআউট</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

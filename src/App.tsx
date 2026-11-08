@@ -15,11 +15,17 @@ import {
   fetchTestFromServer,
   fetchSubmissionFromServer 
 } from './lib/storage';
+import { StudentAuthModal } from './components/auth/StudentAuthModal';
+import { isStudentLoggedIn, StudentUser } from './lib/studentAuth';
 
 export function App() {
   const [currentRole, setCurrentRole] = useState<UserRole>('parent');
   const [activeView, setActiveView] = useState<'landing' | 'dashboard' | 'exam' | 'review'>('landing');
   const [activeTest, setActiveTest] = useState<AssignedTest | null>(null);
+  
+  // Student registration & login modal state
+  const [isStudentAuthModalOpen, setIsStudentAuthModalOpen] = useState(false);
+  const [studentAuthPrompt, setStudentAuthPrompt] = useState<string | undefined>(undefined);
   
   // Resizable Sidebar state (default 208px - slimmer and moved further left)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -239,6 +245,11 @@ export function App() {
     try {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     } catch {}
+    if (role === 'student' && !isStudentLoggedIn()) {
+      setStudentAuthPrompt('সন্তানের ড্যাশবোর্ডে প্রবেশ করতে অনুগ্রহ করে আপনার শিক্ষার্থী অ্যাকাউন্ট তৈরি (রেজিস্ট্রেশন) অথবা লগইন করুন।');
+      setIsStudentAuthModalOpen(true);
+      return;
+    }
     setCurrentRole(role);
     if (activeView === 'landing') {
       setActiveView('dashboard');
@@ -249,11 +260,22 @@ export function App() {
     try {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     } catch {}
-    setCurrentRole(role);
-    setActiveView('dashboard');
+    if (role === 'student') {
+      if (isStudentLoggedIn()) {
+        setCurrentRole('student');
+        setActiveView('dashboard');
+      } else {
+        setStudentAuthPrompt('সন্তানের ড্যাশবোর্ডে প্রবেশ করতে অনুগ্রহ করে আপনার শিক্ষার্থী অ্যাকাউন্ট তৈরি (রেজিস্ট্রেশন) অথবা লগইন করুন।');
+        setIsStudentAuthModalOpen(true);
+      }
+    } else {
+      setCurrentRole('parent');
+      setActiveView('dashboard');
+    }
   };
 
   const handleOpenExamWithPinFromLanding = (test: AssignedTest) => {
+    setCurrentRole('student');
     setActiveTest(test);
     setActiveView('exam');
   };
@@ -287,6 +309,40 @@ export function App() {
     setActiveView('dashboard');
   };
 
+  // When student exits exam or view evaluation results:
+  // Direct to student dashboard if logged in, otherwise show student registration modal
+  const handleExitFromStudentExam = () => {
+    if (window.location.search) {
+      const newUrl = window.location.pathname;
+      window.history.pushState({}, '', newUrl);
+    }
+    if (isStudentLoggedIn()) {
+      setCurrentRole('student');
+      setActiveTest(null);
+      setActiveView('dashboard');
+    } else {
+      setStudentAuthPrompt('সন্তানের ড্যাশবোর্ডে প্রবেশ করতে অনুগ্রহ করে আপনার শিক্ষার্থী অ্যাকাউন্ট তৈরি (রেজিস্ট্রেশন) অথবা লগইন করুন।');
+      setIsStudentAuthModalOpen(true);
+    }
+  };
+
+  const handleStudentAuthSuccess = (_user: StudentUser) => {
+    setIsStudentAuthModalOpen(false);
+    setCurrentRole('student');
+    setActiveTest(null);
+    setActiveView('dashboard');
+  };
+
+  const handleCloseStudentAuthModal = () => {
+    setIsStudentAuthModalOpen(false);
+    // If student was viewing an exam or evaluation, safely return to landing without going to parent dashboard
+    if (activeView === 'exam' || activeTest) {
+      setActiveTest(null);
+      setActiveView('landing');
+      setCurrentRole('student');
+    }
+  };
+
   const handleOpenCreateExamFromSidebar = () => {
     setActiveView('dashboard');
     setCurrentRole('parent');
@@ -315,8 +371,8 @@ export function App() {
       className="min-h-screen bg-[#ebf2fa] text-slate-800 flex flex-col font-sans w-full max-w-full overflow-x-clip relative"
     >
       
-      {/* Universal Control Sidebar (only in dashboard view) */}
-      {activeView !== 'landing' && activeView !== 'exam' && (
+      {/* Universal Control Sidebar (only in dashboard view for parent) */}
+      {activeView !== 'landing' && activeView !== 'exam' && currentRole === 'parent' && (
         <Sidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
@@ -336,9 +392,9 @@ export function App() {
         />
       )}
 
-      {/* Main Viewport Column (offset only when sidebar is active) */}
+      {/* Main Viewport Column (offset only when parent sidebar is active) */}
       <div className={`flex-1 flex flex-col min-w-0 ${
-        activeView !== 'landing' && activeView !== 'exam' ? 'lg:pl-[var(--sidebar-width)]' : ''
+        activeView !== 'landing' && activeView !== 'exam' && currentRole === 'parent' ? 'lg:pl-[var(--sidebar-width)]' : ''
       } ${
         isResizingSidebar ? '' : 'transition-[padding-left] duration-75'
       }`}>
@@ -371,12 +427,12 @@ export function App() {
           ) : activeView === 'exam' && activeTest ? (
             <StartExamScreen
               test={activeTest}
-              onExit={handleExitToDashboard}
+              onExit={handleExitFromStudentExam}
             />
           ) : activeView === 'review' && activeTest ? (
             <LiveExamEngine
               test={activeTest}
-              onExit={handleExitToDashboard}
+              onExit={currentRole === 'student' ? handleExitFromStudentExam : handleExitToDashboard}
               isReviewOnly={true}
             />
           ) : (
@@ -394,6 +450,9 @@ export function App() {
             ) : (
               <StudentDashboard
                 onStartExam={handleOpenExam}
+                onLogout={() => {
+                  setActiveView('landing');
+                }}
               />
             )
           )}
@@ -432,6 +491,15 @@ export function App() {
         )}
 
       </div>
+
+      {/* Student Auth Modal (Registration & Login) */}
+      <StudentAuthModal
+        isOpen={isStudentAuthModalOpen}
+        initialMode="register"
+        onClose={handleCloseStudentAuthModal}
+        onSuccess={handleStudentAuthSuccess}
+        promptMessage={studentAuthPrompt}
+      />
 
     </div>
   );
