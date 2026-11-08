@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   GraduationCap, 
   ShieldCheck, 
@@ -10,10 +10,16 @@ import {
   Camera, 
   Share2, 
   HelpCircle,
-  AlertCircle
+  AlertCircle,
+  LogIn,
+  UserPlus,
+  LogOut,
+  Phone
 } from 'lucide-react';
 import { AssignedTest, UserRole } from '../../types';
 import { getStoredTests, saveStoredTests, fetchTestFromServer } from '../../lib/storage';
+import { getCurrentParent, logoutParent, ParentUser } from '../../lib/parentAuth';
+import { ParentAuthModal } from '../auth/ParentAuthModal';
 
 interface LandingPageProps {
   onSelectRole: (role: UserRole) => void;
@@ -28,8 +34,58 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onCreateCustomExam,
   onToggleSidebar,
 }) => {
+  const [currentParent, setCurrentParent] = useState<ParentUser | null>(() => getCurrentParent());
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+  const [authPrompt, setAuthPrompt] = useState<string | undefined>(undefined);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
+
+  useEffect(() => {
+    const handleAuthChange = () => {
+      setCurrentParent(getCurrentParent());
+    };
+    window.addEventListener('dapathshala_parent_auth_changed', handleAuthChange);
+    window.addEventListener('storage', handleAuthChange);
+    return () => {
+      window.removeEventListener('dapathshala_parent_auth_changed', handleAuthChange);
+      window.removeEventListener('storage', handleAuthChange);
+    };
+  }, []);
+
+  const handleOpenLogin = () => {
+    setAuthPrompt('আপনার মোবাইল নম্বর ও পাসওয়ার্ড দিয়ে সহজে প্রবেশ করুন');
+    setAuthModalMode('login');
+    setIsAuthModalOpen(true);
+  };
+
+  const handleOpenRegister = () => {
+    setAuthPrompt('শুধু মোবাইল নম্বর ও পাসওয়ার্ড দিয়ে নিমেষেই রেজিস্টার করুন');
+    setAuthModalMode('register');
+    setIsAuthModalOpen(true);
+  };
+
+  const handleLogout = () => {
+    logoutParent();
+    setCurrentParent(null);
+  };
+
+  const handleParentPortalClick = () => {
+    const parent = getCurrentParent();
+    if (parent) {
+      onSelectRole('parent');
+    } else {
+      setAuthPrompt('অভিভাবক পোর্টালে প্রবেশের পূর্বে অনুগ্রহ করে আপনার মোবাইল নম্বর ও পাসওয়ার্ড দিয়ে লগইন বা রেজিস্টার করুন।');
+      setAuthModalMode('login');
+      setIsAuthModalOpen(true);
+    }
+  };
+
+  const handleAuthSuccess = (user: ParentUser) => {
+    setCurrentParent(user);
+    setIsAuthModalOpen(false);
+    onSelectRole('parent');
+  };
 
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,19 +138,56 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          {/* Quick Info & Action */}
-          <div className="flex items-center gap-2 sm:gap-3 text-xs font-bold">
-            <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300">
+          {/* Quick Info & Action + Modern Login & Register */}
+          <div className="flex items-center gap-2 sm:gap-2.5 text-xs font-bold">
+            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
               <span>এআই প্রশ্ন ও লাইভ প্রক্টরিং</span>
             </div>
             <button
               type="button"
-              onClick={() => onSelectRole('parent')}
+              onClick={handleParentPortalClick}
               className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
             >
               অভিভাবক পোর্টাল
             </button>
+
+            {currentParent ? (
+              <div className="flex items-center gap-1.5">
+                <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-emerald-400 text-xs font-bold">
+                  <Phone className="w-3.5 h-3.5" />
+                  <span>{currentParent.phone}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+                  title="লগআউট করুন"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                  <span className="hidden sm:inline">লগআউট</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <button
+                  type="button"
+                  onClick={handleOpenLogin}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                >
+                  <LogIn className="w-3.5 h-3.5 text-blue-400" />
+                  <span>লগইন</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenRegister}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>রেজিস্টার</span>
+                </button>
+              </div>
+            )}
           </div>
 
         </div>
@@ -159,10 +252,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
             <button
               type="button"
-              onClick={() => onSelectRole('parent')}
+              onClick={handleParentPortalClick}
               className="w-full py-3.5 px-5 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold text-sm sm:text-base shadow-md shadow-blue-200/80 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.99]"
             >
-              <span>প্রশ্ন তৈরি শুরু করুন (অভিভাবক)</span>
+              <span>অভিভাবক পোর্টালে প্রবেশ করুন</span>
               <ArrowRight className="w-4.5 h-4.5" />
             </button>
           </div>
@@ -307,6 +400,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <p>© ২০২৬ দাপাঠশালা — অভিভাবক ও শিক্ষার্থীর বিশ্বস্ত একাডেমিক মূল্যায়ন প্ল্যাটফর্ম</p>
         </div>
       </footer>
+
+      {/* Parent Mobile & Password Auth Modal */}
+      <ParentAuthModal
+        isOpen={isAuthModalOpen}
+        initialMode={authModalMode}
+        promptMessage={authPrompt}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={handleAuthSuccess}
+      />
 
     </div>
   );

@@ -10,10 +10,13 @@ import {
   X, 
   Shield, 
   User, 
-  Menu
+  Menu,
+  LogOut,
+  Phone
 } from 'lucide-react';
 import { AppNotification, UserRole } from '../../types';
 import { getStoredNotifications, saveStoredNotifications, addDismissedNotifId, clearAllNotifications } from '../../lib/storage';
+import { getCurrentParent, logoutParent } from '../../lib/parentAuth';
 
 interface NavigationProps {
   currentRole: UserRole;
@@ -277,6 +280,21 @@ export const Navigation: React.FC<NavigationProps> = ({
               </div>
             )}
           </div>
+
+          {/* Parent Logout */}
+          {currentRole === 'parent' && (
+            <button
+              type="button"
+              onClick={() => {
+                logoutParent();
+                if (onNavigateHome) onNavigateHome();
+              }}
+              className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+              title="অভিভাবক অ্যাকাউন্ট লগআউট করুন"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          )}
 
         </div>
 

@@ -42,6 +42,9 @@ app.get('/api/health', (_req, res) => {
 // In-memory cache + persistent file storage
 const TESTS_FILE = path.resolve(process.cwd(), '.tests_store.json');
 const SUBMISSIONS_FILE = path.resolve(process.cwd(), '.submissions_store.json');
+const PARENTS_FILE = path.resolve(process.cwd(), '.parents_store.json');
+
+let parentsStore: Record<string, any> = {};
 
 function loadJson<T>(filePath: string, fallback: T): T {
   try {
@@ -317,6 +320,68 @@ app.get('/api/submissions/:pin', (req, res) => {
     return res.json(test);
   }
   res.status(404).json({ error: 'Submission not found' });
+});
+
+// API: Parent Registration (Phone & Password)
+app.post('/api/auth/parent-register', (req, res) => {
+  const { phone, password, id } = req.body || {};
+  if (!phone || !password) {
+    return res.status(400).json({ error: 'মোবাইল নম্বর ও পাসওয়ার্ড আবশ্যক' });
+  }
+  const cleanPhone = String(phone).trim();
+  const parents = loadJson<Record<string, any>>(PARENTS_FILE, {});
+  if (parents[cleanPhone]) {
+    return res.status(400).json({ error: 'এই মোবাইল নম্বর দিয়ে ইতিমধ্যে অ্যাকাউন্ট রয়েছে' });
+  }
+
+  const newParent = {
+    id: id || `parent_${cleanPhone}_${Date.now()}`,
+    phone: cleanPhone,
+    password: String(password).trim(),
+    createdAt: new Date().toISOString()
+  };
+
+  parents[cleanPhone] = newParent;
+  parentsStore[cleanPhone] = newParent;
+  saveJson(PARENTS_FILE, parents);
+
+  res.json({
+    success: true,
+    user: {
+      id: newParent.id,
+      phone: newParent.phone,
+      role: 'parent',
+      createdAt: newParent.createdAt
+    }
+  });
+});
+
+// API: Parent Login (Phone & Password)
+app.post('/api/auth/parent-login', (req, res) => {
+  const { phone, password } = req.body || {};
+  if (!phone || !password) {
+    return res.status(400).json({ error: 'মোবাইল নম্বর ও পাসওয়ার্ড আবশ্যক' });
+  }
+  const cleanPhone = String(phone).trim();
+  const parents = loadJson<Record<string, any>>(PARENTS_FILE, {});
+  const parent = parents[cleanPhone] || parentsStore[cleanPhone];
+
+  if (!parent) {
+    return res.status(404).json({ error: 'কোনো অ্যাকাউন্ট পাওয়া যায়নি' });
+  }
+  if (parent.password !== String(password).trim()) {
+    return res.status(401).json({ error: 'পাসওয়ার্ড সঠিক নয়' });
+  }
+
+  res.json({
+    success: true,
+    user: {
+      id: parent.id,
+      phone: parent.phone,
+      role: 'parent',
+      createdAt: parent.createdAt
+    }
+  });
 });
 
 async function startServer() {

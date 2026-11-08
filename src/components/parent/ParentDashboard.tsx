@@ -30,6 +30,7 @@ import {
   getAlternativeQuestion,
   generateTwoSolutions
 } from '../../lib/curriculumQuestions';
+import { getCurrentParent, logoutParent, ParentUser } from '../../lib/parentAuth';
 
 interface ParentDashboardProps {
   onOpenTest: (test: AssignedTest) => void;
@@ -112,10 +113,18 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
   const [isClearingAll, setIsClearingAll] = useState(false);
 
-  // Load tests on mount and listen to updates
+  const [currentParent, setCurrentParent] = useState<ParentUser | null>(() => getCurrentParent());
+
+  // Load tests on mount and listen to updates (filtered for current parent's privacy)
   const loadTests = () => {
     const list = getStoredTests();
-    setTests(list);
+    const parent = getCurrentParent();
+    if (parent?.phone) {
+      const filtered = list.filter(t => !t.parentPhone || t.parentPhone === parent.phone);
+      setTests(filtered);
+    } else {
+      setTests(list);
+    }
   };
 
   useEffect(() => {
@@ -565,7 +574,8 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       totalMarks: generatedQuestions.length * 20,
       proctoringEnabled: proctoringEnabled,
       aiGradingEnabled: true,
-      questions: generatedQuestions
+      questions: generatedQuestions,
+      parentPhone: currentParent?.phone
     };
 
     const updated = [newTest, ...tests];
@@ -816,9 +826,17 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             <GraduationCap className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              দাপাঠশালা অভিভাবক পোর্টাল
-            </h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                দাপাঠশালা অভিভাবক পোর্টাল
+              </h1>
+              {currentParent?.phone && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>অ্যাকাউন্ট: {currentParent.phone}</span>
+                </span>
+              )}
+            </div>
             <p className="text-xs sm:text-sm text-slate-500 font-semibold">
               এআই প্রশ্নপত্র তৈরি, লিংক শেয়ার ও ফ্রন্ট ক্যামেরা লাইভ খাতা মূল্যায়ন
             </p>

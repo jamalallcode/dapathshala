@@ -32,6 +32,7 @@ export interface AssignedTest {
   parentComment?: string;
   questions: ExamQuestion[];
   submittedAt?: string;
+  parentPhone?: string;
 }
 
 export interface StudentSubmission {
