@@ -1443,16 +1443,6 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 <span>{isSyncing ? 'সিঙ্ক হচ্ছে...' : 'খাতা রিফ্রেশ'}</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setShowCreationModeModal(true)}
-                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
-                title="নতুন পরীক্ষা বা প্রশ্নপত্র তৈরি করুন"
-              >
-                <Plus className="w-4 h-4" />
-                <span>নতুন পরীক্ষা তৈরি করুন</span>
-              </button>
-
               {tests.length > 0 && (
                 <button
                   type="button"
@@ -1677,6 +1667,19 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                   </div>
                 );
               })}
+
+              {filterMode !== 'unreviewed' && (
+                <div className="pt-2 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreationModeModal(true)}
+                    className="px-6 py-2.5 sm:py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold shadow-md cursor-pointer inline-flex items-center gap-2 transition-transform active:scale-95"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>নতুন পরীক্ষা তৈরি করুন</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
