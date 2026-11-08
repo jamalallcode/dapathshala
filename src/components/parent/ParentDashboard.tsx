@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Plus, PlusCircle, Trash2, Copy, Check, Eye, FileText, CheckCircle2, 
+  Plus, PlusCircle, Trash2, Copy, Check, Eye, FileText, FileCheck, CheckCircle2, 
   Clock, Shield, AlertTriangle, MessageSquare, ChevronRight, Share2,
   TrendingUp, Award, BookOpen, Sparkles, RefreshCw, Edit3, X,
   Save, AlertCircle, Camera, ExternalLink, HelpCircle, GraduationCap, ArrowRight, ArrowLeft,
@@ -50,6 +50,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 }) => {
   const [tests, setTests] = useState<AssignedTest[]>([]);
   const [activeViewMode, setActiveViewMode] = useState<'builder' | 'tests'>('tests');
+  const [filterMode, setFilterMode] = useState<'all' | 'unreviewed'>('all');
   const [copiedPin, setCopiedPin] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -785,6 +786,11 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   // Only count tests pending evaluation so the badge count decreases upon review
   const pendingReviewCount = tests.filter(t => t.status === 'submitted').length;
 
+  // Filter tests if parent clicked "সকল উত্তরপত্র" (only answer sheets that haven't been reviewed yet)
+  const displayedTests = filterMode === 'unreviewed'
+    ? tests.filter(t => t.status === 'submitted')
+    : tests;
+
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4">
       
@@ -825,16 +831,40 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             <span>← পরীক্ষাসমূহ ও খাতায় ফিরে যান</span>
           </button>
         ) : (
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-900 text-xs sm:text-sm font-bold">
-              <FileText className="w-4 h-4 text-blue-600" />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveViewMode('tests');
+                setFilterMode('all');
+              }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs ${
+                filterMode === 'all'
+                  ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
+                  : 'bg-blue-50 border-blue-200 text-blue-900 hover:bg-blue-100 hover:border-blue-300'
+              }`}
+              title="সকল নির্ধারিত পরীক্ষা দেখুন"
+            >
+              <FileText className={`w-4 h-4 ${filterMode === 'all' ? 'text-white' : 'text-blue-600'}`} />
               <span>নির্ধারিত পরীক্ষা: {toBn(tests.length)}টি</span>
-              {pendingReviewCount > 0 && (
-                <span className="ml-1 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[11px] font-black animate-pulse">
-                  {toBn(pendingReviewCount)}টি খাতা মূল্যায়নের বাকি
-                </span>
-              )}
-            </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveViewMode('tests');
+                setFilterMode(prev => prev === 'unreviewed' ? 'all' : 'unreviewed');
+              }}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs ${
+                filterMode === 'unreviewed'
+                  ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
+                  : 'bg-blue-50 border-blue-200 text-blue-900 hover:bg-blue-100 hover:border-blue-300'
+              }`}
+              title="যেসব উত্তরপত্র এখনো দেখা হয়নি সব সামনে আনুন"
+            >
+              <FileCheck className={`w-4 h-4 ${filterMode === 'unreviewed' ? 'text-white' : 'text-blue-600'}`} />
+              <span>সকল উত্তরপত্র</span>
+            </button>
           </div>
         )}
       </div>
@@ -1367,15 +1397,41 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
-              <h2 className="text-base sm:text-lg font-black text-slate-900">
-                অভিভাবকের নির্ধারিত পরীক্ষাসমূহ ও খাতা
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base sm:text-lg font-black text-slate-900">
+                  {filterMode === 'unreviewed' ? 'অমূল্যায়িত উত্তরপত্রসমূহ (যা এখনো দেখা হয়নি)' : 'অভিভাবকের নির্ধারিত পরীক্ষাসমূহ ও খাতা'}
+                </h2>
+                {filterMode === 'unreviewed' && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterMode('all')}
+                    className="px-2 py-0.5 rounded-full bg-blue-100 hover:bg-blue-200 text-blue-800 text-[11px] font-bold border border-blue-200 cursor-pointer transition-colors"
+                    title="সকল পরীক্ষা দেখুন"
+                  >
+                    সব দেখুন ✕
+                  </button>
+                )}
+              </div>
               <p className="text-xs text-slate-500 font-medium">
-                সন্তানের জন্য আপনার তৈরি করা পরীক্ষাসমূহ এবং জমা দেওয়া উত্তরপত্র
+                {filterMode === 'unreviewed'
+                  ? `মোট ${toBn(displayedTests.length)}টি উত্তরপত্র মূল্যায়নের অপেক্ষায় রয়েছে`
+                  : 'সন্তানের জন্য আপনার তৈরি করা পরীক্ষাসমূহ এবং জমা দেওয়া উত্তরপত্র'}
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {filterMode === 'unreviewed' && (
+                <button
+                  type="button"
+                  onClick={() => setFilterMode('all')}
+                  className="px-3.5 py-2 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 text-blue-800 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                  title="সকল নির্ধারিত পরীক্ষা দেখুন"
+                >
+                  <FileText className="w-3.5 h-3.5 text-blue-600" />
+                  <span>সকল পরীক্ষা দেখুন</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={handleManualSync}
@@ -1433,9 +1489,27 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 <span>নতুন পরীক্ষা তৈরি করুন</span>
               </button>
             </div>
+          ) : displayedTests.length === 0 ? (
+            <div className="py-8 text-center bg-slate-50/70 rounded-3xl border border-dashed border-slate-300 px-4 sm:px-6">
+              <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto mb-2" />
+              <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">
+                কোনো অমূল্যায়িত উত্তরপত্র বাকি নেই!
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mb-4 font-medium">
+                সব জমাকৃত উত্তরপত্র দেখা সম্পন্ন হয়েছে।
+              </p>
+              <button
+                type="button"
+                onClick={() => setFilterMode('all')}
+                className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-bold shadow-xs cursor-pointer inline-flex items-center gap-1.5 transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                <span>সকল নির্ধারিত পরীক্ষা দেখুন</span>
+              </button>
+            </div>
           ) : (
             <div className="space-y-3.5">
-              {(tests || []).map(test => {
+              {displayedTests.map(test => {
                 const isSubmitted = test.status === 'submitted';
                 const isReviewed = test.status === 'reviewed';
                 const isPending = test.status === 'pending';
@@ -1464,12 +1538,6 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                           পিন: <span className="font-mono font-bold text-blue-600">{test.pin}</span>
                         </span>
 
-                        {/* Status Pills shifted to left alongside Subject and PIN */}
-                        {isSubmitted && (
-                          <span className="text-xs font-black px-2.5 py-1 rounded-full bg-amber-500 text-white animate-pulse inline-flex items-center gap-1 shadow-2xs">
-                            <span>🔔</span> নতুন খাতা জমা পড়েছে!
-                          </span>
-                        )}
                         {isReviewed && (
                           <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1.5 shadow-2xs">
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
