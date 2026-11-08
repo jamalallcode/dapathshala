@@ -5,19 +5,17 @@ import {
   PlusCircle, 
   ShieldCheck, 
   FileText, 
-  ChevronDown, 
-  CheckCircle2, 
   X, 
   Shield, 
   User, 
   Menu,
   LogOut,
-  Phone,
-  Settings
+  Settings,
+  Sliders
 } from 'lucide-react';
 import { AppNotification, UserRole } from '../../types';
 import { getStoredNotifications, saveStoredNotifications, addDismissedNotifId, clearAllNotifications } from '../../lib/storage';
-import { getCurrentParent, logoutParent } from '../../lib/parentAuth';
+import { logoutParent } from '../../lib/parentAuth';
 
 interface NavigationProps {
   currentRole: UserRole;
@@ -50,6 +48,10 @@ export const Navigation: React.FC<NavigationProps> = ({
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const notifContainerRef = useRef<HTMLDivElement>(null);
 
+  // Settings dropdown state (আইকনটিতে ক্লিক করলে ড্রপডাউন: ১. লগ-আউট ২. অন্যান্য)
+  const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
+
   // Load notifications and listen for custom events
   // "যেগুলো একবার দেখা হয়ে যাবে সেগুলো নোটিফিকেশনে আর থাকার দরকার নেই।"
   const loadNotifs = () => {
@@ -74,8 +76,11 @@ export const Navigation: React.FC<NavigationProps> = ({
       if (notifContainerRef.current && !notifContainerRef.current.contains(event.target as Node)) {
         setIsNotifOpen(false);
       }
+      if (settingsMenuRef.current && !settingsMenuRef.current.contains(event.target as Node)) {
+        setIsSettingsMenuOpen(false);
+      }
     };
-    if (isNotifOpen) {
+    if (isNotifOpen || isSettingsMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('touchstart', handleClickOutside);
     }
@@ -83,7 +88,7 @@ export const Navigation: React.FC<NavigationProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('touchstart', handleClickOutside);
     };
-  }, [isNotifOpen]);
+  }, [isNotifOpen, isSettingsMenuOpen]);
 
   const handleDismissNotification = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -284,37 +289,60 @@ export const Navigation: React.FC<NavigationProps> = ({
             )}
           </div>
 
-          {/* Parent Settings & Logout Buttons */}
+          {/* Parent Settings Gear Icon with Dropdown (১. লগ-আউট, ২. অন্যান্য) */}
           {currentRole === 'parent' && (
-            <div className="flex items-center gap-1 sm:gap-1.5 ml-1">
+            <div className="relative ml-1" ref={settingsMenuRef}>
               <button
                 type="button"
-                onClick={() => {
-                  if (onOpenSettings) onOpenSettings();
-                  else if (onSelectTab) onSelectTab('settings');
-                }}
-                className="px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs group"
-                title="অভিভাবক অ্যাকাউন্ট সেটিংস ও প্রোফাইল"
+                onClick={() => setIsSettingsMenuOpen(prev => !prev)}
+                className={`p-1.5 sm:p-2 rounded-lg transition-all cursor-pointer flex items-center justify-center border shadow-2xs group ${
+                  isSettingsMenuOpen
+                    ? 'bg-slate-800 text-amber-400 border-amber-500/60 ring-1 ring-amber-400/30'
+                    : 'bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white border-slate-700/80'
+                }`}
+                title="অভিভাবক সেটিংস মেনু"
+                aria-label="সেটিংস মেনু"
               >
-                <Settings className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-45 transition-transform duration-200" />
-                <span className="hidden sm:inline">সেটিংস</span>
+                <Settings className={`w-4 h-4 text-amber-400 transition-transform duration-200 ${
+                  isSettingsMenuOpen ? 'rotate-90 text-amber-300' : 'group-hover:rotate-45'
+                }`} />
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  if (onOpenSettings) {
-                    onOpenSettings();
-                  } else {
-                    logoutParent();
-                    if (onNavigateHome) onNavigateHome();
-                  }
-                }}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
-                title="লগআউট / সেটিংস"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+              {/* Dropdown Menu */}
+              {isSettingsMenuOpen && (
+                <div className="absolute right-0 mt-2 w-44 bg-white rounded-2xl shadow-2xl border border-slate-200 py-1.5 z-50 animate-in fade-in zoom-in-95 duration-150 select-none">
+                  <div className="px-3.5 py-1.5 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    অভিভাবক মেনু
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSettingsMenuOpen(false);
+                      logoutParent();
+                      if (onNavigateHome) onNavigateHome();
+                      else window.location.reload();
+                    }}
+                    className="w-full px-3.5 py-2.5 text-left text-xs sm:text-sm font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
+                    <span>১. লগ-আউট</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSettingsMenuOpen(false);
+                      if (onOpenSettings) onOpenSettings();
+                      else if (onSelectTab) onSelectTab('settings');
+                    }}
+                    className="w-full px-3.5 py-2.5 text-left text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2.5 transition-colors cursor-pointer border-t border-slate-100"
+                  >
+                    <Sliders className="w-4 h-4 text-slate-500 shrink-0" />
+                    <span>২. অন্যান্য</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

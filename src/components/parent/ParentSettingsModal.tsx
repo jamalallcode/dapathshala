@@ -7,10 +7,7 @@ import {
   Lock, 
   Eye, 
   EyeOff, 
-  ShieldCheck, 
   GraduationCap, 
-  Clock, 
-  LogOut, 
   CheckCircle2, 
   AlertCircle,
   Save,
@@ -21,7 +18,6 @@ import {
   getCurrentParent, 
   updateParentProfile, 
   changeParentPassword, 
-  logoutParent, 
   ParentUser 
 } from '../../lib/parentAuth';
 
@@ -59,7 +55,6 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
   // Status & Feedback
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -75,7 +70,6 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
       setMessage(null);
       setCurrentPassword('');
       setNewPassword('');
-      setShowLogoutConfirm(false);
     }
   }, [isOpen]);
 
@@ -142,17 +136,6 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
       setTimeout(() => setMessage(null), 3000);
     } else {
       setMessage({ type: 'error', text: res.error || 'সংরক্ষণ ব্যর্থ হয়েছে' });
-    }
-  };
-
-  // Handle Logout
-  const handleLogout = () => {
-    logoutParent();
-    onClose();
-    if (onLogoutSuccess) {
-      onLogoutSuccess();
-    } else {
-      window.location.reload();
     }
   };
 
@@ -489,43 +472,6 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
 
             </form>
           )}
-
-          {/* LOGOUT SECTION: Always present at bottom of settings */}
-          <div className="pt-4 border-t border-slate-200">
-            {!showLogoutConfirm ? (
-              <button
-                type="button"
-                onClick={() => setShowLogoutConfirm(true)}
-                className="w-full py-2.5 px-4 rounded-xl border border-rose-200 bg-rose-50/70 hover:bg-rose-100 text-rose-700 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer"
-              >
-                <LogOut className="w-4 h-4 text-rose-600" />
-                <span>অভিভাবক অ্যাকাউন্ট থেকে লগআউট করুন</span>
-              </button>
-            ) : (
-              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 space-y-2.5 animate-in fade-in duration-150">
-                <p className="text-xs font-bold text-rose-900 text-center">
-                  আপনি কি নিশ্চিতভাবে এই অভিভাবক অ্যাকাউন্ট থেকে লগআউট করতে চান?
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowLogoutConfirm(false)}
-                    className="flex-1 py-2 px-3 rounded-lg bg-white border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
-                  >
-                    না, বাতিল করুন
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleLogout}
-                    className="flex-1 py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-xs cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>হ্যাঁ, লগআউট করুন</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
 
         </div>
 
