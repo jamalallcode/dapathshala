@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   GraduationCap, 
   ShieldCheck, 
-  Sparkles, 
   Clock, 
   FileText, 
   CheckCircle2, 
@@ -138,19 +137,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          {/* Quick Info & Action + Modern Login & Register */}
+          {/* Modern Login & Register Actions */}
           <div className="flex items-center gap-2 sm:gap-2.5 text-xs font-bold">
-            <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>এআই প্রশ্ন ও লাইভ প্রক্টরিং</span>
-            </div>
-            <button
-              type="button"
-              onClick={handleParentPortalClick}
-              className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
-            >
-              অভিভাবক পোর্টাল
-            </button>
 
             {currentParent ? (
               <div className="flex items-center gap-1.5">

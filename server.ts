@@ -402,6 +402,11 @@ async function startServer() {
       if (req.originalUrl.startsWith('/api/')) {
         return next();
       }
+      // If it's a static asset request that Vite middleware didn't handle, don't return index.html
+      const ext = path.extname(req.path);
+      if (ext && ext !== '.html') {
+        return next();
+      }
       try {
         const indexHtmlPath = path.resolve(process.cwd(), 'index.html');
         if (fs.existsSync(indexHtmlPath)) {
@@ -417,7 +422,8 @@ async function startServer() {
     });
   } else {
     app.use(express.static(path.resolve(process.cwd(), 'dist')));
-    app.get('/{*splat}', (_req, res) => {
+    // Use fallback handler for SPA routes in production
+    app.use((_req, res) => {
       res.sendFile(path.resolve(process.cwd(), 'dist', 'index.html'));
     });
   }
@@ -430,14 +436,19 @@ async function startServer() {
     console.error('Server listen error:', err?.message || err);
   });
 
-  const gracefulShutdown = () => {
+  const gracefulShutdown = (signal: string) => {
+    console.log(`Received ${signal}, closing server...`);
     server.close(() => {
+      console.log('Server stopped cleanly.');
       process.exit(0);
     });
   };
 
-  process.on('SIGTERM', gracefulShutdown);
-  process.on('SIGINT', gracefulShutdown);
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('Fatal: Server startup failed:', err);
+  process.exit(1);
+});
