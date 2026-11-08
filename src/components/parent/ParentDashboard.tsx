@@ -2233,8 +2233,12 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                           <button
                             type="button"
                             onClick={() => handleOpenReviewModal(test)}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer ring-2 ring-amber-400 ring-offset-1"
-                            title="উত্তরপত্র দেখতে ও মূল্যায়ন করতে ক্লিক করুন"
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-white text-xs sm:text-sm font-bold shadow-xs transition-all cursor-pointer ${
+                              isReviewed
+                                ? 'bg-slate-500 hover:bg-slate-600 active:bg-slate-700 ring-1 ring-slate-400/80 shadow-2xs'
+                                : 'bg-amber-500 hover:bg-amber-600 active:bg-amber-700 ring-2 ring-amber-400 ring-offset-1'
+                            }`}
+                            title={isReviewed ? "মূল্যায়িত উত্তরপত্র দেখতে ক্লিক করুন" : "উত্তরপত্র দেখতে ও মূল্যায়ন করতে ক্লিক করুন"}
                           >
                             <FileText className="w-4 h-4" />
                             <span>উত্তরপত্র</span>
