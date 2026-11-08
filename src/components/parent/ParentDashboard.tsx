@@ -119,6 +119,11 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   };
 
   useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    } catch {}
     loadTests();
 
     const handleStorage = () => loadTests();
@@ -792,7 +797,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     : tests;
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-5 space-y-4">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-6 sm:pt-6 sm:pb-8 space-y-4">
       
       {/* Toast Alert: repositioned to bottom center to prevent covering header/navigation */}
       {toastMessage && (

@@ -197,6 +197,15 @@ export function App() {
     initFromParams();
   }, []);
 
+  // Always ensure page starts at the very top (0, 0) whenever view changes so header is never partially covered
+  useEffect(() => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    } catch {}
+  }, [activeView, currentRole]);
+
   const handleNavigateHome = () => {
     try {
       if (window.location.search) {
@@ -208,7 +217,7 @@ export function App() {
     setActiveTest(null);
     setActiveView('landing');
     try {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     } catch {}
   };
 
@@ -217,6 +226,7 @@ export function App() {
       if (window.location.search) {
         window.history.pushState({}, '', window.location.pathname);
       }
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     } catch {
       // Sandboxed iframe pushState fallback
     }
@@ -225,6 +235,9 @@ export function App() {
   };
 
   const handleRoleChange = (role: UserRole) => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    } catch {}
     setCurrentRole(role);
     if (activeView === 'landing') {
       setActiveView('dashboard');
@@ -232,6 +245,9 @@ export function App() {
   };
 
   const handleSelectRoleFromLanding = (role: UserRole) => {
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    } catch {}
     setCurrentRole(role);
     setActiveView('dashboard');
   };

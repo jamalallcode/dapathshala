@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { 
   GraduationCap, 
   ShieldCheck, 
-  Key, 
   Sparkles, 
   Clock, 
   FileText, 
@@ -104,25 +103,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* ======================================================== */}
       {/* 2. HERO HEADER (Focused & Clean)                         */}
       {/* ======================================================== */}
-      <section className="pt-8 sm:pt-12 pb-6 px-4 max-w-4xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs sm:text-sm font-bold mb-4 shadow-2xs">
+      <section className="pt-4 sm:pt-6 pb-3 px-4 sm:px-6 max-w-6xl mx-auto text-center w-full">
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs sm:text-sm font-bold mb-3 shadow-2xs">
           <span>🎯</span>
           <span>সহজ, নিরাপদ ও স্বচ্ছ একাডেমিক মূল্যায়ন</span>
         </div>
 
-        <h1 className="text-2xl sm:text-4xl lg:text-4.5xl font-black text-slate-900 tracking-tight leading-snug">
+        <h1 className="text-2xl sm:text-3.5xl lg:text-4xl font-black text-slate-900 tracking-tight leading-snug">
           সন্তানের একাডেমিক মূল্যায়ন ও স্মার্ট পরীক্ষা ব্যবস্থা
         </h1>
-
-        <p className="mt-3 text-sm sm:text-base text-slate-600 font-medium max-w-2xl mx-auto leading-relaxed">
-          এআই দিয়ে শ্রেণি ও অধ্যায়ভিত্তিক প্রশ্ন তৈরি করুন, পরীক্ষার লিংক সন্তানকে পাঠান এবং ফ্রন্ট ক্যামেরা নজরদারিতে খাতা মূল্যায়ন ও মন্তব্য দিন।
-        </p>
       </section>
 
       {/* ======================================================== */}
       {/* 3. TWO PRIMARY CHOICE CARDS (অভিভাবক ও সন্তান)           */}
       {/* ======================================================== */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 pb-12">
+      <main className="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 pb-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 items-stretch">
           
           {/* ---------------------------------------------------- */}
@@ -133,15 +128,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r from-blue-600 to-indigo-600" />
 
             <div>
-              <div className="flex items-center justify-between mb-5">
-                <div className="w-13 h-13 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold shadow-xs border border-blue-100">
-                  <GraduationCap className="w-7 h-7" />
-                </div>
-                <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                  অভিভাবক সেকশন
-                </span>
-              </div>
-
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2">
                 আমি একজন অভিভাবক
               </h2>
@@ -189,15 +175,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r from-emerald-500 to-teal-500" />
 
             <div>
-              <div className="flex items-center justify-between mb-5">
-                <div className="w-13 h-13 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold shadow-xs border border-emerald-100">
-                  <Key className="w-7 h-7" />
-                </div>
-                <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  শিক্ষার্থী / সন্তান সেকশন
-                </span>
-              </div>
-
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2">
                 আমি শিক্ষার্থী / সন্তান
               </h2>
@@ -238,21 +215,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 )}
               </form>
 
-              {/* Feature Checklist */}
-              <div className="space-y-2.5 mb-6 text-xs sm:text-sm font-semibold text-slate-700">
-                <div className="flex items-center gap-2.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>'পরীক্ষা শুরু করুন' বাটন চাপার আগে প্রশ্ন দেখা যাবে না</span>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <Camera className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>নকল এড়াতে ফ্রন্ট ক্যামেরা নজরদারি ও ফুলস্ক্রিন সুরক্ষা</span>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>নির্দিষ্ট সময় শেষে স্বয়ংক্রিয়ভাবে খাতা অটো-সাবমিট</span>
-                </div>
-              </div>
             </div>
 
             <button
@@ -341,7 +303,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* 5. MINIMALIST FOOTER                                     */}
       {/* ======================================================== */}
       <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 font-medium">
-        <p>© ২০২৬ দাপাঠশালা — অভিভাবক ও শিক্ষার্থীর বিশ্বস্ত একাডেমিক মূল্যায়ন প্ল্যাটফর্ম</p>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <p>© ২০২৬ দাপাঠশালা — অভিভাবক ও শিক্ষার্থীর বিশ্বস্ত একাডেমিক মূল্যায়ন প্ল্যাটফর্ম</p>
+        </div>
       </footer>
 
     </div>

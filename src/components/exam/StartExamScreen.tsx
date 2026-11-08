@@ -278,16 +278,24 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ test: initialT
             </div>
 
             {/* Anti-Cheating & Exam Rules */}
-            <div className="space-y-2 text-xs text-slate-600 bg-amber-50/70 p-4 rounded-2xl border border-amber-200">
-              <div className="flex items-center gap-1.5 font-bold text-amber-800 mb-1">
-                <ShieldCheck className="w-4 h-4 text-amber-600" />
-                <span>পরীক্ষার বিশেষ নির্দেশনাবলী</span>
+            <div className="space-y-2 text-xs text-slate-700 bg-amber-50/80 p-4 rounded-2xl border border-amber-200">
+              <div className="flex items-center gap-2 font-bold text-amber-900 mb-1.5 text-xs sm:text-sm">
+                <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>পরীক্ষার বিশেষ নির্দেশনাবলী:</span>
               </div>
-              <ul className="list-disc list-inside space-y-1.5 text-slate-700 font-medium">
-                <li>পরীক্ষা শুরু করার পূর্বে প্রশ্ন দেখা যাবে না; শুরু করলেই টাইমার চালু হবে।</li>
-                <li>নকল প্রতিরোধে ফ্রন্ট ক্যামেরা নজরদারি ও ফুলস্ক্রিন সুরক্ষা সক্রিয় থাকবে।</li>
-                <li>পরীক্ষা চলাকালীন নতুন কোনো ট্যাব বা অ্যাপে যাওয়া সম্পূর্ণ নিষিদ্ধ ও লক থাকবে।</li>
-                <li>সময় শেষ হওয়ার পর খাতা স্বয়ংক্রিয়ভাবে অভিভাবকের কাছে জমা হবে।</li>
+              <ul className="space-y-2 text-slate-700 text-xs sm:text-sm font-semibold">
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                  <span>'পরীক্ষা শুরু করুন' বাটন চাপার আগে প্রশ্ন দেখা যাবে না</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                  <span>নকল এড়াতে ফ্রন্ট ক্যামেরা নজরদারি ও ফুলস্ক্রিন সুরক্ষা</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                  <span>নির্দিষ্ট সময় শেষে স্বয়ংক্রিয়ভাবে খাতা অটো-সাবমিট</span>
+                </li>
               </ul>
             </div>
 
