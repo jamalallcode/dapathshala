@@ -133,6 +133,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
         <form onSubmit={handlePinSubmit} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
           <div className="relative">
             <input
+              id="student-pin-input"
               type="text"
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value)}
@@ -158,7 +159,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
       )}
 
       {/* 3. Assigned Test List */}
-      <div className="space-y-4">
+      <div id="student-exam-list" className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg sm:text-xl font-black text-slate-900 flex items-center gap-2">
             <BookOpen className="w-5 h-5 text-emerald-600" />

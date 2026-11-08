@@ -371,8 +371,8 @@ export function App() {
       className="min-h-screen bg-[#ebf2fa] text-slate-800 flex flex-col font-sans w-full max-w-full overflow-x-clip relative"
     >
       
-      {/* Universal Control Sidebar (only in dashboard view for parent) */}
-      {activeView !== 'landing' && activeView !== 'exam' && currentRole === 'parent' && (
+      {/* Universal Control Sidebar (in dashboard view for both parent and student) */}
+      {activeView !== 'landing' && activeView !== 'exam' && (
         <Sidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
@@ -392,9 +392,9 @@ export function App() {
         />
       )}
 
-      {/* Main Viewport Column (offset only when parent sidebar is active) */}
+      {/* Main Viewport Column (offset when sidebar is active) */}
       <div className={`flex-1 flex flex-col min-w-0 ${
-        activeView !== 'landing' && activeView !== 'exam' && currentRole === 'parent' ? 'lg:pl-[var(--sidebar-width)]' : ''
+        activeView !== 'landing' && activeView !== 'exam' ? 'lg:pl-[var(--sidebar-width)]' : ''
       } ${
         isResizingSidebar ? '' : 'transition-[padding-left] duration-75'
       }`}>

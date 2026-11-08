@@ -4,10 +4,15 @@ import {
   Award, 
   Brain, 
   X,
-  Camera
+  Camera,
+  BookOpen,
+  Key,
+  GraduationCap,
+  LogOut
 } from 'lucide-react';
 import { UserRole, AssignedTest } from '../../types';
 import { getCurrentParent, ParentUser, updateParentProfile } from '../../lib/parentAuth';
+import { getCurrentStudent, StudentUser, updateStudentProfile, logoutStudent } from '../../lib/studentAuth';
 
 export interface SidebarProps {
   isOpen: boolean;
@@ -44,6 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenSettings
 }) => {
   const [parentUser, setParentUser] = useState<ParentUser | null>(() => getCurrentParent());
+  const [studentUser, setStudentUser] = useState<StudentUser | null>(() => getCurrentStudent());
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const getFirstLetter = (name?: string): string => {
@@ -80,8 +86,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
         const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        updateParentProfile({ avatar: compressedDataUrl });
-        setParentUser(getCurrentParent());
+        if (currentRole === 'student') {
+          updateStudentProfile({ avatar: compressedDataUrl });
+          setStudentUser(getCurrentStudent());
+        } else {
+          updateParentProfile({ avatar: compressedDataUrl });
+          setParentUser(getCurrentParent());
+        }
       };
       img.src = event.target?.result as string;
     };
@@ -92,11 +103,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     const handleAuthChange = () => {
       setParentUser(getCurrentParent());
+      setStudentUser(getCurrentStudent());
     };
     window.addEventListener('dapathshala_parent_auth_changed', handleAuthChange);
+    window.addEventListener('dapathshala_student_auth_changed', handleAuthChange);
     window.addEventListener('storage', handleAuthChange);
     return () => {
       window.removeEventListener('dapathshala_parent_auth_changed', handleAuthChange);
+      window.removeEventListener('dapathshala_student_auth_changed', handleAuthChange);
       window.removeEventListener('storage', handleAuthChange);
     };
   }, []);
@@ -129,7 +143,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }`}
       >
         {/* ======================================================== */}
-        {/* 1. TOP HEADER: Parent Photo + Name & Mobile Number       */}
+        {/* 1. TOP HEADER: Photo + Name & Mobile Number              */}
         {/* ======================================================== */}
         <div className="h-14 border-b border-slate-800/90 flex items-center justify-between px-3 bg-[#090e1a] shrink-0">
           <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
@@ -143,10 +157,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="hidden"
             />
 
-            {/* Parent Profile Avatar / Initial Letter - Click to upload from computer */}
+            {/* Profile Avatar / Initial Letter - Click to upload from computer */}
             <div 
               onClick={() => fileInputRef.current?.click()}
-              className="relative w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-700 border-2 border-blue-400/60 flex items-center justify-center shrink-0 shadow-xs cursor-pointer group/avatar transition-transform hover:scale-105"
+              className={`relative w-9 h-9 rounded-full overflow-hidden border-2 flex items-center justify-center shrink-0 shadow-xs cursor-pointer group/avatar transition-transform hover:scale-105 ${
+                currentRole === 'student'
+                  ? 'bg-gradient-to-br from-emerald-600 to-teal-700 border-emerald-400/60'
+                  : 'bg-gradient-to-br from-blue-600 to-indigo-700 border-blue-400/60'
+              }`}
               title="কম্পিউটার থেকে ছবি সেট করতে ক্লিক করুন"
               role="button"
               tabIndex={0}
@@ -156,15 +174,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }
               }}
             >
-              {parentUser?.avatar ? (
+              {(currentRole === 'student' ? studentUser?.avatar : parentUser?.avatar) ? (
                 <img 
-                  src={parentUser.avatar} 
-                  alt={parentUser?.name || 'অভিভাবক'} 
+                  src={currentRole === 'student' ? studentUser?.avatar : parentUser?.avatar} 
+                  alt={currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')} 
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <span className="text-white font-black text-sm select-none">
-                  {getFirstLetter(parentUser?.name)}
+                  {getFirstLetter(currentRole === 'student' ? studentUser?.name : parentUser?.name)}
                 </span>
               )}
 
@@ -181,10 +199,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               title="মূল ওয়েবসাইট / ল্যান্ডিং পেজে যান"
             >
               <span className="font-bold text-white text-sm tracking-tight block truncate group-hover:text-blue-300 transition-colors">
-                {parentUser?.name || 'অভিভাবক'}
+                {currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')}
               </span>
               <span className="text-xs text-slate-400 font-semibold block truncate">
-                {parentUser?.phone || '০১৭৮৯৫৩৯৪৯৪'}
+                {currentRole === 'student' 
+                  ? (studentUser?.studentClass ? `${studentUser.studentClass} • ${studentUser.phone || ''}` : (studentUser?.phone || 'শিক্ষার্থী কর্নার'))
+                  : (parentUser?.phone || '০১৭৮৯৫৩৯৪৯৪')}
               </span>
             </div>
           </div>
@@ -205,73 +225,133 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* ======================================================== */}
         <div className="flex-1 overflow-y-auto py-3 space-y-1 text-sm font-semibold">
           
-          {/* Menu: প্রশ্নপত্র তৈরি */}
-          <div>
-            <button
-              type="button"
-              onClick={() => {
-                handleLinkClick(() => {
-                  onRoleChange('parent');
-                  onNavigateDashboard();
-                  onSelectParentTab('assigned');
-                });
-              }}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
-                parentTab === 'assigned' && activeView === 'dashboard'
-                  ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
-                  : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 truncate min-w-0">
-                <PlusCircle className="w-4.5 h-4.5 text-blue-400 shrink-0" />
-                <span className="truncate">প্রশ্নপত্র তৈরি</span>
+          {currentRole === 'parent' ? (
+            <>
+              {/* Menu: প্রশ্নপত্র তৈরি */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleLinkClick(() => {
+                      onRoleChange('parent');
+                      onNavigateDashboard();
+                      onSelectParentTab('assigned');
+                    });
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
+                    parentTab === 'assigned' && activeView === 'dashboard'
+                      ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
+                      : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 truncate min-w-0">
+                    <PlusCircle className="w-4.5 h-4.5 text-blue-400 shrink-0" />
+                    <span className="truncate">প্রশ্নপত্র তৈরি</span>
+                  </div>
+                </button>
               </div>
-            </button>
-          </div>
 
-          {/* Menu 5: ফলাফল ও রিপোর্ট কার্ড */}
-          <div>
-            <button
-              type="button"
-              onClick={() => handleLinkClick(() => {
-                onRoleChange('parent');
-                onNavigateDashboard();
-                onSelectParentTab('report');
-              })}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
-                parentTab === 'report' && activeView === 'dashboard'
-                  ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
-                  : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 truncate min-w-0">
-                <Award className="w-4.5 h-4.5 text-amber-500 shrink-0" />
-                <span className="truncate">ফলাফল ও রিপোর্ট</span>
+              {/* Menu: ফলাফল ও রিপোর্ট */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => handleLinkClick(() => {
+                    onRoleChange('parent');
+                    onNavigateDashboard();
+                    onSelectParentTab('report');
+                  })}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
+                    parentTab === 'report' && activeView === 'dashboard'
+                      ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
+                      : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 truncate min-w-0">
+                    <Award className="w-4.5 h-4.5 text-amber-500 shrink-0" />
+                    <span className="truncate">ফলাফল ও রিপোর্ট</span>
+                  </div>
+                </button>
               </div>
-            </button>
-          </div>
 
-          {/* Menu: কুইজ ও ব্রেইন গেমস */}
-          <div>
-            <button
-              type="button"
-              onClick={() => handleLinkClick(() => {
-                onRoleChange('parent');
-                onNavigateDashboard();
-                onSelectParentTab('games');
-              })}
-              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
-                parentTab === 'games' && activeView === 'dashboard'
-                  ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
-                  : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 truncate min-w-0">
-                <Brain className="w-4.5 h-4.5 text-rose-400 shrink-0" />
-                <span className="truncate">কুইজ ও ব্রেইন গেমস</span>
+              {/* Menu: কুইজ ও ব্রেইন গেমস */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => handleLinkClick(() => {
+                    onRoleChange('parent');
+                    onNavigateDashboard();
+                    onSelectParentTab('games');
+                  })}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
+                    parentTab === 'games' && activeView === 'dashboard'
+                      ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
+                      : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 truncate min-w-0">
+                    <Brain className="w-4.5 h-4.5 text-rose-400 shrink-0" />
+                    <span className="truncate">কুইজ ও ব্রেইন গেমস</span>
+                  </div>
+                </button>
               </div>
-            </button>
-          </div>
+            </>
+          ) : (
+            <>
+              {/* Student Menu 1: নির্ধারিত পরীক্ষা */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => handleLinkClick(() => {
+                    onNavigateDashboard();
+                    const el = document.getElementById('student-exam-list');
+                    el?.scrollIntoView({ behavior: 'smooth' });
+                  })}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors bg-emerald-600/25 text-white font-bold border-l-2 border-emerald-500 hover:bg-emerald-600/35"
+                >
+                  <div className="flex items-center gap-2.5 truncate min-w-0">
+                    <BookOpen className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
+                    <span className="truncate">নির্ধারিত পরীক্ষাসমূহ</span>
+                  </div>
+                </button>
+              </div>
+
+              {/* Student Menu 2: পিন দিয়ে পরীক্ষা */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => handleLinkClick(() => {
+                    onNavigateDashboard();
+                    const input = document.getElementById('student-pin-input');
+                    input?.focus();
+                  })}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white"
+                >
+                  <div className="flex items-center gap-2.5 truncate min-w-0">
+                    <Key className="w-4.5 h-4.5 text-amber-400 shrink-0" />
+                    <span className="truncate">পিন দিয়ে পরীক্ষা</span>
+                  </div>
+                </button>
+              </div>
+
+              {/* Student Menu 3: কুইজ ও ব্রেইন গেমস */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => handleLinkClick(() => {
+                    onRoleChange('parent');
+                    onNavigateDashboard();
+                    onSelectParentTab('games');
+                  })}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white"
+                >
+                  <div className="flex items-center gap-2.5 truncate min-w-0">
+                    <Brain className="w-4.5 h-4.5 text-rose-400 shrink-0" />
+                    <span className="truncate">কুইজ ও ব্রেইন গেমস</span>
+                  </div>
+                </button>
+              </div>
+            </>
+          )}
 
         </div>
 

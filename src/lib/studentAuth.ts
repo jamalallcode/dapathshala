@@ -221,3 +221,24 @@ export async function loginStudent(
 export function logoutStudent() {
   setCurrentStudent(null);
 }
+
+// Update Student Profile (Avatar, Name, Class)
+export function updateStudentProfile(updates: Partial<Pick<StudentUser, 'name' | 'studentClass' | 'avatar'>>) {
+  const current = getCurrentStudent();
+  if (!current) return;
+  const updated: StudentUser = {
+    ...current,
+    ...updates
+  };
+  setCurrentStudent(updated);
+
+  // Also update in registered accounts storage
+  const accounts = getStoredStudentAccounts();
+  if (accounts[current.phone]) {
+    accounts[current.phone] = {
+      ...accounts[current.phone],
+      ...updates
+    };
+    saveStoredStudentAccounts(accounts);
+  }
+}
