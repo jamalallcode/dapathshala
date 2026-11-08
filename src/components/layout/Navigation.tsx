@@ -2,16 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Bell, 
   Home, 
-  PlusCircle, 
-  ShieldCheck, 
-  FileText, 
   X, 
-  Shield, 
-  User, 
   Menu,
-  LogOut,
   Settings,
-  Sliders
+  Phone,
+  Mail,
+  Clock,
+  Info,
+  HelpCircle
 } from 'lucide-react';
 import { AppNotification, UserRole } from '../../types';
 import { getStoredNotifications, saveStoredNotifications, addDismissedNotifId, clearAllNotifications } from '../../lib/storage';
@@ -47,6 +45,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const notifContainerRef = useRef<HTMLDivElement>(null);
+  const [activeNavModal, setActiveNavModal] = useState<'about' | 'guide' | 'contact' | null>(null);
 
   // Settings dropdown state (আইকনটিতে ক্লিক করলে ড্রপডাউন: ১. লগ-আউট ২. অন্যান্য)
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
@@ -120,7 +119,8 @@ export const Navigation: React.FC<NavigationProps> = ({
   const unreadNotifs = notifications;
 
   return (
-    <header className="sticky top-0 z-40 bg-[#0c1322] border-b border-slate-800 text-slate-200 w-full select-none shadow-sm">
+    <>
+      <header className="sticky top-0 z-40 bg-[#0c1322] border-b border-slate-800 text-slate-200 w-full select-none shadow-sm">
       <div className="w-full flex items-center justify-between h-13 px-3 sm:px-4">
         
         {/* Left Section: Mobile Menu + Blue Home Square + Header Menu Links */}
@@ -153,15 +153,58 @@ export const Navigation: React.FC<NavigationProps> = ({
             <Home className="w-4.5 h-4.5 pointer-events-none" />
           </button>
 
-          {/* Clean Menu Items */}
-          <div className="hidden sm:flex items-center gap-1.5 ml-3 text-sm font-semibold text-slate-200">
+          {/* Clean Menu Items (সর্বোচ্চ ৫ টি আইটেম) */}
+          <div className="hidden md:flex items-center gap-1 ml-3 text-xs sm:text-sm font-semibold text-slate-200">
+            {/* ১. হোম */}
             <button
               type="button"
-              onClick={() => onSelectTab?.('assigned')}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
+              onClick={(e) => {
+                e.preventDefault();
+                onNavigateHome?.();
+              }}
+              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
             >
-              <FileText className="w-4 h-4 text-blue-400" />
-              <span>নির্ধারিত পরীক্ষা</span>
+              হোম
+            </button>
+
+            {/* ২. আমাদের সম্পর্কে */}
+            <button
+              type="button"
+              onClick={() => setActiveNavModal('about')}
+              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+            >
+              আমাদের সম্পর্কে
+            </button>
+
+            {/* ৩. কুইজ ও গেমস */}
+            <button
+              type="button"
+              onClick={() => {
+                onRoleChange('parent');
+                onNavigateDashboard?.();
+                onSelectTab?.('games');
+              }}
+              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+            >
+              কুইজ ও গেমস
+            </button>
+
+            {/* ৪. নির্দেশিকা */}
+            <button
+              type="button"
+              onClick={() => setActiveNavModal('guide')}
+              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
+            >
+              নির্দেশিকা
+            </button>
+
+            {/* ৫. যোগাযোগ */}
+            <button
+              type="button"
+              onClick={() => setActiveNavModal('contact')}
+              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 hover:text-amber-300 text-amber-400 transition-colors cursor-pointer"
+            >
+              যোগাযোগ
             </button>
           </div>
 
@@ -273,10 +316,9 @@ export const Navigation: React.FC<NavigationProps> = ({
                       if (onNavigateHome) onNavigateHome();
                       else window.location.reload();
                     }}
-                    className="w-full px-3.5 py-2.5 text-left text-xs sm:text-sm font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors cursor-pointer"
+                    className="w-full px-4 py-2.5 text-left text-xs sm:text-sm font-bold text-rose-600 hover:bg-rose-50 block transition-colors cursor-pointer"
                   >
-                    <LogOut className="w-4 h-4 text-rose-500 shrink-0" />
-                    <span>১. লগ-আউট</span>
+                    লগআউট
                   </button>
 
                   <button
@@ -286,10 +328,9 @@ export const Navigation: React.FC<NavigationProps> = ({
                       if (onOpenSettings) onOpenSettings();
                       else if (onSelectTab) onSelectTab('settings');
                     }}
-                    className="w-full px-3.5 py-2.5 text-left text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-blue-700 flex items-center gap-2.5 transition-colors cursor-pointer border-t border-slate-100"
+                    className="w-full px-4 py-2.5 text-left text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-blue-700 block transition-colors cursor-pointer border-t border-slate-100"
                   >
-                    <Sliders className="w-4 h-4 text-slate-500 shrink-0" />
-                    <span>২. অন্যান্য</span>
+                    অন্যান্য
                   </button>
                 </div>
               )}
@@ -300,5 +341,165 @@ export const Navigation: React.FC<NavigationProps> = ({
 
       </div>
     </header>
+
+    {/* ======================================================== */}
+    {/* NAVBAR MODAL 1: যোগাযোগ ও হেল্পলাইন                        */}
+    {/* ======================================================== */}
+    {activeNavModal === 'contact' && (
+      <div className="fixed inset-0 z-[120] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+        <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full border border-slate-200 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                <Phone className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900">যোগাযোগ ও হেল্পলাইন</h3>
+                <p className="text-xs text-slate-500 font-medium">দাপাঠশালা সাপোর্ট ও সহায়তা কেন্দ্র</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveNavModal(null)}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="space-y-2.5 text-xs sm:text-sm">
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+              <Phone className="w-4 h-4 text-emerald-600 shrink-0" />
+              <div>
+                <p className="text-[11px] text-slate-500 font-semibold">হটলাইন / মোবাইল:</p>
+                <p className="font-bold text-slate-900 font-mono">০১৭৮৯-৫৩৯৪৯৪</p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+              <Mail className="w-4 h-4 text-blue-600 shrink-0" />
+              <div>
+                <p className="text-[11px] text-slate-500 font-semibold">অফিসিয়াল ইমেইল:</p>
+                <p className="font-bold text-slate-900 font-mono">support@dapathshala.com</p>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center gap-3">
+              <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+              <div>
+                <p className="text-[11px] text-slate-500 font-semibold">সেবা প্রদানের সময়সূচী:</p>
+                <p className="font-bold text-slate-800">প্রতিদিন সকাল ৯:০০ টা হতে রাত ১০:০০ টা</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => setActiveNavModal(null)}
+              className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm transition-colors cursor-pointer"
+            >
+              বন্ধ করুন
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ======================================================== */}
+    {/* NAVBAR MODAL 2: আমাদের সম্পর্কে                            */}
+    {/* ======================================================== */}
+    {activeNavModal === 'about' && (
+      <div className="fixed inset-0 z-[120] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+        <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full border border-slate-200 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                <Info className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900">আমাদের সম্পর্কে</h3>
+                <p className="text-xs text-slate-500 font-medium">দাপাঠশালা স্মার্ট মূল্যায়ন প্ল্যাটফর্ম</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveNavModal(null)}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
+            ‘দাপাঠশালা’ হলো বাংলাদেশের জাতীয় শিক্ষাক্রম অনুযায়ী সন্তানের মেধা যাচাই, নিরাপদ অনলাইন পরীক্ষা গ্রহণ ও স্বচ্ছ মূল্যায়নের জন্য তৈরি আধুনিক প্ল্যাটফর্ম। অভিভাবকরা সহজেই নিজে বা কৃত্রিম বুদ্ধিমত্তা (এআই) দিয়ে প্রশ্নপত্র তৈরি করতে পারেন এবং সন্তান ঘরে বসেই পরীক্ষা দিতে পারে।
+          </p>
+
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => setActiveNavModal(null)}
+              className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm transition-colors cursor-pointer"
+            >
+              বন্ধ করুন
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* ======================================================== */}
+    {/* NAVBAR MODAL 3: নির্দেশিকা                                  */}
+    {/* ======================================================== */}
+    {activeNavModal === 'guide' && (
+      <div className="fixed inset-0 z-[120] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+        <div className="bg-white rounded-3xl p-6 sm:p-7 max-w-md w-full border border-slate-200 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                <HelpCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900">ব্যবহার নির্দেশিকা</h3>
+                <p className="text-xs text-slate-500 font-medium">কীভাবে প্ল্যাটফর্মটি ব্যবহার করবেন</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveNavModal(null)}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="space-y-2 text-xs sm:text-sm text-slate-700">
+            <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-100">
+              <p className="font-bold text-blue-900">১. প্রশ্নপত্র তৈরি:</p>
+              <p className="text-slate-600 text-xs mt-0.5">অভিভাবক পোর্টালে নিজে প্রশ্ন লিখুন বা এআই দিয়ে স্বয়ংক্রিয়ভাবে প্রশ্নপত্র তৈরি করুন।</p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-indigo-50/70 border border-indigo-100">
+              <p className="font-bold text-indigo-900">২. সন্তানের পরীক্ষা:</p>
+              <p className="text-slate-600 text-xs mt-0.5">৬ সংখ্যার পিন বা লিংক সন্তানের কাছে দিন। নির্ধারিত সময়ে সন্তান পরীক্ষা সম্পন্ন করবে।</p>
+            </div>
+            <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-100">
+              <p className="font-bold text-emerald-900">৩. খাতা মূল্যায়ন ও ফলাফল:</p>
+              <p className="text-slate-600 text-xs mt-0.5">পরীক্ষা জমা দেওয়ার পর উত্তরপত্র দেখে নম্বর অনুমোদন করুন এবং সার্বিক রিপোর্ট কার্ড সংগ্রহ করুন।</p>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => setActiveNavModal(null)}
+              className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm transition-colors cursor-pointer"
+            >
+              বুঝেছি
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </>
   );
 };

@@ -214,7 +214,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onRoleChange('parent');
                   onNavigateDashboard();
                   onSelectParentTab('assigned');
-                  onOpenCreateExam();
                 });
               }}
               className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
