@@ -631,7 +631,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
   return (
     <div 
-      className="w-full max-w-4xl mx-auto px-4 sm:px-6 pt-6 pb-32 sm:pb-24 space-y-6 select-none"
+      className="w-full max-w-4xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6 pb-28 sm:pb-24 space-y-4 sm:space-y-6 select-none overflow-x-hidden"
       onContextMenu={(e) => e.preventDefault()}
     >
       
@@ -791,35 +791,58 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       )}
 
       {/* Top Exam Header Strip */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs flex items-center justify-between gap-4">
-        <button
-          type="button"
-          onClick={onExit}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>ফিরে যান</span>
-        </button>
+      <div className="bg-white rounded-2xl p-3 sm:p-5 border border-slate-200 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-4 overflow-hidden">
+        <div className="flex items-center justify-between sm:justify-start gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={onExit}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer shrink-0 py-1.5 px-2.5 rounded-xl hover:bg-slate-100 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" />
+            <span className="whitespace-nowrap">ফিরে যান</span>
+          </button>
 
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-2">
-            <h2 className="text-sm sm:text-base font-black text-slate-900 truncate max-w-xs sm:max-w-md">
+          {/* On mobile screens, show the timer or compact status badge on the top right */}
+          {!isReviewOnly && !isSubmitted ? (
+            <div className={`sm:hidden flex items-center gap-1.5 px-2.5 py-1 rounded-xl font-mono text-xs font-black border ${
+              timeLeft < 180 ? "bg-rose-50 text-rose-600 border-rose-200 animate-pulse" : "bg-blue-50 text-blue-700 border-blue-200"
+            }`}>
+              <Clock className="w-3.5 h-3.5" />
+              <span>{formatTime(timeLeft)}</span>
+            </div>
+          ) : (
+            <div className={`sm:hidden flex items-center gap-1 px-2.5 py-1 rounded-xl border text-[11px] font-bold shrink-0 ${
+              isReviewed 
+                ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                : "bg-blue-50 text-blue-800 border-blue-200"
+            }`}>
+              <CheckCircle2 className={`w-3.5 h-3.5 ${isReviewed ? "text-emerald-600" : "text-blue-600"}`} />
+              <span>{isReviewed ? "মূল্যায়ন সম্পন্ন" : "খাতা জমা"}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Center Title & Subtitle - always wraps or truncates cleanly, never bleeds right */}
+        <div className="flex-1 min-w-0 text-left sm:text-center px-1">
+          <div className="flex items-center sm:justify-center gap-2 overflow-hidden">
+            <h2 className="text-xs sm:text-base font-black text-slate-900 truncate" title={test.title}>
               {test.title}
             </h2>
             {!isReviewOnly && !isSubmitted && (
-              <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold">
+              <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold shrink-0">
                 <ShieldCheck className="w-3 h-3 text-purple-600" />
                 <span>নতুন ট্যাব লক ও ফুলস্ক্রিন সক্রিয়</span>
               </span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500 font-medium">
+          <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate">
             {isReviewOnly || isSubmitted ? "উত্তরপত্র ও খাতা পর্যালোচনা" : "লাইভ পরীক্ষা চলমান (ফ্রন্ট ক্যামেরা নজরদারি ও ফুলস্ক্রিন সুরক্ষা)"}
           </p>
         </div>
 
+        {/* Desktop Right Controls / Status */}
         {!isReviewOnly && !isSubmitted ? (
-          <div className="flex items-center gap-2">
+          <div className="hidden sm:flex items-center gap-2 shrink-0">
             {!isFullscreen && (
               <button
                 type="button"
@@ -839,7 +862,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             </div>
           </div>
         ) : (
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold ${
+          <div className={`hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold shrink-0 ${
             isReviewed 
               ? "bg-emerald-50 text-emerald-800 border-emerald-300"
               : "bg-blue-50 text-blue-800 border-blue-200"

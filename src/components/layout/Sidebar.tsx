@@ -114,14 +114,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {isOpen && (
         <div 
           onClick={onClose}
-          className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs z-50 lg:hidden"
+          className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-[50] lg:hidden"
           aria-hidden="true"
         />
       )}
 
       {/* Sidebar Container with Resizable Drag Handle */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-40 bg-[#0c1322] text-slate-300 border-r border-slate-800/90 flex flex-col select-none w-64 lg:w-[var(--sidebar-width)] ${
+        className={`fixed top-0 bottom-0 left-0 z-[60] bg-[#0c1322] text-slate-300 border-r border-slate-800/90 flex flex-col select-none w-64 lg:w-[var(--sidebar-width)] shadow-2xl ${
           isResizing ? '' : 'transition-[width] duration-75'
         } ${
           // Mobile drawer slide
