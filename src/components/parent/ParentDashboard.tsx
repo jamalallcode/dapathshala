@@ -4,7 +4,7 @@ import {
   Clock, Shield, AlertTriangle, MessageSquare, ChevronRight, Share2,
   TrendingUp, Award, BookOpen, Sparkles, RefreshCw, Edit3, X,
   Save, AlertCircle, Camera, ExternalLink, HelpCircle, GraduationCap, ArrowRight, ArrowLeft,
-  RotateCcw, MessageCircle, Lightbulb, ChevronDown, Printer
+  RotateCcw, MessageCircle, Lightbulb, ChevronDown, Printer, Settings
 } from 'lucide-react';
 import { AssignedTest, StudentSubmission, ExamQuestion } from '../../types';
 import { 
@@ -31,25 +31,42 @@ import {
   generateTwoSolutions
 } from '../../lib/curriculumQuestions';
 import { getCurrentParent, logoutParent, ParentUser } from '../../lib/parentAuth';
+import { ParentSettingsModal } from './ParentSettingsModal';
 
 interface ParentDashboardProps {
   onOpenTest: (test: AssignedTest) => void;
   onOpenReview: (test: AssignedTest) => void;
   onNavigateHome?: () => void;
-  activeTab?: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report';
-  onTabChange?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report') => void;
+  activeTab?: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings';
+  onTabChange?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings') => void;
   showCreateModalExternal?: boolean;
   onCloseCreateModalExternal?: () => void;
+  isSettingsOpenExternal?: boolean;
+  onCloseSettingsExternal?: () => void;
 }
 
 export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   onOpenTest,
   onOpenReview,
   onNavigateHome,
+  activeTab,
+  onTabChange,
   showCreateModalExternal,
-  onCloseCreateModalExternal
+  onCloseCreateModalExternal,
+  isSettingsOpenExternal,
+  onCloseSettingsExternal
 }) => {
   const [tests, setTests] = useState<AssignedTest[]>([]);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const showSettingsModal = Boolean(isSettingsOpenExternal || isSettingsOpen || activeTab === 'settings');
+
+  const handleCloseSettings = () => {
+    setIsSettingsOpen(false);
+    onCloseSettingsExternal?.();
+    if (activeTab === 'settings' && onTabChange) {
+      onTabChange('assigned');
+    }
+  };
   const [activeViewMode, setActiveViewMode] = useState<'builder' | 'tests'>('tests');
   const [filterMode, setFilterMode] = useState<'all' | 'unreviewed'>('all');
   const [copiedPin, setCopiedPin] = useState<string | null>(null);
@@ -115,15 +132,17 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
   const [currentParent, setCurrentParent] = useState<ParentUser | null>(() => getCurrentParent());
 
-  // Load tests on mount and listen to updates (filtered for current parent's privacy)
+  // Load tests on mount and listen to updates (strictly filtered for current parent)
+  // যদি কোনো অভিভাবক কোনো প্রশ্ন তৈরি করে না থাকে তবে কোনো অটোমেটিক প্রশ্ন দেখাবে না
   const loadTests = () => {
     const list = getStoredTests();
     const parent = getCurrentParent();
     if (parent?.phone) {
-      const filtered = list.filter(t => !t.parentPhone || t.parentPhone === parent.phone);
+      // STRICT FILTER: Only tests explicitly created by this parent!
+      const filtered = list.filter(t => t.parentPhone && t.parentPhone === parent.phone);
       setTests(filtered);
     } else {
-      setTests(list);
+      setTests([]);
     }
   };
 
@@ -888,6 +907,16 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               <FileCheck className={`w-4 h-4 ${filterMode === 'unreviewed' ? 'text-white' : 'text-blue-600'}`} />
               <span>সকল উত্তরপত্র</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setIsSettingsOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs group"
+              title="অভিভাবক অ্যাকাউন্ট সেটিংস ও প্রোফাইল এডিট"
+            >
+              <Settings className="w-4 h-4 text-amber-500 group-hover:rotate-45 transition-transform duration-200" />
+              <span>সেটিংস</span>
+            </button>
           </div>
         )}
       </div>
@@ -1486,10 +1515,10 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 <FileText className="w-6 h-6" />
               </div>
               <h3 className="text-base sm:text-lg font-black text-slate-800 mb-1">
-                এখনও কোনো পরীক্ষা তৈরি করা হয়নি
+                কোন প্রশ্ন তৈরি করেননি
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mb-4 font-medium leading-relaxed">
-                আপনার সন্তানের জন্য নতুন পরীক্ষা তৈরি করতে নিচের বাটনে ক্লিক করুন। আপনি চাইলে নিজে প্রশ্ন লিখতে পারেন অথবা এআই দিয়ে স্বয়ংক্রিয়ভাবে তৈরি করতে পারেন।
+                আপনার সন্তানের জন্য নতুন প্রশ্নপত্র বা পরীক্ষা তৈরি করতে নিচের বাটনে ক্লিক করুন।
               </p>
               
               {/* Marked Button: Opens creation mode modal with single + icon */}
@@ -2541,6 +2570,23 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* Parent Account Settings Modal */}
+      <ParentSettingsModal
+        isOpen={showSettingsModal}
+        onClose={handleCloseSettings}
+        onProfileUpdated={(updated) => {
+          setCurrentParent(updated);
+          showToast('✓ অভিভাবক প্রোফাইল তথ্য সফলভাবে আপডেট হয়েছে!');
+        }}
+        onLogoutSuccess={() => {
+          if (onNavigateHome) {
+            onNavigateHome();
+          } else {
+            window.location.reload();
+          }
+        }}
+      />
 
     </div>
   );

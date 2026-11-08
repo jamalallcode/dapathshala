@@ -12,7 +12,8 @@ import {
   User, 
   Menu,
   LogOut,
-  Phone
+  Phone,
+  Settings
 } from 'lucide-react';
 import { AppNotification, UserRole } from '../../types';
 import { getStoredNotifications, saveStoredNotifications, addDismissedNotifId, clearAllNotifications } from '../../lib/storage';
@@ -25,7 +26,8 @@ interface NavigationProps {
   onNavigateHome?: () => void;
   onNavigateDashboard?: () => void;
   onOpenCreateExam?: () => void;
-  onSelectTab?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report') => void;
+  onSelectTab?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings') => void;
+  onOpenSettings?: () => void;
   isHomeActive?: boolean;
   onToggleSidebar?: () => void;
   isSidebarOpen?: boolean;
@@ -39,6 +41,7 @@ export const Navigation: React.FC<NavigationProps> = ({
   onNavigateDashboard,
   onOpenCreateExam,
   onSelectTab,
+  onOpenSettings,
   isHomeActive,
   onToggleSidebar,
   isSidebarOpen
@@ -281,19 +284,38 @@ export const Navigation: React.FC<NavigationProps> = ({
             )}
           </div>
 
-          {/* Parent Logout */}
+          {/* Parent Settings & Logout Buttons */}
           {currentRole === 'parent' && (
-            <button
-              type="button"
-              onClick={() => {
-                logoutParent();
-                if (onNavigateHome) onNavigateHome();
-              }}
-              className="p-1.5 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
-              title="অভিভাবক অ্যাকাউন্ট লগআউট করুন"
-            >
-              <LogOut className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1 sm:gap-1.5 ml-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenSettings) onOpenSettings();
+                  else if (onSelectTab) onSelectTab('settings');
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs group"
+                title="অভিভাবক অ্যাকাউন্ট সেটিংস ও প্রোফাইল"
+              >
+                <Settings className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-45 transition-transform duration-200" />
+                <span className="hidden sm:inline">সেটিংস</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenSettings) {
+                    onOpenSettings();
+                  } else {
+                    logoutParent();
+                    if (onNavigateHome) onNavigateHome();
+                  }
+                }}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors cursor-pointer"
+                title="লগআউট / সেটিংস"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
           )}
 
         </div>

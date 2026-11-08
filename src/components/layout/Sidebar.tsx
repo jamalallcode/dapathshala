@@ -12,7 +12,8 @@ import {
   ChevronRight, 
   X,
   GraduationCap,
-  BookMarked
+  BookMarked,
+  Settings
 } from 'lucide-react';
 import { UserRole, AssignedTest } from '../../types';
 
@@ -27,9 +28,10 @@ export interface SidebarProps {
   activeView: 'landing' | 'dashboard' | 'exam' | 'review';
   onNavigateHome: () => void;
   onNavigateDashboard: () => void;
-  parentTab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report';
-  onSelectParentTab: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report') => void;
+  parentTab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings';
+  onSelectParentTab: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings') => void;
   onOpenCreateExam: () => void;
+  onOpenSettings?: () => void;
   onDirectStartExam?: (test: AssignedTest) => void;
 }
 
@@ -46,7 +48,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigateDashboard,
   parentTab,
   onSelectParentTab,
-  onOpenCreateExam
+  onOpenCreateExam,
+  onOpenSettings
 }) => {
   const [openSubmenu, setOpenSubmenu] = useState<string | null>('exams');
 
@@ -287,6 +290,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center gap-2.5 truncate min-w-0">
                 <BookMarked className="w-4.5 h-4.5 text-cyan-400 shrink-0" />
                 <span className="truncate">সিলেবাস ও প্রশ্নব্যাংক</span>
+              </div>
+            </button>
+          </div>
+
+          {/* Menu 9: সেটিংস ও প্রোফাইল */}
+          <div>
+            <button
+              type="button"
+              onClick={() => handleLinkClick(() => {
+                onRoleChange('parent');
+                onNavigateDashboard();
+                if (onOpenSettings) {
+                  onOpenSettings();
+                } else {
+                  onSelectParentTab('settings');
+                }
+              })}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
+                parentTab === 'settings' && activeView === 'dashboard'
+                  ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
+                  : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 truncate min-w-0">
+                <Settings className="w-4.5 h-4.5 text-amber-400 shrink-0" />
+                <span className="truncate">সেটিংস ও প্রোফাইল</span>
               </div>
             </button>
           </div>

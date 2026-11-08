@@ -3,6 +3,11 @@
 export interface ParentUser {
   id: string;
   phone: string;
+  name?: string;
+  childName?: string;
+  childClass?: string;
+  defaultDurationMinutes?: number;
+  proctoringStrictness?: 'standard' | 'high';
   role: 'parent';
   createdAt: string;
 }
@@ -10,6 +15,11 @@ export interface ParentUser {
 interface StoredParentAccount {
   id: string;
   phone: string;
+  name?: string;
+  childName?: string;
+  childClass?: string;
+  defaultDurationMinutes?: number;
+  proctoringStrictness?: 'standard' | 'high';
   passwordHash: string;
   createdAt: string;
 }
@@ -99,6 +109,71 @@ export function setCurrentParent(user: ParentUser | null) {
 // Logout Parent
 export function logoutParent() {
   setCurrentParent(null);
+}
+
+// Update Parent Profile (Name, Child Name, Child Class, Preferences)
+export function updateParentProfile(updates: Partial<ParentUser>): { success: boolean; user?: ParentUser; error?: string } {
+  try {
+    const current = getCurrentParent();
+    if (!current) {
+      return { success: false, error: 'কোনো অভিভাবক অ্যাকাউন্ট সক্রিয় নেই' };
+    }
+    const accounts = getStoredParentAccounts();
+    const account = accounts[current.phone];
+
+    const updatedUser: ParentUser = {
+      ...current,
+      ...updates,
+      phone: current.phone,
+      role: 'parent'
+    };
+
+    if (account) {
+      accounts[current.phone] = {
+        ...account,
+        ...updates,
+        phone: current.phone
+      };
+      saveStoredParentAccounts(accounts);
+    }
+
+    setCurrentParent(updatedUser);
+    return { success: true, user: updatedUser };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'প্রোফাইল আপডেট ব্যর্থ হয়েছে' };
+  }
+}
+
+// Change Parent Password
+export function changeParentPassword(currentPasswordRaw: string, newPasswordRaw: string): { success: boolean; error?: string } {
+  try {
+    const current = getCurrentParent();
+    if (!current) {
+      return { success: false, error: 'কোনো অভিভাবক অ্যাকাউন্ট সক্রিয় নেই' };
+    }
+    const accounts = getStoredParentAccounts();
+    const account = accounts[current.phone];
+    if (!account) {
+      return { success: false, error: 'অ্যাকাউন্ট রেকর্ড পাওয়া যায়নি' };
+    }
+
+    const currentPassword = currentPasswordRaw.trim();
+    const newPassword = newPasswordRaw.trim();
+
+    if (account.passwordHash !== currentPassword) {
+      return { success: false, error: 'বর্তমান পাসওয়ার্ড সঠিক নয়' };
+    }
+    if (!newPassword || newPassword.length < 4) {
+      return { success: false, error: 'নতুন পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে' };
+    }
+
+    account.passwordHash = newPassword;
+    accounts[current.phone] = account;
+    saveStoredParentAccounts(accounts);
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে' };
+  }
 }
 
 // Register Parent (Only Mobile & Password)

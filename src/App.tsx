@@ -77,8 +77,9 @@ export function App() {
   }, [isResizingSidebar, sidebarWidth]);
   
   // Coordinated Dashboard state for sidebar control
-  const [parentActiveTab, setParentActiveTab] = useState<'overview' | 'assigned' | 'review' | 'proctoring' | 'report'>('assigned');
+  const [parentActiveTab, setParentActiveTab] = useState<'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings'>('assigned');
   const [showCreateModalExternal, setShowCreateModalExternal] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
   // Check URL query parameters on load across devices (e.g. ?pin=997080 or ?reviewPin=997080)
   useEffect(() => {
@@ -293,10 +294,14 @@ export function App() {
     setShowCreateModalExternal(true);
   };
 
-  const handleSelectParentTabFromSidebar = (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report') => {
+  const handleSelectParentTabFromSidebar = (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings') => {
     setCurrentRole('parent');
     setActiveView('dashboard');
-    setParentActiveTab(tab);
+    if (tab === 'settings') {
+      setIsSettingsModalOpen(true);
+    } else {
+      setParentActiveTab(tab);
+    }
   };
 
   const handleDirectStartExam = (test: AssignedTest) => {
@@ -326,6 +331,7 @@ export function App() {
           parentTab={parentActiveTab}
           onSelectParentTab={handleSelectParentTabFromSidebar}
           onOpenCreateExam={handleOpenCreateExamFromSidebar}
+          onOpenSettings={() => setIsSettingsModalOpen(true)}
           onDirectStartExam={handleDirectStartExam}
         />
       )}
@@ -347,6 +353,7 @@ export function App() {
             onNavigateDashboard={handleNavigateDashboard}
             onOpenCreateExam={handleOpenCreateExamFromSidebar}
             onSelectTab={handleSelectParentTabFromSidebar}
+            onOpenSettings={() => setIsSettingsModalOpen(true)}
             isHomeActive={false}
             onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
             isSidebarOpen={isSidebarOpen}
@@ -381,6 +388,8 @@ export function App() {
                 onTabChange={setParentActiveTab}
                 showCreateModalExternal={showCreateModalExternal}
                 onCloseCreateModalExternal={() => setShowCreateModalExternal(false)}
+                isSettingsOpenExternal={isSettingsModalOpen}
+                onCloseSettingsExternal={() => setIsSettingsModalOpen(false)}
               />
             ) : (
               <StudentDashboard
