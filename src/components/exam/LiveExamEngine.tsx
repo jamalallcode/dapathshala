@@ -54,6 +54,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [headStatus, setHeadStatus] = useState<'forward' | 'turned'>('forward');
   const [motionStatus, setMotionStatus] = useState<'normal' | 'excessive'>('normal');
   const [motionPercent, setMotionPercent] = useState<number>(0);
+  const [gazeAwayCount, setGazeAwayCount] = useState<number>(0);
+  const gazeAwayCountRef = useRef<number>(0);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [proctorLogs, setProctorLogs] = useState<string[]>([]);
   const [isSimulatingSuspicious, setIsSimulatingSuspicious] = useState(false);
@@ -409,12 +411,20 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        triggerSuspiciousFlag('ট্যাব পরিবর্তন বা অন্য অ্যাপে যাওয়ার চেষ্টা সনাক্ত হয়েছে!');
+        const now = Date.now();
+        if (now - lastViolationTimeRef.current > 2000) {
+          lastViolationTimeRef.current = now;
+          handleGazeAway('ট্যাব পরিবর্তন বা অন্য অ্যাপে যাওয়ার চেষ্টা');
+        }
       }
     };
 
     const handleWindowBlur = () => {
-      triggerSuspiciousFlag('পরীক্ষার উইন্ডো থেকে ফোকাস সরানো হয়েছে!');
+      const now = Date.now();
+      if (now - lastViolationTimeRef.current > 2000) {
+        lastViolationTimeRef.current = now;
+        handleGazeAway('পরীক্ষার উইন্ডো থেকে ফোকাস সরানো হয়েছে');
+      }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -424,7 +434,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
     };
-  }, [isReviewOnly, isSubmitted, violationCount]);
+  }, [isReviewOnly, isSubmitted]);
 
   // Explicit function to request hardware webcam on user click
   const requestWebcamAccess = async () => {
@@ -452,7 +462,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }
   };
 
-  // Real-time AI Automated Computer Vision Proctoring Engine (runs every 140ms ~7 FPS)
+  // Real-time AI Automated Computer Vision Gaze Tracker (runs every 140ms ~7 FPS)
   useEffect(() => {
     if (isReviewOnly || isSubmitted || !cameraActive) return;
 
@@ -476,51 +486,13 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         ctx.drawImage(videoRef.current, 0, 0, 80, 60);
         const imgData = ctx.getImageData(0, 0, 80, 60);
         const data = imgData.data;
-        const totalPixels = 80 * 60;
 
-        // -------------------------------------------------------------
-        // 1. REAL-TIME MOTION DIFFERENCING (অতিরিক্ত নড়াচড়া সনাক্তকরণ)
-        // -------------------------------------------------------------
-        let movingPixels = 0;
-        const currentGray = new Uint8ClampedArray(totalPixels);
-        const prevGray = prevFrameDataRef.current;
-
-        for (let i = 0; i < totalPixels; i++) {
-          const p = i * 4;
-          const lum = (data[p] * 299 + data[p + 1] * 587 + data[p + 2] * 114) >> 10;
-          currentGray[i] = lum;
-          if (prevGray) {
-            const diff = Math.abs(lum - prevGray[i]);
-            if (diff > 18) {
-              movingPixels++;
-            }
-          }
-        }
-        prevFrameDataRef.current = currentGray;
-
-        const currentMotionPercent = prevGray ? (movingPixels / totalPixels) * 100 : 0;
-        setMotionPercent(Math.round(currentMotionPercent));
-
+        // Candidate is allowed to move naturally, so we do not penalize body movement
         const now = Date.now();
-        const canTriggerViolation = now - lastViolationTimeRef.current > 1800;
-
-        // Check for Excessive Movement
-        if (currentMotionPercent > 18.0) {
-          motionConsecutiveRef.current++;
-          if (motionConsecutiveRef.current >= 2) {
-            setMotionStatus('excessive');
-            if (canTriggerViolation) {
-              lastViolationTimeRef.current = now;
-              triggerSuspiciousFlag('অতিরিক্ত নড়াচড়া সনাক্ত হয়েছে! অনুগ্রহ করে শান্ত হয়ে সোজা হয়ে বসুন।');
-            }
-          }
-        } else {
-          motionConsecutiveRef.current = 0;
-          setMotionStatus('normal');
-        }
+        const canTriggerViolation = now - lastViolationTimeRef.current > 2000;
 
         // -------------------------------------------------------------
-        // 2. FACE DETECTION & HEAD TURN / PROFILE ANALYSIS (মাথা ঘোরানো)
+        // FACE DETECTION & HEAD/EYE GAZE TRACKING (দৃষ্টি স্ক্রিনে আছে কিনা)
         // -------------------------------------------------------------
         let faceSkinCount = 0;
         let weightedFaceY = 0;
@@ -565,7 +537,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             setHeadStatus('turned');
             if (canTriggerViolation) {
               lastViolationTimeRef.current = now;
-              triggerSuspiciousFlag('ক্যামেরা ফ্রেমে কোনো মুখ দেখা যাচ্ছে না! সরাসরি ক্যামেরার সামনে বসুন।');
+              handleGazeAway('ক্যামেরা ফ্রেমে মুখ সনাক্ত হয়নি / দৃষ্টি বাইরে');
             }
           }
           isAnalyzingRef.current = false;
@@ -592,10 +564,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         const baseX = baselineFaceXRef.current ?? 40;
         const baseY = baselineFaceYRef.current ?? 26;
 
-        // Condition 1: Head Turned Sideways or Backwards (মাথা সম্পূর্ণ ঘুরানো)
-        // Profile view narrows face aspect ratio (faceW/faceH < 0.52), or shifts centroid far from center
+        // Condition 1: Head Turned Sideways or Backwards (মাথা ও চোখ সম্পূর্ণ অন্যদিকে ঘুরানো)
         const isTurnedSideways = (faceW / faceH < 0.52) || (Math.abs(centroidX - baseX) > 13.5);
-        // Head turned backwards shows dark hair dominating upper frame with little/no face
         const isTurnedBackwards = upperDarkHairCount > 130 && faceSkinCount < 45;
         const isHeadTurned = isTurnedSideways || isTurnedBackwards;
 
@@ -610,7 +580,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
           if (headTurnConsecutiveRef.current >= 2 && canTriggerViolation) {
             lastViolationTimeRef.current = now;
-            triggerSuspiciousFlag('মাথা অন্যদিকে ঘোরানো সনাক্ত হয়েছে! সরাসরি ক্যামেরার দিকে তাকিয়ে পরীক্ষা দিন।');
+            handleGazeAway('মাথা ও দৃষ্টি অন্যদিকে ঘোরানো সনাক্ত হয়েছে');
           }
         } else if (isHeadDownAtDesk) {
           lookDownConsecutiveRef.current++;
@@ -620,7 +590,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
           if (lookDownConsecutiveRef.current >= 2 && canTriggerViolation) {
             lastViolationTimeRef.current = now;
-            triggerSuspiciousFlag('দৃষ্টি নিচে নামিয়ে বই বা নোট পড়ার চেষ্টা সনাক্ত হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে উত্তর দিন।');
+            handleGazeAway('দৃষ্টি নিচে নামিয়ে বই বা নোট দেখার চেষ্টা সনাক্ত হয়েছে');
           }
         } else {
           headTurnConsecutiveRef.current = 0;
@@ -639,31 +609,34 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     return () => clearInterval(interval);
   }, [isReviewOnly, isSubmitted, cameraActive]);
 
-  // Trigger Warning, Sound Alarm & Log Incident
-  const triggerSuspiciousFlag = (reason: string) => {
-    playWarningBeep();
+  // Handle when candidate removes eyes from screen:
+  // Rule: Max 2 times allowed within grace limit. 3rd time and onwards (> 2) triggers warning and alarm!
+  // Exam never auto-terminates; it runs until scheduled time ends or script is submitted.
+  const handleGazeAway = (reason: string) => {
+    const next = gazeAwayCountRef.current + 1;
+    gazeAwayCountRef.current = next;
+    setGazeAwayCount(next);
+    setViolationCount(next);
+
     const nowTime = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const logEntry = `[${nowTime}] ${reason} (মোট ঘটনা: ${next} বার)`;
+    
+    proctorLogsRef.current = [...proctorLogsRef.current, logEntry];
+    setProctorLogs([...proctorLogsRef.current]);
 
-    setViolationCount(prev => {
-      const next = prev + 1;
-      const logEntry = `[${nowTime}] ${reason} (সতর্কতা #${next})`;
-      
-      proctorLogsRef.current = [...proctorLogsRef.current, logEntry];
-      setProctorLogs([...proctorLogsRef.current]);
-      setLastWarning(`⚠️ সতর্কতা (${next}/৫): ${reason}`);
-      
-      if (next >= 5) {
-        // Auto-submit exam immediately on 5 persistent violations
-        setTimeout(() => {
-          handleSubmitExam(true);
-        }, 1200);
-      }
-      return next;
-    });
+    // Rule: First 2 times are allowed within grace limit without warning.
+    // From 3rd time onwards (> 2), warn immediately with alarm!
+    if (next > 2) {
+      playWarningBeep();
+      setLastWarning(`⚠️ দৃষ্টি স্ক্রিন থেকে সরানো সনাক্ত হয়েছে! অনুগ্রহ করে স্ক্রিনের দিকে তাকিয়ে পরীক্ষা দিন (লঙ্ঘন সংখ্যা: ${next} বার)`);
+      setTimeout(() => {
+        setLastWarning(null);
+      }, 4000);
+    }
+  };
 
-    setTimeout(() => {
-      setLastWarning(null);
-    }, 4000);
+  const triggerSuspiciousFlag = (reason: string) => {
+    handleGazeAway(reason);
   };
 
   // Timer countdown & Auto-submit
@@ -734,13 +707,13 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     const calculatedScore = questionsList.length > 0 ? Math.round((correctCount / questionsList.length) * 100) : 0;
     
     const recordedLogs = proctorLogsRef.current.length > 0 ? proctorLogsRef.current : proctorLogs;
-    const finalFlags = isForcedByProctor 
-      ? ['৫ বার অসদুপায় / বই-নোট পড়ার চেষ্টার কারণে পরীক্ষা নির্ধারিত সময়ের পূর্বে স্বয়ংক্রিয়ভাবে জমা হয়েছে', ...recordedLogs]
-      : recordedLogs.length > 0
-      ? recordedLogs
-      : violationCount > 0 
-      ? [`${violationCount} বার দৃষ্টি অন্যদিকে বা ট্যাবে যাওয়ার চেষ্টা সনাক্ত হয়েছে`] 
+    const totalAway = gazeAwayCountRef.current;
+    const summaryFlag = totalAway > 2 
+      ? [`পরীক্ষার্থী মোট ${totalAway} বার স্ক্রিন থেকে চোখ সরিয়েছিল (অনুমোদিত ২ বারের বেশি হওয়ায় ${totalAway - 2} বার সতর্কতাপ্রাপ্ত)`]
+      : totalAway > 0
+      ? [`পরীক্ষার্থী মোট ${totalAway} বার চোখ সরিয়েছিল (অনুমোদিত ২ বারের মধ্যে ছিল)`]
       : [];
+    const finalFlags = [...summaryFlag, ...recordedLogs];
 
     const nowIso = new Date().toISOString();
     const updatedTest: AssignedTest = {
@@ -923,8 +896,6 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                   <span className={`text-[8px] sm:text-[8.5px] font-black px-1 sm:px-1.5 py-0.5 rounded shadow-sm transition-all ${
                     headStatus === 'turned' || gazeStatus === 'looking_away'
                       ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
-                      : motionStatus === 'excessive'
-                      ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
                       : gazeStatus === 'looking_down'
                       ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
                       : gazeStatus === 'face_missing'
@@ -932,14 +903,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                       : 'bg-emerald-950/85 text-emerald-300 border border-emerald-500/40'
                   }`}>
                     {headStatus === 'turned' || gazeStatus === 'looking_away'
-                      ? '⚠️ মাথা অন্যদিকে ঘুরানো!'
-                      : motionStatus === 'excessive'
-                      ? '⚠️ অতিরিক্ত নড়াচড়া!'
+                      ? '⚠️ দৃষ্টি অন্যদিকে!'
                       : gazeStatus === 'looking_down'
-                      ? '⚠️ দৃষ্টি বই/নোটে!'
+                      ? '⚠️ দৃষ্টি নিচে নামানো!'
                       : gazeStatus === 'face_missing'
                       ? '⚠️ মুখ অনুপস্থিত!'
-                      : 'দৃষ্টি ও মুখ স্ক্রিনে ✓'}
+                      : 'দৃষ্টি স্ক্রিনে ✓'}
                   </span>
                   <div className="flex items-center gap-1 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded-full text-[8px] sm:text-[9px] text-emerald-400 font-mono font-bold">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
@@ -948,42 +917,33 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-mono text-white/90 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded">
-                  <span>স্বয়ংক্রিয় এআই প্রক্টরিং</span>
-                  <span className={violationCount > 0 ? "text-rose-400 font-bold" : "text-emerald-400"}>
-                    সতর্কতা: {violationCount}/৫
+                  <span>চোখের দৃষ্টি ট্র্যাকিং</span>
+                  <span className={gazeAwayCount > 2 ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
+                    চোখ সরানো: {gazeAwayCount} বার {gazeAwayCount > 2 ? `(${gazeAwayCount - 2} সতর্কতাপ্রাপ্ত)` : '(ছাড় সীমার মধ্যে)'}
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* Realtime Continuous Proctor Sensors HUD (Always Automatic - No button click needed) */}
+            {/* Realtime Continuous Proctor Sensors HUD */}
             <div className="w-full px-0.5 pt-1.5 flex flex-col gap-1 text-center">
-              <div className="grid grid-cols-3 gap-1 text-[7.5px] sm:text-[8px] font-mono">
-                <div className={`py-1 px-0.5 rounded transition-colors ${
-                  headStatus === 'turned' 
-                    ? 'bg-rose-950 text-rose-300 border border-rose-600 font-bold animate-pulse' 
-                    : 'bg-slate-800 text-slate-300 border border-slate-700/60'
-                }`}>
-                  <span className="block text-[6.5px] sm:text-[7px] text-slate-400">মাথা</span>
-                  <span>{headStatus === 'turned' ? 'ঘুরানো ⚠️' : 'সোজা ✓'}</span>
-                </div>
-
+              <div className="grid grid-cols-2 gap-1 text-[7.5px] sm:text-[8px] font-mono">
                 <div className={`py-1 px-0.5 rounded transition-colors ${
                   gazeStatus !== 'normal' 
                     ? 'bg-rose-950 text-rose-300 border border-rose-600 font-bold animate-pulse' 
                     : 'bg-slate-800 text-slate-300 border border-slate-700/60'
                 }`}>
-                  <span className="block text-[6.5px] sm:text-[7px] text-slate-400">দৃষ্টি</span>
-                  <span>{gazeStatus === 'looking_down' ? 'বই/নোটে ⚠️' : gazeStatus === 'looking_away' ? 'অন্যত্র ⚠️' : gazeStatus === 'face_missing' ? 'নাই ⚠️' : 'স্ক্রিনে ✓'}</span>
+                  <span className="block text-[6.5px] sm:text-[7px] text-slate-400">দৃষ্টির অবস্থান</span>
+                  <span>{gazeStatus !== 'normal' ? 'স্ক্রিনের বাইরে ⚠️' : 'স্ক্রিনে নিবদ্ধ ✓'}</span>
                 </div>
 
                 <div className={`py-1 px-0.5 rounded transition-colors ${
-                  motionStatus === 'excessive' 
+                  gazeAwayCount > 2 
                     ? 'bg-rose-950 text-rose-300 border border-rose-600 font-bold animate-pulse' 
                     : 'bg-slate-800 text-slate-300 border border-slate-700/60'
                 }`}>
-                  <span className="block text-[6.5px] sm:text-[7px] text-slate-400">নড়াচড়া</span>
-                  <span>{motionStatus === 'excessive' ? `অস্থির ⚠️` : `স্বাভাবিক ✓`}</span>
+                  <span className="block text-[6.5px] sm:text-[7px] text-slate-400">সর্বোচ্চ ছাড়: ২ বার</span>
+                  <span>মোট: {gazeAwayCount} বার {gazeAwayCount > 2 ? '⚠️' : '✓'}</span>
                 </div>
               </div>
 
