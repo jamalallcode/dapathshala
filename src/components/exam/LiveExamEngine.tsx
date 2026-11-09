@@ -50,7 +50,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [isHoveringTopBar, setIsHoveringTopBar] = useState(false);
   
   // Gaze, Head Direction & Motion Detection States
-  const [gazeStatus, setGazeStatus] = useState<'normal' | 'looking_down' | 'looking_away' | 'face_missing'>('normal');
+  const [gazeStatus, setGazeStatus] = useState<'normal' | 'looking_down' | 'looking_away' | 'side_glance' | 'face_missing'>('normal');
   const [headStatus, setHeadStatus] = useState<'forward' | 'turned'>('forward');
   const [motionStatus, setMotionStatus] = useState<'normal' | 'excessive'>('normal');
   const [motionPercent, setMotionPercent] = useState<number>(0);
@@ -75,11 +75,71 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const motionConsecutiveRef = useRef<number>(0);
   const headTurnConsecutiveRef = useRef<number>(0);
   const lookDownConsecutiveRef = useRef<number>(0);
+  const sideGlanceConsecutiveRef = useRef<number>(0);
   const faceMissingConsecutiveRef = useRef<number>(0);
   const isAnalyzingRef = useRef<boolean>(false);
   const baselineFaceYRef = useRef<number | null>(null);
   const baselineFaceXRef = useRef<number | null>(null);
   const calibrationSamplesCountRef = useRef<number>(0);
+
+  // 4 Proctoring Strictness Levels (অভিভাবক কর্তৃক নির্বাচিত ৪টি মাত্রা)
+  const effectiveProctoringLevel: 1 | 2 | 3 | 4 = (
+    test.proctoringLevel ||
+    Number(localStorage.getItem('dapathshala_parent_proctoring_level')) ||
+    2
+  ) as 1 | 2 | 3 | 4;
+
+  const proctorConfig = {
+    1: {
+      levelNum: 1,
+      name: 'লেভেল ১ (মৃদু)',
+      tag: 'সহনশীল',
+      yawThreshold: 16.0,
+      pitchDownThreshold: 10.0,
+      sideGlanceLow: 0.25,
+      sideGlanceHigh: 0.75,
+      consecutiveRequired: 3,
+    },
+    2: {
+      levelNum: 2,
+      name: 'লেভেল ২ (মাঝারি)',
+      tag: 'স্ট্যান্ডার্ড',
+      yawThreshold: 12.0,
+      pitchDownThreshold: 8.5,
+      sideGlanceLow: 0.33,
+      sideGlanceHigh: 0.67,
+      consecutiveRequired: 2,
+    },
+    3: {
+      levelNum: 3,
+      name: 'লেভেল ৩ (কঠোর - আড় চোখ সনাক্ত)',
+      tag: 'কঠোর',
+      yawThreshold: 8.5,
+      pitchDownThreshold: 6.8,
+      sideGlanceLow: 0.38,
+      sideGlanceHigh: 0.62,
+      consecutiveRequired: 2,
+    },
+    4: {
+      levelNum: 4,
+      name: 'লেভেল ৪ (সর্বোচ্চ কঠোর - অতি-সংবেদনশীল)',
+      tag: 'অতি-সংবেদনশীল',
+      yawThreshold: 6.0,
+      pitchDownThreshold: 5.0,
+      sideGlanceLow: 0.42,
+      sideGlanceHigh: 0.58,
+      consecutiveRequired: 1,
+    },
+  }[effectiveProctoringLevel] || {
+    levelNum: 2,
+    name: 'লেভেল ২ (মাঝারি)',
+    tag: 'স্ট্যান্ডার্ড',
+    yawThreshold: 12.0,
+    pitchDownThreshold: 8.5,
+    sideGlanceLow: 0.33,
+    sideGlanceHigh: 0.67,
+    consecutiveRequired: 2,
+  };
 
   // Sharp Anti-Cheating Audible Warning Alarm (Two-tone alert)
   const playWarningBeep = () => {
@@ -564,36 +624,91 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         const baseX = baselineFaceXRef.current ?? 40;
         const baseY = baselineFaceYRef.current ?? 26;
 
-        // Condition 1: Head Turned Sideways or Backwards (মাথা ও চোখ সম্পূর্ণ অন্যদিকে ঘুরানো)
-        const isTurnedSideways = (faceW / faceH < 0.52) || (Math.abs(centroidX - baseX) > 13.5);
+        // Condition 1: Eye Region Pupil Lateral Glance Analysis (আড় চোখে এদিক-সেদিক তাকানো সনাক্তকরণ)
+        const eyeTop = Math.floor(faceMinY + faceH * 0.18);
+        const eyeBottom = Math.floor(faceMinY + faceH * 0.44);
+        const leftEyeX1 = Math.floor(faceMinX + faceW * 0.12);
+        const leftEyeX2 = Math.floor(faceMinX + faceW * 0.46);
+        const rightEyeX1 = Math.floor(faceMinX + faceW * 0.54);
+        const rightEyeX2 = Math.floor(faceMinX + faceW * 0.88);
+
+        let leftPupilWeightedX = 0, leftPupilCount = 0;
+        let rightPupilWeightedX = 0, rightPupilCount = 0;
+
+        for (let y = Math.max(0, eyeTop); y < Math.min(60, eyeBottom); y++) {
+          for (let x = Math.max(0, leftEyeX1); x < Math.min(80, leftEyeX2); x++) {
+            const idx = (y * 80 + x) * 4;
+            const lum = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+            if (lum < 55) {
+              leftPupilWeightedX += x;
+              leftPupilCount++;
+            }
+          }
+          for (let x = Math.max(0, rightEyeX1); x < Math.min(80, rightEyeX2); x++) {
+            const idx = (y * 80 + x) * 4;
+            const lum = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+            if (lum < 55) {
+              rightPupilWeightedX += x;
+              rightPupilCount++;
+            }
+          }
+        }
+
+        let isSideGlance = false;
+        if (leftPupilCount >= 3 && rightPupilCount >= 3) {
+          const leftNorm = (leftPupilWeightedX / leftPupilCount - leftEyeX1) / Math.max(leftEyeX2 - leftEyeX1, 1);
+          const rightNorm = (rightPupilWeightedX / rightPupilCount - rightEyeX1) / Math.max(rightEyeX2 - rightEyeX1, 1);
+          const avgPupilOffset = (leftNorm + rightNorm) / 2;
+
+          if (avgPupilOffset < proctorConfig.sideGlanceLow || avgPupilOffset > proctorConfig.sideGlanceHigh) {
+            isSideGlance = true;
+          }
+        }
+
+        // Condition 2: Head Turned Sideways or Backwards (মাথা ও চোখ সম্পূর্ণ অন্যদিকে ঘুরানো)
+        const isTurnedSideways = (faceW / faceH < 0.52) || (Math.abs(centroidX - baseX) > proctorConfig.yawThreshold);
         const isTurnedBackwards = upperDarkHairCount > 130 && faceSkinCount < 45;
         const isHeadTurned = isTurnedSideways || isTurnedBackwards;
 
-        // Condition 2: Head Pitched Downwards toward desk/lap to read books or notes
-        const isHeadDownAtDesk = (centroidY > baseY + 8.5) || (faceMinY > 26.0);
+        // Condition 3: Head Pitched Downwards toward desk/lap to read books or notes
+        const isHeadDownAtDesk = (centroidY > baseY + proctorConfig.pitchDownThreshold) || (faceMinY > 26.5);
 
         if (isHeadTurned) {
           headTurnConsecutiveRef.current++;
+          sideGlanceConsecutiveRef.current = 0;
           lookDownConsecutiveRef.current = 0;
           setHeadStatus('turned');
           setGazeStatus('looking_away');
 
-          if (headTurnConsecutiveRef.current >= 2 && canTriggerViolation) {
+          if (headTurnConsecutiveRef.current >= proctorConfig.consecutiveRequired && canTriggerViolation) {
             lastViolationTimeRef.current = now;
             handleGazeAway('মাথা ও দৃষ্টি অন্যদিকে ঘোরানো সনাক্ত হয়েছে');
           }
+        } else if (isSideGlance) {
+          sideGlanceConsecutiveRef.current++;
+          headTurnConsecutiveRef.current = 0;
+          lookDownConsecutiveRef.current = 0;
+          setHeadStatus('forward');
+          setGazeStatus('side_glance');
+
+          if (sideGlanceConsecutiveRef.current >= proctorConfig.consecutiveRequired && canTriggerViolation) {
+            lastViolationTimeRef.current = now;
+            handleGazeAway('আড় চোখে এদিক-সেদিক তাকানো সনাক্ত হয়েছে');
+          }
         } else if (isHeadDownAtDesk) {
           lookDownConsecutiveRef.current++;
+          sideGlanceConsecutiveRef.current = 0;
           headTurnConsecutiveRef.current = 0;
           setHeadStatus('forward');
           setGazeStatus('looking_down');
 
-          if (lookDownConsecutiveRef.current >= 2 && canTriggerViolation) {
+          if (lookDownConsecutiveRef.current >= proctorConfig.consecutiveRequired && canTriggerViolation) {
             lastViolationTimeRef.current = now;
             handleGazeAway('দৃষ্টি নিচে নামিয়ে বই বা নোট দেখার চেষ্টা সনাক্ত হয়েছে');
           }
         } else {
           headTurnConsecutiveRef.current = 0;
+          sideGlanceConsecutiveRef.current = 0;
           lookDownConsecutiveRef.current = 0;
           setHeadStatus('forward');
           setGazeStatus('normal');
@@ -607,11 +722,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }, 140);
 
     return () => clearInterval(interval);
-  }, [isReviewOnly, isSubmitted, cameraActive]);
+  }, [isReviewOnly, isSubmitted, cameraActive, proctorConfig]);
 
-  // Handle when candidate removes eyes from screen:
-  // Rule: Max 2 times allowed within grace limit. 3rd time and onwards (> 2) triggers warning and alarm!
-  // Exam never auto-terminates; it runs until scheduled time ends or script is submitted.
+  // Handle when candidate removes eyes from screen or looks out of corner of eyes:
+  // Rule 1: Max 2 times allowed within grace limit without warning.
+  // Rule 2: From 3rd time onwards (> 2), candidate is warned immediately with alarm and warning message.
+  // Rule 3: STRICT REQUIREMENT: Minimum 50 warnings before auto-termination! (মিনিমাম ৫০ বার সতর্ক করার পর পরীক্ষা শেষ হবে, তার আগে নয়)
   const handleGazeAway = (reason: string) => {
     const next = gazeAwayCountRef.current + 1;
     gazeAwayCountRef.current = next;
@@ -624,11 +740,24 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     proctorLogsRef.current = [...proctorLogsRef.current, logEntry];
     setProctorLogs([...proctorLogsRef.current]);
 
-    // Rule: First 2 times are allowed within grace limit without warning.
-    // From 3rd time onwards (> 2), warn immediately with alarm!
+    // Calculate warnings received beyond 2 grace events
+    const warningNum = Math.max(0, next - 2);
+
+    // Auto-termination STRICTLY occurs ONLY after minimum 50 warnings! Before 50, test continues.
+    if (warningNum >= 50) {
+      playWarningBeep();
+      setLastWarning(`⛔ সর্বোচ্চ ৫০ বার সতর্কতার মাত্রা লঙ্ঘিত হয়েছে! পরীক্ষাটি স্বয়ংক্রিয়ভাবে সমাপ্ত ও জমা নেওয়া হচ্ছে...`);
+      setTimeout(() => {
+        handleSubmitExam(true);
+      }, 1600);
+      return;
+    }
+
+    // Rule: First 2 times are allowed within grace limit without alarm.
+    // From 3rd time onwards (> 2), warn immediately with alarm sound and banner!
     if (next > 2) {
       playWarningBeep();
-      setLastWarning(`⚠️ দৃষ্টি স্ক্রিন থেকে সরানো সনাক্ত হয়েছে! অনুগ্রহ করে স্ক্রিনের দিকে তাকিয়ে পরীক্ষা দিন (লঙ্ঘন সংখ্যা: ${next} বার)`);
+      setLastWarning(`⚠️ ${reason}! সতর্কতা: ${warningNum}/৫০ (সর্বনিম্ন ৫০ বার না হওয়া পর্যন্ত পরীক্ষা শেষ হবে না)`);
       setTimeout(() => {
         setLastWarning(null);
       }, 4000);
@@ -708,11 +837,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     
     const recordedLogs = proctorLogsRef.current.length > 0 ? proctorLogsRef.current : proctorLogs;
     const totalAway = gazeAwayCountRef.current;
-    const summaryFlag = totalAway > 2 
-      ? [`পরীক্ষার্থী মোট ${totalAway} বার স্ক্রিন থেকে চোখ সরিয়েছিল (অনুমোদিত ২ বারের বেশি হওয়ায় ${totalAway - 2} বার সতর্কতাপ্রাপ্ত)`]
+    const warningNum = Math.max(0, totalAway - 2);
+    const summaryFlag = isForcedByProctor || warningNum >= 50
+      ? [`সর্বোচ্চ ৫০ বার সতর্কবার্তা লঙ্ঘনের কারণে পরীক্ষাটি স্বয়ংক্রিয়ভাবে সমাপ্ত হয়েছে (মোট ঘটনা: ${totalAway} বার, সতর্কতাপ্রাপ্ত: ${warningNum} বার)`]
+      : totalAway > 2 
+      ? [`পরীক্ষার্থী মোট ${totalAway} বার স্ক্রিন থেকে দৃষ্টি সরিয়েছিল/আড় চোখে তাকিয়েছিল (অনুমোদিত ২ বারের বেশি হওয়ায় ${warningNum} বার সতর্কতাপ্রাপ্ত, ৫০ বারের কম থাকায় পরীক্ষা বাতিল হয়নি)`]
       : totalAway > 0
-      ? [`পরীক্ষার্থী মোট ${totalAway} বার চোখ সরিয়েছিল (অনুমোদিত ২ বারের মধ্যে ছিল)`]
-      : [];
+      ? [`পরীক্ষার্থী মোট ${totalAway} বার দৃষ্টি সরিয়েছিল (অনুমোদিত ২ বারের ছাড় সীমার মধ্যে ছিল)`]
+      : ['পরীক্ষার্থী পূর্ণ মনোযোগ সহকারে স্ক্রিনের দিকে তাকিয়ে পরীক্ষা সম্পন্ন করেছে ✓'];
     const finalFlags = [...summaryFlag, ...recordedLogs];
 
     const nowIso = new Date().toISOString();
@@ -738,8 +870,10 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     const notifs = getStoredNotifications();
     const newNotif = {
       id: `notif-${Date.now()}`,
-      title: "নতুন উত্তরপত্র জমা হয়েছে",
-      message: `আপনার সন্তান "${test.title}" পরীক্ষা সফলভাবে সম্পন্ন করে খাতা জমা দিয়েছে। প্রাপ্ত স্কোর: ${calculatedScore}%। খাতা মূল্যায়ন করুন।`,
+      title: isForcedByProctor || warningNum >= 50 ? "পরীক্ষা ৫০ বার সতর্কতায় স্বয়ংক্রিয় সমাপ্ত" : "নতুন উত্তরপত্র জমা হয়েছে",
+      message: isForcedByProctor || warningNum >= 50
+        ? `আপনার সন্তান "${test.title}" পরীক্ষায় সর্বোচ্চ ৫০ বার প্রক্টরিং সতর্কতা লঙ্ঘন করায় পরীক্ষাটি স্বয়ংক্রিয়ভাবে সমাপ্ত ও জমা হয়েছে। প্রাপ্ত স্কোর: ${calculatedScore}%।`
+        : `আপনার সন্তান "${test.title}" পরীক্ষা সফলভাবে সম্পন্ন করে খাতা জমা দিয়েছে। প্রাপ্ত স্কোর: ${calculatedScore}%। খাতা মূল্যায়ন করুন।`,
       time: "এইমাত্র",
       testId: test.id,
       isRead: false,
@@ -851,14 +985,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           <div className={`${isCameraMinimized ? "hidden" : "flex"} bg-slate-900 border-2 border-emerald-500 rounded-2xl p-2 shadow-2xl w-40 sm:w-56 flex-col items-center`}>
             {/* Header with Minimize Button */}
             <div className="w-full flex items-center justify-between pb-1 px-1 border-b border-slate-800 mb-1.5">
-              <div className="flex items-center gap-1.5 text-[9.5px] font-bold text-emerald-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-                <span>ফ্রন্ট ক্যামেরা প্রক্টরিং</span>
+              <div className="flex items-center gap-1.5 text-[9px] sm:text-[9.5px] font-bold text-emerald-400 truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0"></span>
+                <span className="truncate">ক্যামেরা • {proctorConfig.name}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setIsCameraMinimized(true)}
-                className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[9px] font-bold cursor-pointer border border-slate-700 transition-colors"
+                className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[9px] font-bold cursor-pointer border border-slate-700 transition-colors shrink-0 ml-1"
                 title="ক্যামেরা ছোট করুন"
               >
                 মিনিমাইজ −
@@ -888,13 +1022,15 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
               {/* Live AI Proctor Bounding Box & Motion/Gaze Tracking HUD */}
               <div className={`absolute inset-1.5 rounded-lg border-2 pointer-events-none transition-colors duration-200 flex flex-col justify-between p-1.5 ${
-                headStatus === 'turned' || gazeStatus === 'looking_away' || gazeStatus === 'looking_down' || motionStatus === 'excessive' || gazeStatus === 'face_missing'
+                headStatus === 'turned' || gazeStatus === 'looking_away' || gazeStatus === 'side_glance' || gazeStatus === 'looking_down' || motionStatus === 'excessive' || gazeStatus === 'face_missing'
                   ? 'border-rose-500 bg-rose-500/15 animate-pulse'
                   : 'border-emerald-400/80'
               }`}>
                 <div className="flex items-center justify-between">
                   <span className={`text-[8px] sm:text-[8.5px] font-black px-1 sm:px-1.5 py-0.5 rounded shadow-sm transition-all ${
-                    headStatus === 'turned' || gazeStatus === 'looking_away'
+                    gazeStatus === 'side_glance'
+                      ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
+                      : headStatus === 'turned' || gazeStatus === 'looking_away'
                       ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
                       : gazeStatus === 'looking_down'
                       ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
@@ -902,7 +1038,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                       ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
                       : 'bg-emerald-950/85 text-emerald-300 border border-emerald-500/40'
                   }`}>
-                    {headStatus === 'turned' || gazeStatus === 'looking_away'
+                    {gazeStatus === 'side_glance'
+                      ? '⚠️ আড় চোখে তাকানো!'
+                      : headStatus === 'turned' || gazeStatus === 'looking_away'
                       ? '⚠️ দৃষ্টি অন্যদিকে!'
                       : gazeStatus === 'looking_down'
                       ? '⚠️ দৃষ্টি নিচে নামানো!'
@@ -917,9 +1055,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-mono text-white/90 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded">
-                  <span>চোখের দৃষ্টি ট্র্যাকিং</span>
+                  <span>সতর্কতা (সর্বনিম্ন ৫০):</span>
                   <span className={gazeAwayCount > 2 ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
-                    চোখ সরানো: {gazeAwayCount} বার {gazeAwayCount > 2 ? `(${gazeAwayCount - 2} সতর্কতাপ্রাপ্ত)` : '(ছাড় সীমার মধ্যে)'}
+                    {Math.max(0, gazeAwayCount - 2)}/৫০ {Math.max(0, gazeAwayCount - 2) >= 50 ? '⛔' : Math.max(0, gazeAwayCount - 2) > 0 ? '⚠️' : '✓'}
                   </span>
                 </div>
               </div>
@@ -934,17 +1072,36 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                     : 'bg-slate-800 text-slate-300 border border-slate-700/60'
                 }`}>
                   <span className="block text-[6.5px] sm:text-[7px] text-slate-400">দৃষ্টির অবস্থান</span>
-                  <span>{gazeStatus !== 'normal' ? 'স্ক্রিনের বাইরে ⚠️' : 'স্ক্রিনে নিবদ্ধ ✓'}</span>
+                  <span className="truncate block">
+                    {gazeStatus === 'side_glance'
+                      ? 'আড় চোখ ⚠️'
+                      : gazeStatus === 'looking_away'
+                      ? 'স্ক্রিনের বাইরে ⚠️'
+                      : gazeStatus === 'looking_down'
+                      ? 'দৃষ্টি নিচে ⚠️'
+                      : gazeStatus === 'face_missing'
+                      ? 'অনুপস্থিত ⚠️'
+                      : 'স্ক্রিনে নিবদ্ধ ✓'}
+                  </span>
                 </div>
 
                 <div className={`py-1 px-0.5 rounded transition-colors ${
-                  gazeAwayCount > 2 
-                    ? 'bg-rose-950 text-rose-300 border border-rose-600 font-bold animate-pulse' 
+                  Math.max(0, gazeAwayCount - 2) >= 50 
+                    ? 'bg-rose-900 text-white border border-rose-500 font-bold'
+                    : Math.max(0, gazeAwayCount - 2) > 0
+                    ? 'bg-amber-950 text-amber-300 border border-amber-600 font-bold' 
                     : 'bg-slate-800 text-slate-300 border border-slate-700/60'
                 }`}>
-                  <span className="block text-[6.5px] sm:text-[7px] text-slate-400">সর্বোচ্চ ছাড়: ২ বার</span>
-                  <span>মোট: {gazeAwayCount} বার {gazeAwayCount > 2 ? '⚠️' : '✓'}</span>
+                  <span className="block text-[6.5px] sm:text-[7px] text-slate-400">৫০ বারে সমাপ্তি</span>
+                  <span className="truncate block">
+                    সতর্কতা: {Math.max(0, gazeAwayCount - 2)}/৫০
+                  </span>
                 </div>
+              </div>
+
+              <div className="text-[7px] sm:text-[7.5px] text-slate-400 font-mono bg-slate-950/80 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between">
+                <span className="truncate">মাত্রা: {proctorConfig.name}</span>
+                <span className="shrink-0 text-slate-300 font-bold">ছাড়: {Math.min(gazeAwayCount, 2)}/২</span>
               </div>
 
               {!cameraActive && (
@@ -1001,10 +1158,17 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               {test.title}
             </h2>
             {!isReviewOnly && !isSubmitted && (
-              <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold shrink-0">
-                <ShieldCheck className="w-3 h-3 text-purple-600" />
-                <span>নতুন ট্যাব লক ও ফুলস্ক্রিন সক্রিয়</span>
-              </span>
+              <>
+                <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200 text-[10px] font-bold shrink-0">
+                  <ShieldCheck className="w-3 h-3 text-purple-600" />
+                  <span>{proctorConfig.name}</span>
+                </span>
+                <span className={`hidden lg:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 border ${
+                  Math.max(0, gazeAwayCount - 2) > 0 ? "bg-amber-50 text-amber-800 border-amber-300" : "bg-emerald-50 text-emerald-800 border-emerald-300"
+                }`}>
+                  <span>সতর্কতা: {Math.max(0, gazeAwayCount - 2)}/৫০</span>
+                </span>
+              </>
             )}
           </div>
           <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate">

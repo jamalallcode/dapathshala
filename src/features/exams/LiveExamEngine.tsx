@@ -426,22 +426,22 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       violationType,
       violationDetails: reason,
       flagCount: nextCount,
-      isAutoSubmitted: nextCount >= 3
+      isAutoSubmitted: nextCount >= 50
     }).catch(err => console.warn('Proctoring log record note:', err));
 
-    if (nextCount >= 3) {
-      // 3rd violation: Auto-submit exam immediately
+    if (nextCount >= 50) {
+      // 50th violation: Auto-submit exam immediately (ন্যূনতম ৫০ বার সতর্ক করার পর)
       setWarningModal({
         isOpen: true,
-        reason: 'সতর্কতা সীমা অতিক্রান্ত (৩/৩)! ৩ বার নিয়ম ভঙ্গের কারণে পরীক্ষাটি স্বয়ংক্রিয়ভাবে জমা (Auto-submit) করা হয়েছে।',
-        count: 3,
+        reason: 'সর্বোচ্চ সতর্কতার মাত্রা অতিক্রান্ত (৫০/৫০)! ৫০ বার নিয়ম ভঙ্গের কারণে পরীক্ষাটি স্বয়ংক্রিয়ভাবে জমা (Auto-submit) করা হয়েছে।',
+        count: 50,
         isAutoSubmit: true
       });
-      calculateResult(true, 3);
+      calculateResult(true, 50);
     } else {
       setWarningModal({
         isOpen: true,
-        reason,
+        reason: `${reason} (সতর্কতা: ${nextCount}/৫০ — ৫০ বার না হওয়া পর্যন্ত পরীক্ষা শেষ হবে না)`,
         count: nextCount,
         isAutoSubmit: false
       });
@@ -1050,7 +1050,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               <ShieldAlert size={15} className="text-red-400" />
             )}
             <span>
-              {suspiciousCount === 0 ? 'প্রক্টরিং সক্রিয় • ০/৩' : `সতর্কতা: ${suspiciousCount}/৩`}
+              {suspiciousCount === 0 ? 'প্রক্টরিং সক্রিয় • ০/৫০' : `সতর্কতা: ${suspiciousCount}/৫০`}
             </span>
           </div>
 
@@ -1121,7 +1121,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
                       : 'bg-red-50 text-red-700 border border-red-200'
                   }`}>
-                    সতর্কতা: {suspiciousCount}/৩
+                    সতর্কতা: {suspiciousCount}/৫০ (সর্বনিম্ন ৫০)
                   </div>
                 </div>
               </div>
@@ -1254,7 +1254,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               className="relative z-10 max-w-lg w-full bg-white rounded-3xl shadow-2xl border-2 border-red-200 overflow-hidden p-6 sm:p-8 space-y-5 text-center"
             >
               <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center shadow-lg ${
-                warningModal.count >= 3 
+                warningModal.count >= 50 
                   ? 'bg-red-600 text-white shadow-red-200 animate-bounce' 
                   : 'bg-amber-100 text-amber-600 shadow-amber-100'
               }`}>
@@ -1263,9 +1263,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
               <div className="space-y-2">
                 <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-snug">
-                  {warningModal.count >= 3 
+                  {warningModal.count >= 50 
                     ? 'পরীক্ষা অটো-সাবমিট হয়েছে!' 
-                    : 'সতর্কতা! পরীক্ষা চলাকালীন অন্য ট্যাবে যাওয়া নিষেধ'}
+                    : 'সতর্কতা! পরীক্ষা চলাকালীন অন্য ট্যাবে যাওয়া বা দৃষ্টি সরানো নিষেধ'}
                 </h3>
                 <div className="inline-block px-3 py-1 bg-red-50 text-red-700 rounded-xl text-xs sm:text-sm font-bold border border-red-200">
                   {warningModal.reason}
@@ -1275,38 +1275,34 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               {/* Suspicious Flags Counter Visualization */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-600">সন্দেহজনক কার্যকলাপ (Suspicious Flags):</span>
+                  <span className="text-slate-600">সতর্কতার সংখ্যা (সর্বনিম্ন ৫০ বারে সমাপ্তি):</span>
                   <span className={`px-2 py-0.5 rounded-lg ${
-                    warningModal.count >= 3 ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'
+                    warningModal.count >= 50 ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'
                   }`}>
-                    {warningModal.count} / ৩
+                    {warningModal.count} / ৫০
                   </span>
                 </div>
 
-                {/* 3 Flags Visual Progress Indicators */}
-                <div className="grid grid-cols-3 gap-2">
-                  {[1, 2, 3].map((flagNum) => (
-                    <div
-                      key={flagNum}
-                      className={`h-2.5 rounded-full transition-all ${
-                        flagNum <= warningModal.count
-                          ? 'bg-red-500'
-                          : 'bg-slate-200'
-                      }`}
-                    />
-                  ))}
+                {/* Progress bar up to 50 */}
+                <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      warningModal.count >= 50 ? 'bg-red-600' : 'bg-amber-500'
+                    }`}
+                    style={{ width: `${Math.min(100, (warningModal.count / 50) * 100)}%` }}
+                  />
                 </div>
 
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  {warningModal.count === 1 && '⚠️ প্রথম সতর্কতা: পরীক্ষা চলাকালীন অন্য ট্যাব, উইন্ডো বা অ্যাপ খোলা সম্পূর্ণ নিষেধ। আর ২টি সতর্কতায় পরীক্ষা বাতিল ও অটো-সাবমিট হবে।'}
-                  {warningModal.count === 2 && '🚨 চূড়ান্ত সতর্কতা! আর মাত্র ১ বার অন্য ট্যাবে গেলে পরীক্ষাটি সাথে সাথে অটো-সাবমিট হয়ে যাবে।'}
-                  {warningModal.count >= 3 && '⛔ সর্বোচ্চ ৩ বার নিয়ম ভাঙার কারণে পরীক্ষাটি তাৎক্ষণিক স্বয়ংক্রিয়ভাবে সমাপ্ত ও সাবমিট করা হয়েছে।'}
+                  {warningModal.count >= 50
+                    ? '⛔ সর্বোচ্চ ৫০ বার নিয়ম ভাঙার কারণে পরীক্ষাটি স্বয়ংক্রিয়ভাবে সমাপ্ত ও সাবমিট করা হয়েছে।'
+                    : `⚠️ বর্তমান সতর্কতা: ${warningModal.count}/৫০। মনে রাখবেন, ন্যূনতম ৫০ বার সতর্কবার্তা লঙ্ঘিত না হওয়া পর্যন্ত পরীক্ষা কখনই স্বয়ংক্রিয়ভাবে বাতিল বা সমাপ্ত হবে না।`}
                 </p>
               </div>
 
               {/* Modal Action Button */}
               <div>
-                {warningModal.count < 3 ? (
+                {warningModal.count < 50 ? (
                   <Button
                     variant="primary"
                     className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-indigo-200 cursor-pointer"

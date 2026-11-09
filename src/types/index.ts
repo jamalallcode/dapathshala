@@ -27,6 +27,7 @@ export interface AssignedTest {
   totalMarks?: number;
   isPublished?: boolean;
   proctoringEnabled: boolean;
+  proctoringLevel?: 1 | 2 | 3 | 4;
   aiGradingEnabled: boolean;
   proctoringFlags?: string[];
   parentComment?: string;

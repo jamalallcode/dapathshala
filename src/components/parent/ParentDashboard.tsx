@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, PlusCircle, Trash2, Copy, Check, Eye, FileText, FileCheck, CheckCircle2, 
-  Clock, Shield, AlertTriangle, MessageSquare, ChevronRight, Share2,
+  Clock, Shield, ShieldAlert, AlertTriangle, MessageSquare, ChevronRight, Share2,
   TrendingUp, Award, BookOpen, Sparkles, RefreshCw, Edit3, X,
   Save, AlertCircle, Camera, ExternalLink, HelpCircle, GraduationCap, ArrowRight, ArrowLeft,
   RotateCcw, MessageCircle, Lightbulb, ChevronDown, Printer, Settings,
@@ -84,6 +84,10 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [questionCount, setQuestionCount] = useState(1);
   const [durationMinutes, setDurationMinutes] = useState(15);
   const [proctoringEnabled, setProctoringEnabled] = useState(true);
+  const [proctoringLevel, setProctoringLevel] = useState<1 | 2 | 3 | 4>(() => {
+    const saved = localStorage.getItem('dapathshala_parent_proctoring_level');
+    return (saved ? Number(saved) : 2) as 1 | 2 | 3 | 4;
+  });
 
   // Creation Mode Selection: 'manual' (নিজে প্রশ্ন তৈরি করুন) vs 'ai' (এআই দিয়ে তৈরি করুন) vs 'institution' (প্রতিষ্ঠান ও সালের প্রশ্ন)
   const [showCreationModeModal, setShowCreationModeModal] = useState(false);
@@ -833,6 +837,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       studentName: 'পরীক্ষার্থী / সন্তান',
       totalMarks: generatedQuestions.length * 20,
       proctoringEnabled: proctoringEnabled,
+      proctoringLevel: proctoringEnabled ? proctoringLevel : 2,
       aiGradingEnabled: true,
       questions: generatedQuestions,
       parentPhone: currentParent?.phone
@@ -1806,36 +1811,114 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               </div>
             )}
 
-            {/* Anti-Cheating Proctoring Toggle & Info Banner */}
-            <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-              <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={proctoringEnabled}
-                  onChange={(e) => setProctoringEnabled(e.target.checked)}
-                  className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
-                />
-                <span className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
-                  <Camera className="w-4 h-4 text-emerald-600" />
-                  <span>নকল প্রতিরোধে ফ্রন্ট ক্যামেরা ও ফুলস্ক্রিন নজরদারি সক্রিয় থাকবে</span>
-                </span>
-              </label>
+            {/* Anti-Cheating Proctoring Toggle & Strictness Level (4 Levels) */}
+            <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={proctoringEnabled}
+                    onChange={(e) => setProctoringEnabled(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span className="text-xs sm:text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                    <Camera className="w-4 h-4 text-emerald-600" />
+                    <span>নকল প্রতিরোধে ফ্রন্ট ক্যামেরা ও লাইভ নজরদারি সক্রিয় থাকবে</span>
+                  </span>
+                </label>
 
-              <div className={`inline-flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-xl border ${
-                creationMode === 'manual'
-                  ? 'text-blue-700 bg-blue-50 border-blue-200'
-                  : creationMode === 'institution'
-                  ? 'text-purple-700 bg-purple-50 border-purple-200'
-                  : 'text-amber-700 bg-amber-50 border-amber-200'
-              }`}>
-                <span>
-                  {creationMode === 'manual'
-                    ? '✍️ ম্যানুয়াল মোড সক্রিয়'
+                <div className={`inline-flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-xl border ${
+                  creationMode === 'manual'
+                    ? 'text-blue-700 bg-blue-50 border-blue-200'
                     : creationMode === 'institution'
-                    ? '🏛️ প্রতিষ্ঠান ও বোর্ড প্রশ্নব্যাংক সক্রিয়'
-                    : '✨ এআই মোড সক্রিয়'}
-                </span>
+                    ? 'text-purple-700 bg-purple-50 border-purple-200'
+                    : 'text-amber-700 bg-amber-50 border-amber-200'
+                }`}>
+                  <span>
+                    {creationMode === 'manual'
+                      ? '✍️ ম্যানুয়াল মোড সক্রিয়'
+                      : creationMode === 'institution'
+                      ? '🏛️ প্রতিষ্ঠান ও বোর্ড প্রশ্নব্যাংক সক্রিয়'
+                      : '✨ এআই মোড সক্রিয়'}
+                  </span>
+                </div>
               </div>
+
+              {/* 4 Proctoring Levels Selector (লেভেল ১, লেভেল ২, লেভেল ৩, লেভেল ৪) */}
+              {proctoringEnabled && (
+                <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200 space-y-2.5 animate-in fade-in duration-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+                    <span className="font-bold text-slate-700 flex items-center gap-1.5">
+                      <ShieldAlert className="w-3.5 h-3.5 text-blue-600" />
+                      <span>প্রক্টরিং নজরদারির কঠোরতার মাত্রা নির্ধারণ করুন (মোট ৪টি লেভেল):</span>
+                    </span>
+                    <span className="font-black text-[11px] px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 self-start sm:self-auto">
+                      নির্বাচিত: লেভেল {proctoringLevel === 1 ? '১ (মৃদু)' : proctoringLevel === 2 ? '২ (মাঝারি)' : proctoringLevel === 3 ? '৩ (কঠোর - আড় চোখ সনাক্ত)' : '৪ (সর্বোচ্চ কঠোর - অতি-সংবেদনশীল)'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                    {[
+                      {
+                        lvl: 1 as const,
+                        name: 'লেভেল ১: মৃদু',
+                        tag: 'সহনশীল',
+                        desc: 'বড় ধরনের মাথা ঘোরানো বা অনুপস্থিতি সনাক্ত। ছোটখাটো আড় চোখে তাকানো ছাড়।'
+                      },
+                      {
+                        lvl: 2 as const,
+                        name: 'লেভেল ২: মাঝারি',
+                        tag: 'স্ট্যান্ডার্ড',
+                        desc: 'স্বাভাবিক পরীক্ষা মানদণ্ড। মাথা এদিক-ওদিক সরালে বা চোখ ফেরালে সতর্কবার্তা।'
+                      },
+                      {
+                        lvl: 3 as const,
+                        name: 'লেভেল ৩: কঠোর',
+                        tag: 'আড় চোখ সনাক্ত',
+                        desc: 'মাথা সোজা রেখে আড় চোখে এদিক-সেদিক তাকালে ও বই খোঁজার চেষ্টা করলেই সতর্কবার্তা।'
+                      },
+                      {
+                        lvl: 4 as const,
+                        name: 'লেভেল ৪: সর্বোচ্চ',
+                        tag: 'অতি-সংবেদনশীল',
+                        desc: 'সামান্যতম আড় চোখে তাকানো বা চোখের মণি কর্নারে নেওয়ার সাথে সাথেই তাৎক্ষণিক সতর্কবার্তা।'
+                      }
+                    ].map((item) => (
+                      <button
+                        key={item.lvl}
+                        type="button"
+                        onClick={() => {
+                          setProctoringLevel(item.lvl);
+                          localStorage.setItem('dapathshala_parent_proctoring_level', String(item.lvl));
+                        }}
+                        className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                          proctoringLevel === item.lvl
+                            ? 'border-blue-600 bg-white shadow-xs ring-2 ring-blue-500/30'
+                            : 'border-slate-200 bg-white/60 hover:bg-white text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <span className={`text-xs font-black ${proctoringLevel === item.lvl ? 'text-blue-700' : 'text-slate-800'}`}>
+                            {item.name}
+                          </span>
+                          <span className={`text-[9.5px] px-1.5 py-0.2 rounded font-bold ${
+                            proctoringLevel === item.lvl ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {item.tag}
+                          </span>
+                        </div>
+                        <p className="text-[10.5px] leading-relaxed text-slate-500">
+                          {item.desc}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="text-[11px] text-slate-500 pt-0.5 italic">
+                    ℹ️ নির্দেশিকা: পরীক্ষার্থী চোখ সরালে বা আড় চোখে তাকালে তাৎক্ষণিক সতর্ক ও কাউন্ট হবে। তবে ন্যূনতম ৫০ বার সতর্ক না হওয়া পর্যন্ত পরীক্ষা কখনই স্বয়ংক্রিয়ভাবে সমাপ্ত হবে না।
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

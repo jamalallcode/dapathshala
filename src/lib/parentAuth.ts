@@ -9,6 +9,7 @@ export interface ParentUser {
   childClass?: string;
   defaultDurationMinutes?: number;
   proctoringStrictness?: 'standard' | 'high';
+  proctoringLevel?: 1 | 2 | 3 | 4;
   role: 'parent';
   createdAt: string;
 }
@@ -22,6 +23,7 @@ interface StoredParentAccount {
   childClass?: string;
   defaultDurationMinutes?: number;
   proctoringStrictness?: 'standard' | 'high';
+  proctoringLevel?: 1 | 2 | 3 | 4;
   passwordHash: string;
   createdAt: string;
 }

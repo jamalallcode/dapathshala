@@ -54,6 +54,7 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
   // Form states - Preferences
   const [defaultDuration, setDefaultDuration] = useState(15);
   const [proctoringStrictness, setProctoringStrictness] = useState<'standard' | 'high'>('standard');
+  const [proctoringLevel, setProctoringLevel] = useState<1 | 2 | 3 | 4>(2);
 
   // Status & Feedback
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -70,6 +71,8 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
         setChildClass(current.childClass || '৮ম শ্রেণি');
         setDefaultDuration(current.defaultDurationMinutes || 15);
         setProctoringStrictness(current.proctoringStrictness || 'standard');
+        const storedLevel = (current.proctoringLevel || Number(localStorage.getItem('dapathshala_parent_proctoring_level')) || 2) as 1 | 2 | 3 | 4;
+        setProctoringLevel(storedLevel);
       }
       setMessage(null);
       setCurrentPassword('');
@@ -134,9 +137,11 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
     setIsSubmitting(true);
     setMessage(null);
 
+    localStorage.setItem('dapathshala_parent_proctoring_level', String(proctoringLevel));
     const res = updateParentProfile({
       defaultDurationMinutes: defaultDuration,
-      proctoringStrictness: proctoringStrictness
+      proctoringStrictness: proctoringLevel >= 3 ? 'high' : 'standard',
+      proctoringLevel: proctoringLevel
     });
 
     setIsSubmitting(false);
@@ -510,39 +515,66 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
                 </div>
               </div>
 
-              {/* Proctoring Level */}
-              <div className="space-y-1">
-                <label className="block text-xs font-bold text-slate-700">
-                  লাইভ প্রক্টরিং নজরদারি মাত্রা
-                </label>
+              {/* Proctoring Strictness Level (4 Levels: 1, 2, 3, 4) */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-700">
+                    লাইভ প্রক্টরিং নজরদারির কঠোরতার মাত্রা (মোট ৪টি লেভেল)
+                  </label>
+                  <span className="text-[11px] font-black px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                    লেভেল {proctoringLevel === 1 ? '১ (মৃদু)' : proctoringLevel === 2 ? '২ (মাঝারি)' : proctoringLevel === 3 ? '৩ (কঠোর)' : '৪ (সর্বোচ্চ)'}
+                  </span>
+                </div>
+                
                 <div className="space-y-2">
-                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/60 cursor-pointer hover:bg-slate-50">
-                    <input
-                      type="radio"
-                      name="proctoringLevel"
-                      checked={proctoringStrictness === 'standard'}
-                      onChange={() => setProctoringStrictness('standard')}
-                      className="mt-0.5 text-blue-600"
-                    />
-                    <div>
-                      <p className="text-xs font-bold text-slate-800">স্ট্যান্ডার্ড প্রক্টরিং (সুপারিশকৃত)</p>
-                      <p className="text-[11px] text-slate-500">ট্যাব পরিবর্তন ও ক্যামেরা অনুপস্থিতি সতর্কবার্তা প্রদর্শন করবে।</p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-start gap-2.5 p-3 rounded-xl border border-slate-200 bg-slate-50/60 cursor-pointer hover:bg-slate-50">
-                    <input
-                      type="radio"
-                      name="proctoringLevel"
-                      checked={proctoringStrictness === 'high'}
-                      onChange={() => setProctoringStrictness('high')}
-                      className="mt-0.5 text-blue-600"
-                    />
-                    <div>
-                      <p className="text-xs font-bold text-slate-800">কঠোর নজরদারি (Strict)</p>
-                      <p className="text-[11px] text-slate-500">লাইভ ক্যামেরা স্ন্যাপশট ও প্রতিটি ক্ষুদ্র বিচ্যুতি রেকর্ড হবে।</p>
-                    </div>
-                  </label>
+                  {[
+                    {
+                      level: 1,
+                      title: 'লেভেল ১: মৃদু (সহনশীল)',
+                      desc: 'বড় ধরনের মাথা ঘোরানো বা সম্পূর্ণ অনুপস্থিতি সনাক্ত করবে। ছোটখাটো আড় চোখের নড়াচড়ায় ছাড় থাকবে।'
+                    },
+                    {
+                      level: 2,
+                      title: 'লেভেল ২: মাঝারি (স্ট্যান্ডার্ড)',
+                      desc: 'স্বাভাবিক পরীক্ষা প্রোটোকল। মাথা সামান্য ঘোরালে বা চোখ সরালে সতর্ক করবে।'
+                    },
+                    {
+                      level: 3,
+                      title: 'লেভেল ৩: কঠোর (আড় চোখ সনাক্ত)',
+                      desc: 'সোজা বসে আড় চোখে এদিক-সেদিক তাকালে এবং বই বা নোটের দিকে দৃষ্টি সামান্য সরালেই সতর্ক করবে।'
+                    },
+                    {
+                      level: 4,
+                      title: 'লেভেল ৪: সর্বোচ্চ কঠোর (অতি-সংবেদনশীল)',
+                      desc: 'সামান্যতম আড় চোখে তাকানো বা চোখের মণি কর্নারে নেওয়ার সাথে সাথেই তাৎক্ষণিক সতর্ক করা হবে।'
+                    }
+                  ].map((item) => (
+                    <label
+                      key={item.level}
+                      onClick={() => setProctoringLevel(item.level as 1 | 2 | 3 | 4)}
+                      className={`flex items-start gap-2.5 p-3 rounded-xl border transition-all cursor-pointer ${
+                        proctoringLevel === item.level
+                          ? 'border-blue-600 bg-blue-50/70 shadow-xs ring-1 ring-blue-500'
+                          : 'border-slate-200 bg-slate-50/60 hover:bg-slate-50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="proctoringLevelChoice"
+                        checked={proctoringLevel === item.level}
+                        onChange={() => setProctoringLevel(item.level as 1 | 2 | 3 | 4)}
+                        className="mt-0.5 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <p className={`text-xs font-bold ${proctoringLevel === item.level ? 'text-blue-900' : 'text-slate-800'}`}>
+                          {item.title}
+                        </p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          {item.desc}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
                 </div>
               </div>
 
