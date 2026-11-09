@@ -63,6 +63,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 }) => {
   const [tests, setTests] = useState<AssignedTest[]>([]);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'profile' | 'password' | 'preferences'>('preferences');
   const showSettingsModal = Boolean(isSettingsOpenExternal || isSettingsOpen || activeTab === 'settings');
 
   const handleCloseSettings = () => {
@@ -1142,6 +1143,21 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           </button>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
+            {/* প্রক্টরিং কঠোরতার মাত্রা (৪টি লেভেল) সরাসরি বাটন */}
+            <button
+              type="button"
+              onClick={() => {
+                setSettingsInitialTab('preferences');
+                setIsSettingsOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 active:bg-purple-200 border border-purple-200 text-purple-900 text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs active:scale-98"
+              title="প্রক্টরিং কঠোরতার ৪টি লেভেল নির্ধারণ করুন"
+            >
+              <ShieldAlert className="w-4 h-4 text-purple-600 shrink-0" />
+              <span>প্রক্টরিং: লেভেল {proctoringLevel === 1 ? '১ (মৃদু)' : proctoringLevel === 2 ? '২ (মাঝারি)' : proctoringLevel === 3 ? '৩ (কঠোর)' : '৪ (সর্বোচ্চ)'}</span>
+              <Settings className="w-3.5 h-3.5 text-purple-500 shrink-0" />
+            </button>
+
             {/* নতুন প্রশ্ন তৈরি করুন (স্থানান্তরিত: উপরে ব্যানার কার্ডে) */}
             <button
               type="button"
@@ -2375,6 +2391,68 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             </div>
           </div>
 
+          {/* Quick Proctoring Strictness Level Card in Tests View */}
+          <div className="bg-gradient-to-r from-purple-50 via-indigo-50/60 to-purple-50 border border-purple-200/90 rounded-2xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-start sm:items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center shrink-0 shadow-2xs">
+                <ShieldAlert className="w-4.5 h-4.5 text-purple-600" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-black text-slate-800">
+                    লাইভ প্রক্টরিং কঠোরতার মাত্রা:
+                  </span>
+                  <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-purple-600 text-white shadow-2xs">
+                    লেভেল {proctoringLevel === 1 ? '১ (মৃদু)' : proctoringLevel === 2 ? '২ (মাঝারি)' : proctoringLevel === 3 ? '৩ (কঠোর - আড় চোখ সনাক্ত)' : '৪ (সর্বোচ্চ কঠোর - অতি-সংবেদনশীল)'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  পরীক্ষার্থী আড় চোখে বা অন্য দিকে তাকালে তাৎক্ষণিক সতর্ক ও কাউন্ট হবে (সর্বনিম্ন ৫০ বারে সমাপ্তি)।
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0 flex-wrap">
+              <span className="text-[11px] font-bold text-slate-600 hidden md:inline">লেভেল নির্বাচন:</span>
+              {[
+                { lvl: 1, name: 'লেভেল ১' },
+                { lvl: 2, name: 'লেভেল ২' },
+                { lvl: 3, name: 'লেভেল ৩' },
+                { lvl: 4, name: 'লেভেল ৪' }
+              ].map(item => (
+                <button
+                  key={item.lvl}
+                  type="button"
+                  onClick={() => {
+                    setProctoringLevel(item.lvl as 1 | 2 | 3 | 4);
+                    localStorage.setItem('dapathshala_parent_proctoring_level', String(item.lvl));
+                    showToast(`✓ প্রক্টরিং কঠোরতার মাত্রা লেভেল ${item.lvl} এ সেট করা হয়েছে!`);
+                  }}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    proctoringLevel === item.lvl 
+                      ? 'bg-purple-600 text-white shadow-xs ring-2 ring-purple-600/30' 
+                      : 'bg-white text-purple-800 hover:bg-purple-100 border border-purple-200 shadow-2xs'
+                  }`}
+                  title={`লেভেল ${item.lvl} নির্বাচন করুন`}
+                >
+                  {item.name}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setSettingsInitialTab('preferences');
+                  setIsSettingsOpen(true);
+                }}
+                className="p-1.5 text-purple-700 hover:text-purple-900 hover:bg-purple-100 rounded-xl transition-colors cursor-pointer border border-purple-200 bg-white ml-1 shadow-2xs flex items-center gap-1 text-[11px] font-bold"
+                title="পূর্ণাঙ্গ প্রক্টরিং সেটিংস খুলুন"
+              >
+                <Settings className="w-3.5 h-3.5 text-purple-600" />
+                <span className="hidden sm:inline">সেটিংস</span>
+              </button>
+            </div>
+          </div>
+
           {tests.length === 0 ? (
             <div className="py-7 sm:py-9 text-center bg-slate-50/70 rounded-3xl border border-dashed border-slate-300 px-4 sm:px-6">
               <div className="w-13 h-13 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center mx-auto mb-2.5 shadow-2xs">
@@ -3249,6 +3327,51 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               </button>
             </div>
 
+            {/* Proctoring Level Quick Selector inside Modal */}
+            <div className="p-3.5 bg-gradient-to-r from-purple-50 to-indigo-50/70 rounded-2xl border border-purple-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-2.5">
+                <ShieldAlert className="w-5 h-5 text-purple-600 shrink-0" />
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-slate-800">
+                      প্রক্টরিং কঠোরতার মাত্রা:
+                    </span>
+                    <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-purple-600 text-white shadow-2xs">
+                      লেভেল {proctoringLevel === 1 ? '১ (মৃদু)' : proctoringLevel === 2 ? '২ (মাঝারি)' : proctoringLevel === 3 ? '৩ (কঠোর - আড় চোখ সনাক্ত)' : '৪ (সর্বোচ্চ কঠোর - অতি-সংবেদনশীল)'}
+                    </span>
+                  </div>
+                  <p className="text-[10.5px] text-slate-500 mt-0.5">
+                    পরীক্ষার্থীর জন্য নির্ধারিত এই লেভেল অনুযায়ী পরীক্ষা পর্যবেক্ষণ করা হবে (ন্যূনতম ৫০ বারে সমাপ্তি)।
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0 flex-wrap">
+                {[
+                  { lvl: 1, name: 'লেভেল ১' },
+                  { lvl: 2, name: 'লেভেল ২' },
+                  { lvl: 3, name: 'লেভেল ৩' },
+                  { lvl: 4, name: 'লেভেল ৪' }
+                ].map(item => (
+                  <button
+                    key={item.lvl}
+                    type="button"
+                    onClick={() => {
+                      setProctoringLevel(item.lvl as 1 | 2 | 3 | 4);
+                      localStorage.setItem('dapathshala_parent_proctoring_level', String(item.lvl));
+                      showToast(`✓ প্রক্টরিং কঠোরতার মাত্রা লেভেল ${item.lvl} এ সেট করা হয়েছে!`);
+                    }}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      proctoringLevel === item.lvl 
+                        ? 'bg-purple-600 text-white shadow-xs ring-2 ring-purple-600/30' 
+                        : 'bg-white text-purple-800 hover:bg-purple-100 border border-purple-200'
+                    }`}
+                  >
+                    {item.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Three Choices - Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               
@@ -3381,6 +3504,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* Parent Account Settings Modal */}
       <ParentSettingsModal
         isOpen={showSettingsModal}
+        initialTab={settingsInitialTab}
         onClose={handleCloseSettings}
         onProfileUpdated={(updated) => {
           setCurrentParent(updated);

@@ -11,7 +11,8 @@ import {
   Info,
   HelpCircle,
   Crown,
-  ShieldCheck
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 import { AppNotification, UserRole } from '../../types';
 import { getStoredNotifications, saveStoredNotifications, addDismissedNotifId, clearAllNotifications } from '../../lib/storage';
@@ -396,9 +397,12 @@ export const Navigation: React.FC<NavigationProps> = ({
                       if (onOpenSettings) onOpenSettings();
                       else if (onSelectTab) onSelectTab('settings');
                     }}
-                    className="w-full px-4 py-2.5 text-left text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-blue-700 block transition-colors cursor-pointer border-t border-slate-100"
+                    className="w-full px-4 py-2.5 text-left text-xs sm:text-sm font-bold text-slate-800 hover:bg-purple-50 hover:text-purple-700 transition-colors cursor-pointer border-t border-slate-100 flex items-center justify-between"
                   >
-                    অন্যান্য
+                    <div className="flex items-center gap-2">
+                      <ShieldAlert className="w-4 h-4 text-purple-600 shrink-0" />
+                      <span>প্রক্টরিং ও পরীক্ষা সেটিংস (৪টি লেভেল)</span>
+                    </div>
                   </button>
 
                   <button

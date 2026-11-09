@@ -14,7 +14,8 @@ import {
   KeyRound,
   Sliders,
   Camera,
-  Trash2
+  Trash2,
+  ShieldAlert
 } from 'lucide-react';
 import { 
   getCurrentParent, 
@@ -26,6 +27,7 @@ import {
 interface ParentSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: 'profile' | 'password' | 'preferences';
   onLogoutSuccess?: () => void;
   onProfileUpdated?: (user: ParentUser) => void;
 }
@@ -33,10 +35,11 @@ interface ParentSettingsModalProps {
 export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
   isOpen,
   onClose,
+  initialTab = 'profile',
   onLogoutSuccess,
   onProfileUpdated
 }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'preferences'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'preferences'>(initialTab);
   const [parent, setParent] = useState<ParentUser | null>(null);
 
   // Form states - Profile
@@ -62,6 +65,9 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
       const current = getCurrentParent();
       setParent(current);
       if (current) {
@@ -78,7 +84,7 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
       setCurrentPassword('');
       setNewPassword('');
     }
-  }, [isOpen]);
+  }, [isOpen, initialTab]);
 
   if (!isOpen) return null;
 
@@ -254,8 +260,8 @@ export const ParentSettingsModal: React.FC<ParentSettingsModalProps> = ({
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Sliders className="w-4 h-4" />
-            <span>পরীক্ষা প্রেফারেন্স</span>
+            <ShieldAlert className="w-4 h-4 text-purple-600" />
+            <span>প্রক্টরিং লেভেল (১-৪) ও প্রেফারেন্স</span>
           </button>
         </div>
 
