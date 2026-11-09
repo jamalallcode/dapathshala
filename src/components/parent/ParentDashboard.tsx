@@ -5,7 +5,7 @@ import {
   TrendingUp, Award, BookOpen, Sparkles, RefreshCw, Edit3, X,
   Save, AlertCircle, Camera, ExternalLink, HelpCircle, GraduationCap, ArrowRight, ArrowLeft,
   RotateCcw, MessageCircle, Lightbulb, ChevronDown, Printer, Settings,
-  Brain, Trophy, Target, Zap
+  Brain, Trophy, Target, Zap, Landmark, School, Lock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AssignedTest, StudentSubmission, ExamQuestion } from '../../types';
@@ -34,6 +34,9 @@ import {
 } from '../../lib/curriculumQuestions';
 import { getCurrentParent, logoutParent, ParentUser } from '../../lib/parentAuth';
 import { ParentSettingsModal } from './ParentSettingsModal';
+import { InstitutionPaperExplorer } from './InstitutionPaperExplorer';
+import { AdminPaperBulkUploadModal } from '../admin/AdminPaperBulkUploadModal';
+import { InstitutionPaper } from '../../lib/institutionPapers';
 
 interface ParentDashboardProps {
   onOpenTest: (test: AssignedTest) => void;
@@ -69,7 +72,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       onTabChange('assigned');
     }
   };
-  const [activeViewMode, setActiveViewMode] = useState<'builder' | 'tests'>('tests');
+  const [activeViewMode, setActiveViewMode] = useState<'builder' | 'tests' | 'institution_papers'>('tests');
   const [filterMode, setFilterMode] = useState<'all' | 'unreviewed'>('all');
   const [copiedPin, setCopiedPin] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -82,9 +85,33 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [durationMinutes, setDurationMinutes] = useState(15);
   const [proctoringEnabled, setProctoringEnabled] = useState(true);
 
-  // Creation Mode Selection: 'manual' (নিজে প্রশ্ন তৈরি করুন) vs 'ai' (এআই দিয়ে তৈরি করুন)
+  // Creation Mode Selection: 'manual' (নিজে প্রশ্ন তৈরি করুন) vs 'ai' (এআই দিয়ে তৈরি করুন) vs 'institution' (প্রতিষ্ঠান ও সালের প্রশ্ন)
   const [showCreationModeModal, setShowCreationModeModal] = useState(false);
-  const [creationMode, setCreationMode] = useState<'manual' | 'ai'>('manual');
+  const [creationMode, setCreationMode] = useState<'manual' | 'ai' | 'institution'>('manual');
+  const [showAdminUploadModal, setShowAdminUploadModal] = useState(false);
+
+  // Authentic School & Board Question Paper Header metadata (3rd Picture Format)
+  const [selectedInstitutionMeta, setSelectedInstitutionMeta] = useState<{
+    institutionName: string;
+    year: string;
+    studentClass: string;
+    subject: string;
+    examType: string;
+    region?: string;
+    subjectCode: string;
+    setCode: string;
+    paperPart?: string;
+  }>({
+    institutionName: 'মতিঝিল সরকারি বালিকা উচ্চ বিদ্যালয়',
+    year: '২০২৪',
+    studentClass: '১০ম শ্রেণি',
+    subject: 'বাংলা ১ম পত্র',
+    examType: 'নির্বাচনী পরীক্ষা / টেস্ট পরীক্ষা',
+    region: 'বুড়িগঙ্গা',
+    subjectCode: '১০১',
+    setCode: '০৩ সেট',
+    paperPart: 'প্রথম পত্র'
+  });
 
   // Custom exam title input
   const [examTitleInput, setExamTitleInput] = useState('');
@@ -160,11 +187,14 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     window.addEventListener('dapathshala_tests_updated', handleStorage);
     window.addEventListener('dapathshala_submissions_updated', handleStorage);
     window.addEventListener('dapathshala_notifs_updated', handleStorage);
+    const handleOpenAdmin = () => setShowAdminUploadModal(true);
+    window.addEventListener('dapathshala_open_admin_portal', handleOpenAdmin);
     return () => {
       window.removeEventListener('storage', handleStorage);
       window.removeEventListener('dapathshala_tests_updated', handleStorage);
       window.removeEventListener('dapathshala_submissions_updated', handleStorage);
       window.removeEventListener('dapathshala_notifs_updated', handleStorage);
+      window.removeEventListener('dapathshala_open_admin_portal', handleOpenAdmin);
     };
   }, []);
 
@@ -632,6 +662,77 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     setShowCreationModeModal(false);
   };
 
+  // Select Institution & Board Question Paper
+  const handleSelectInstitutionPaper = (paper: InstitutionPaper) => {
+    setCreationMode('institution');
+    setIsFinalized(false);
+    setCreatedTestResult(null);
+
+    // Derive authentic subject code (e.g. বাংলা ১ম = ১০১, বাংলা ২য় = ১০২, গণিত = ১০৯, ইত্যাদি)
+    let subCode = '১০১';
+    let pPart = 'প্রথম পত্র';
+    if (paper.subject.includes('গণিত')) {
+      subCode = '১০৯';
+      pPart = 'আবশ্যিক';
+    } else if (paper.subject.includes('ইংরেজি ১ম') || paper.subject.includes('English 1st')) {
+      subCode = '১০৭';
+      pPart = 'প্রথম পত্র';
+    } else if (paper.subject.includes('ইংরেজি ২য়') || paper.subject.includes('English 2nd')) {
+      subCode = '১০৮';
+      pPart = 'দ্বিতীয় পত্র';
+    } else if (paper.subject.includes('পদার্থ')) {
+      subCode = '১৩৬';
+      pPart = 'তত্ত্বীয়';
+    } else if (paper.subject.includes('রসায়ন')) {
+      subCode = '১৩৭';
+      pPart = 'তত্ত্বীয়';
+    } else if (paper.subject.includes('জীববিজ্ঞান')) {
+      subCode = '১৩৮';
+      pPart = 'তত্ত্বীয়';
+    } else if (paper.subject.includes('বিজ্ঞান')) {
+      subCode = '১২৭';
+      pPart = 'সাধারণ';
+    } else if (paper.subject.includes('হিসাব')) {
+      subCode = '১৪৬';
+      pPart = 'ব্যবসায় শিক্ষা';
+    }
+
+    setSelectedInstitutionMeta({
+      institutionName: paper.institutionName,
+      year: paper.year,
+      studentClass: paper.studentClass,
+      subject: paper.subject,
+      examType: paper.examType,
+      region: paper.districtOrBoard || 'বুড়িগঙ্গা',
+      subjectCode: subCode,
+      setCode: '০৩ সেট',
+      paperPart: pPart
+    });
+
+    const questions: ExamQuestion[] = (paper.questions || []).map((q, idx) => {
+      const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
+      return {
+        id: q.id || `inst_q_${Date.now()}_${idx}`,
+        question: q.question,
+        options: [...q.options],
+        correctAnswer: q.correctAnswer,
+        correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
+        explanation: q.explanation || '',
+        solutions: q.solutions || generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation)
+      };
+    });
+
+    setGeneratedQuestions(questions);
+    setSelectedClass(paper.studentClass || selectedClass);
+    setSelectedSubject(paper.subject || selectedSubject);
+    setExamTitleInput(`${paper.institutionName} - ${paper.studentClass} ${paper.subject} (${paper.examType} ${paper.year})`);
+    setDurationMinutes(paper.durationMinutes || 30);
+    setQuestionCount(questions.length);
+
+    setActiveViewMode('builder');
+    showToast(`🏛️ "${paper.institutionName}" এর প্রশ্নপত্র (${toBn(questions.length)}টি প্রশ্ন) লোড হয়েছে!`);
+  };
+
   // Generate / Regenerate with AI
   const handleGenerateWithAI = () => {
     const questions = getQuestionsForChapter(selectedSubject, selectedChapter, questionCount);
@@ -1025,7 +1126,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             <ArrowLeft className="w-4 h-4" />
             <span>← ড্যাশবোর্ডে ফিরে যান</span>
           </button>
-        ) : activeViewMode === 'builder' ? (
+        ) : (activeViewMode === 'builder' || activeViewMode === 'institution_papers') ? (
           <button
             type="button"
             onClick={() => setActiveViewMode('tests')}
@@ -1490,6 +1591,26 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 স্মার্ট এআই
               </span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveViewMode('institution_papers');
+              }}
+              className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                creationMode === 'institution'
+                  ? 'bg-purple-700 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <Landmark className="w-4 h-4 text-purple-300" />
+              <span>৩. প্রতিষ্ঠান ও সালের প্রশ্ন</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                creationMode === 'institution' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'
+              }`}>
+                প্রশ্নব্যাংক
+              </span>
+            </button>
           </div>
 
           {/* Section A: Exam Basic Information */}
@@ -1497,19 +1618,33 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             <div className="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                  creationMode === 'manual' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                  creationMode === 'manual' 
+                    ? 'bg-blue-100 text-blue-700' 
+                    : creationMode === 'institution'
+                    ? 'bg-purple-100 text-purple-700'
+                    : 'bg-amber-100 text-amber-700'
                 }`}>
-                  {creationMode === 'manual' ? <Edit3 className="w-4.5 h-4.5" /> : <Sparkles className="w-4.5 h-4.5" />}
+                  {creationMode === 'manual' ? (
+                    <Edit3 className="w-4.5 h-4.5" />
+                  ) : creationMode === 'institution' ? (
+                    <Landmark className="w-4.5 h-4.5" />
+                  ) : (
+                    <Sparkles className="w-4.5 h-4.5" />
+                  )}
                 </div>
                 <div>
                   <h2 className="text-base sm:text-lg font-black text-slate-900">
                     {creationMode === 'manual' 
                       ? '১. নিজে প্রশ্ন তৈরি করুন (ম্যানুয়াল পদ্ধতি)' 
+                      : creationMode === 'institution'
+                      ? '৩. বিভিন্ন প্রতিষ্ঠান ও সালের প্রশ্ন (সংরক্ষিত প্রশ্নব্যাংক)'
                       : '২. এআই দিয়ে তৈরি করুন (স্বয়ংক্রিয় এআই পদ্ধতি)'}
                   </h2>
                   <p className="text-xs text-slate-500 font-medium">
                     {creationMode === 'manual'
                       ? 'নিজে হাতে প্রশ্ন ও অপশন লিখুন এবং সঠিক উত্তর চিহ্নিত করে পরীক্ষা প্রস্তুত করুন।'
+                      : creationMode === 'institution'
+                      ? 'শীর্ষ স্কুল, কলেজ ও শিক্ষা বোর্ডের সংরক্ষিত প্রশ্নপত্র লোড হয়েছে। প্রয়োজনে এডিট করুন বা সরাসরি লিংক তৈরি করুন।'
                       : 'শ্রেণি, বিষয় ও অধ্যায় সিলেক্ট করুন; এআই পাঠ্যবই অনুযায়ী প্রশ্ন তৈরি করে দেবে।'}
                   </p>
                 </div>
@@ -1686,52 +1821,168 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 </span>
               </label>
 
-              <div className="inline-flex items-center gap-2 text-xs font-bold text-blue-700 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200">
-                <span>{creationMode === 'manual' ? '✍️ ম্যানুয়াল মোড সক্রিয়' : '✨ এআই মোড সক্রিয়'}</span>
+              <div className={`inline-flex items-center gap-2 text-xs font-bold px-3 py-1.5 rounded-xl border ${
+                creationMode === 'manual'
+                  ? 'text-blue-700 bg-blue-50 border-blue-200'
+                  : creationMode === 'institution'
+                  ? 'text-purple-700 bg-purple-50 border-purple-200'
+                  : 'text-amber-700 bg-amber-50 border-amber-200'
+              }`}>
+                <span>
+                  {creationMode === 'manual'
+                    ? '✍️ ম্যানুয়াল মোড সক্রিয়'
+                    : creationMode === 'institution'
+                    ? '🏛️ প্রতিষ্ঠান ও বোর্ড প্রশ্নব্যাংক সক্রিয়'
+                    : '✨ এআই মোড সক্রিয়'}
+                </span>
               </div>
             </div>
           </div>
 
           {/* Section B: Question Authoring / Review Section */}
           <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
-              <div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
-                  <span>
-                    {creationMode === 'manual' ? '✍️ নিজে প্রশ্ন প্রণয়ন' : '✨ এআই প্রস্তুতকৃত প্রশ্নপত্র'}
-                    {' '}(মোট: {toBn(generatedQuestions.length)}টি প্রশ্ন)
+            {creationMode === 'institution' ? (
+              /* ======================================================== */
+              /* AUTHENTIC BANGLADESH SCHOOL/BOARD QUESTION PAPER HEADER   */
+              /* (হুবহু ৩ নং ছবির অফিসিয়াল বোর্ড ও স্কুল প্রশ্নপত্র ফরম্যাট)      */
+              /* ======================================================== */
+              <div className="w-full bg-[#fdfdfd] border-2 border-slate-900 rounded-3xl p-5 sm:p-7 shadow-xs relative select-none font-['Noto_Sans_Bengali']">
+                
+                {/* 1. Top Meta Row: Region/Area - Code - Serial/Year */}
+                <div className="flex items-center justify-between text-xs sm:text-sm font-black text-slate-800 pb-2 border-b border-dashed border-slate-300">
+                  <span className="tracking-wide text-slate-700 font-bold">
+                    {selectedInstitutionMeta.region || 'বুড়িগঙ্গা'}
                   </span>
-                </h3>
-                <p className="text-xs text-slate-500 font-medium">
-                  {creationMode === 'manual'
-                    ? 'নিচে খালি ফরম্যাটে প্রশ্ন লিখুন, ৪টি অপশন দিন এবং সঠিক উত্তরের বোতামে ক্লিক করে টিক দিন'
-                    : 'পছন্দ না হলে পাশে থাকা "বিকল্প প্রশ্ন" বাটনে নতুন প্রশ্ন আনুন অথবা নিজের মতো "এডিট" করুন'}
-                </p>
-              </div>
+                  <span className="font-bold text-slate-700 px-2.5 py-0.5 rounded bg-slate-100 border border-slate-200">
+                    ৮৩
+                  </span>
+                  <span className="font-mono font-black text-slate-900 tracking-wider">
+                    {selectedInstitutionMeta.subjectCode}/{selectedInstitutionMeta.year}
+                  </span>
+                </div>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <button
-                  type="button"
-                  onClick={handleAddQuestion}
-                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>নতুন প্রশ্ন যোগ করুন</span>
-                </button>
+                {/* 2. Main Center Header Block (Matching Picture 3) */}
+                <div className="text-center py-3.5 space-y-1">
+                  
+                  {/* Set Box: ০৩ সেট */}
+                  <div className="inline-block px-3.5 py-1 rounded border-2 border-slate-900 text-xs sm:text-sm font-black text-slate-950 tracking-wider bg-white shadow-2xs mb-1">
+                    {selectedInstitutionMeta.setCode || '০৩ সেট'}
+                  </div>
 
-                {creationMode === 'manual' && (
+                  {/* Institution Name */}
+                  <h2 className="text-xl sm:text-2.5xl font-black text-slate-950 tracking-tight leading-snug">
+                    {selectedInstitutionMeta.institutionName}
+                  </h2>
+
+                  {/* Class & Exam Type */}
+                  <p className="text-xs sm:text-sm font-bold text-slate-800">
+                    {selectedInstitutionMeta.studentClass} • {selectedInstitutionMeta.examType}
+                  </p>
+
+                  {/* Subject Name */}
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 pt-1">
+                    {selectedInstitutionMeta.subject.includes('(') ? selectedInstitutionMeta.subject : `${selectedInstitutionMeta.subject} (বহুনির্বাচনি অভীক্ষা)`}
+                  </h3>
+
+                  {/* Paper Part (প্রথম পত্র) */}
+                  <p className="text-xs sm:text-sm font-bold text-slate-700">
+                    {selectedInstitutionMeta.paperPart || 'প্রথম পত্র'}
+                  </p>
+
+                  {/* Syllabus Notice */}
+                  <p className="text-xs font-semibold text-slate-600 pt-0.5">
+                    [{selectedInstitutionMeta.year} সালের সিলেবাস অনুযায়ী]
+                  </p>
+
+                  {/* Boxed Subject Code (হুবহু ৩ নং ছবির মতো বক্স করা ডিজিট) */}
+                  <div className="pt-2 flex items-center justify-center gap-2">
+                    <span className="text-xs sm:text-sm font-bold text-slate-900">বিষয় কোড :</span>
+                    <div className="inline-flex items-center border-2 border-slate-900 rounded bg-white shadow-2xs overflow-hidden">
+                      {selectedInstitutionMeta.subjectCode.split('').map((digit, dIdx) => (
+                        <span
+                          key={dIdx}
+                          className="w-7 h-7 flex items-center justify-center font-black text-xs sm:text-sm text-slate-950 border-r last:border-r-0 border-slate-900 font-mono"
+                        >
+                          {digit}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Time & Total Marks Row */}
+                  <div className="pt-3 flex items-center justify-center gap-8 sm:gap-14 text-xs sm:text-sm font-black text-slate-950 border-t border-slate-900 mt-2">
+                    <span>সময় — {toBn(durationMinutes)} মিনিট</span>
+                    <span>পূর্ণমান — {toBn(generatedQuestions.length)}</span>
+                  </div>
+
+                  {/* Special Instruction Note */}
+                  <p className="pt-2 text-[11px] sm:text-xs font-bold text-slate-700 italic max-w-xl mx-auto leading-relaxed">
+                    [বিশেষ দ্রষ্টব্য: সরবরাহকৃত বহুনির্বাচনি অভীক্ষার উত্তরপত্রে প্রশ্নের ক্রমিক নম্বরের বিপরীতে সঠিক উত্তরের বৃত্তটি বলপেন দিয়ে ভরাট করো। সকল প্রশ্নের মান সমান।]
+                  </p>
+                </div>
+
+                {/* 3. Action Toolbar at bottom of authentic header */}
+                <div className="pt-3 border-t border-dashed border-slate-300 flex flex-wrap items-center justify-between gap-2">
                   <button
                     type="button"
-                    onClick={handleLoadCurriculumSuggestion}
-                    className="px-3 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-600 hover:text-slate-900 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shrink-0"
-                    title="পাঠ্যবইয়ের প্রশ্নব্যাংক থেকে আইডিয়া দেখতে চাইলে ক্লিক করুন"
+                    onClick={() => setActiveViewMode('institution_papers')}
+                    className="px-3.5 py-1.5 rounded-xl border border-purple-300 bg-purple-50 hover:bg-purple-100 text-purple-800 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
                   >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span className="hidden md:inline">বইয়ের আইডিয়া দেখুন</span>
+                    <Landmark className="w-3.5 h-3.5 text-purple-600" />
+                    <span>অন্য প্রতিষ্ঠান বা সালের প্রশ্নপত্র বাছাই করুন</span>
                   </button>
-                )}
+
+                  <button
+                    type="button"
+                    onClick={handleAddQuestion}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer ml-auto"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>নতুন প্রশ্ন যোগ করুন</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            ) : (
+              /* Standard Manual / AI Header */
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+                    <span>
+                      {creationMode === 'manual' ? '✍️ নিজে প্রশ্ন প্রণয়ন' : '✨ এআই প্রস্তুতকৃত প্রশ্নপত্র'}
+                      {' '}(মোট: {toBn(generatedQuestions.length)}টি প্রশ্ন)
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    {creationMode === 'manual'
+                      ? 'নিচে খালি ফরম্যাটে প্রশ্ন লিখুন, ৪টি অপশন দিন এবং সঠিক উত্তরের বোতামে ক্লিক করে টিক দিন'
+                      : 'পছন্দ না হলে পাশে থাকা "বিকল্প প্রশ্ন" বাটনে নতুন প্রশ্ন আনুন অথবা নিজের মতো "এডিট" করুন'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleAddQuestion}
+                    className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>নতুন প্রশ্ন যোগ করুন</span>
+                  </button>
+
+                  {creationMode === 'manual' && (
+                    <button
+                      type="button"
+                      onClick={handleLoadCurriculumSuggestion}
+                      className="px-3 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-600 hover:text-slate-900 text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                      title="পাঠ্যবইয়ের প্রশ্নব্যাংক থেকে আইডিয়া দেখতে চাইলে ক্লিক করুন"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                      <span className="hidden md:inline">বইয়ের আইডিয়া দেখুন</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Questions List */}
             <div className="space-y-4">
@@ -2264,6 +2515,18 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             </div>
           )}
         </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* VIEW 3: INSTITUTION & BOARD PAPERS FULL EXPLORER         */}
+      {/* (কোনো পপাপ নয় - সরাসরি ড্যাশবোর্ড ক্যানভাসে উন্মুক্ত ভিউ)  */}
+      {/* ======================================================== */}
+      {activeTab !== 'report' && activeTab !== 'games' && activeViewMode === 'institution_papers' && (
+        <InstitutionPaperExplorer
+          onBack={() => setActiveViewMode('tests')}
+          onSelectPaper={handleSelectInstitutionPaper}
+          onOpenAdminUpload={() => setShowAdminUploadModal(true)}
+        />
       )}
 
       {/* ======================================================== */}
@@ -2874,14 +3137,14 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* (১. নিজে প্রশ্ন তৈরি করুন / ২. এআই দিয়ে তৈরি করুন)         */}
       {/* ======================================================== */}
       {showCreationModeModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-xl w-full border border-slate-200 shadow-2xl space-y-6 relative animate-in zoom-in-95">
+        <div className="fixed inset-0 lg:left-[var(--sidebar-width,208px)] z-[80] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-4xl w-full border border-slate-200 shadow-2xl space-y-5 relative animate-in zoom-in-95">
             
             {/* Modal Header */}
             <div className="flex items-start justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
-                  <PlusCircle className="w-6 h-6" />
+                <div className="w-11 h-11 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
+                  <PlusCircle className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
@@ -2902,25 +3165,25 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               </button>
             </div>
 
-            {/* Two Choices - Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Three Choices - Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               
               {/* Option 1: নিজে প্রশ্ন তৈরি করুন */}
               <button
                 type="button"
                 onClick={() => handleSelectCreationMode('manual')}
-                className="group relative flex flex-col items-start p-5 rounded-2xl border-2 border-blue-200 hover:border-blue-600 bg-blue-50/40 hover:bg-blue-50 text-left transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer active:scale-[0.98]"
+                className="group relative flex flex-col items-start p-4 sm:p-5 rounded-2xl border-2 border-blue-200 hover:border-blue-600 bg-blue-50/40 hover:bg-blue-50 text-left transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer active:scale-[0.98]"
               >
                 <div className="flex items-center justify-between w-full mb-3">
-                  <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
+                  <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
                     <Edit3 className="w-5 h-5" />
                   </div>
-                  <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
                     অভিভাবকের পছন্দ
                   </span>
                 </div>
                 
-                <h4 className="text-base font-black text-slate-900 group-hover:text-blue-700 mb-1.5 transition-colors flex items-center gap-1.5">
+                <h4 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-blue-700 mb-1.5 transition-colors flex items-center gap-1.5">
                   <span>১. নিজে প্রশ্ন তৈরি করুন</span>
                 </h4>
                 
@@ -2938,18 +3201,18 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               <button
                 type="button"
                 onClick={() => handleSelectCreationMode('ai')}
-                className="group relative flex flex-col items-start p-5 rounded-2xl border-2 border-amber-200 hover:border-amber-500 bg-amber-50/40 hover:bg-amber-50 text-left transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer active:scale-[0.98]"
+                className="group relative flex flex-col items-start p-4 sm:p-5 rounded-2xl border-2 border-amber-200 hover:border-amber-500 bg-amber-50/40 hover:bg-amber-50 text-left transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer active:scale-[0.98]"
               >
                 <div className="flex items-center justify-between w-full mb-3">
-                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-400 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-400 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
                     <Sparkles className="w-5 h-5" />
                   </div>
-                  <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
                     স্বয়ংক্রিয় ও দ্রুত
                   </span>
                 </div>
                 
-                <h4 className="text-base font-black text-slate-900 group-hover:text-amber-700 mb-1.5 transition-colors flex items-center gap-1.5">
+                <h4 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-amber-700 mb-1.5 transition-colors flex items-center gap-1.5">
                   <span>২. এআই দিয়ে তৈরি করুন</span>
                 </h4>
                 
@@ -2963,10 +3226,55 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 </div>
               </button>
 
+              {/* Option 3: বিভিন্ন প্রতিষ্ঠান ও সালের প্রশ্ন */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreationModeModal(false);
+                  setActiveViewMode('institution_papers');
+                }}
+                className="group relative flex flex-col items-start p-4 sm:p-5 rounded-2xl border-2 border-purple-200 hover:border-purple-600 bg-purple-50/40 hover:bg-purple-50 text-left transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer active:scale-[0.98]"
+              >
+                <div className="flex items-center justify-between w-full mb-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-700 to-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
+                    <Landmark className="w-5 h-5" />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                    স্কুল ও বোর্ড প্রশ্ন
+                  </span>
+                </div>
+                
+                <h4 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-purple-700 mb-1.5 transition-colors flex items-center gap-1.5">
+                  <span>৩. বিভিন্ন প্রতিষ্ঠান ও সালের প্রশ্ন</span>
+                </h4>
+                
+                <p className="text-xs text-slate-600 leading-relaxed font-medium mb-4">
+                  মতিঝিল আইডিয়াল, ভিকারুননিসা, রাজউক কিংবা শিক্ষা বোর্ডের আসল প্রশ্নপত্র ১-ক্লিকেই রেডি করে সন্তানের পরীক্ষা নিন।
+                </p>
+
+                <div className="mt-auto w-full pt-3 border-t border-purple-100 flex items-center justify-between text-xs font-bold text-purple-700 group-hover:translate-x-0.5 transition-transform">
+                  <span>প্রশ্নপত্র দেখতে ক্লিক করুন</span>
+                  <ArrowRight className="w-4 h-4" />
+                </div>
+              </button>
+
             </div>
 
-            {/* Footer */}
-            <div className="flex items-center justify-end pt-2 border-t border-slate-100">
+            {/* Footer with discreet Admin Lock button */}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreationModeModal(false);
+                  setShowAdminUploadModal(true);
+                }}
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-amber-700 transition-colors cursor-pointer"
+                title="কেবলমাত্র অ্যাডমিন এক্সেস"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>অ্যাডমিন প্রশ্ন আপলোড</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowCreationModeModal(false)}
@@ -2979,6 +3287,12 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* Secure Admin Bulk Question Paper Upload Portal Modal */}
+      <AdminPaperBulkUploadModal
+        isOpen={showAdminUploadModal}
+        onClose={() => setShowAdminUploadModal(false)}
+      />
 
       {/* Parent Account Settings Modal */}
       <ParentSettingsModal

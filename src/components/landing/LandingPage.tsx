@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   GraduationCap, 
   ShieldCheck, 
@@ -13,18 +13,22 @@ import {
   LogIn,
   UserPlus,
   LogOut,
-  Phone
+  Phone,
+  Crown,
+  Lock
 } from 'lucide-react';
 import { AssignedTest, UserRole } from '../../types';
 import { getStoredTests, saveStoredTests, fetchTestFromServer } from '../../lib/storage';
 import { getCurrentParent, logoutParent, ParentUser } from '../../lib/parentAuth';
 import { ParentAuthModal } from '../auth/ParentAuthModal';
+import { SecretAdminLoginModal } from '../admin/SecretAdminLoginModal';
 
 interface LandingPageProps {
   onSelectRole: (role: UserRole) => void;
   onOpenExamWithPin: (test: AssignedTest) => void;
   onCreateCustomExam?: () => void;
   onToggleSidebar?: () => void;
+  onAdminLogin?: () => void;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
@@ -32,6 +36,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onOpenExamWithPin,
   onCreateCustomExam,
   onToggleSidebar,
+  onAdminLogin,
 }) => {
   const [currentParent, setCurrentParent] = useState<ParentUser | null>(() => getCurrentParent());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -39,6 +44,48 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [authPrompt, setAuthPrompt] = useState<string | undefined>(undefined);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
+
+  // 20-clicks Secret Admin Trigger
+  const [adminClicks, setAdminClicks] = useState(0);
+  const [showSecretAdminModal, setShowSecretAdminModal] = useState(false);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
+    return localStorage.getItem('dapathshala_is_admin') === 'true';
+  });
+  const adminClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Consecutive 20-click handler for the marked graduation cap icon
+  const handleMarkedIconClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (adminClickTimeoutRef.current) {
+      clearTimeout(adminClickTimeoutRef.current);
+    }
+
+    const nextCount = adminClicks + 1;
+    if (nextCount >= 20) {
+      setAdminClicks(0);
+      setShowSecretAdminModal(true);
+    } else {
+      setAdminClicks(nextCount);
+      // Reset if inactive for 5 seconds
+      adminClickTimeoutRef.current = setTimeout(() => {
+        setAdminClicks(0);
+      }, 5000);
+    }
+  };
+
+  const handleAdminSuccess = () => {
+    setIsAdminLoggedIn(true);
+    if (onAdminLogin) {
+      onAdminLogin();
+    } else {
+      onSelectRole('parent');
+      setTimeout(() => {
+        window.dispatchEvent(new Event('dapathshala_open_admin_portal'));
+      }, 150);
+    }
+  };
 
   useEffect(() => {
     const handleAuthChange = () => {
@@ -124,9 +171,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           
           {/* Logo & Platform Name */}
           <div className="flex items-center gap-3">
-            <div className="w-8.5 h-8.5 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-xs">
-              <GraduationCap className="w-5 h-5" />
-            </div>
+            <button
+              type="button"
+              onClick={handleMarkedIconClick}
+              className="w-8.5 h-8.5 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-90 text-white flex items-center justify-center shadow-xs cursor-pointer transition-all select-none focus:outline-none"
+              title="দাপাঠশালা লোগো"
+              aria-label="দাপাঠশালা লোগো"
+            >
+              <GraduationCap className="w-5 h-5 pointer-events-none" />
+            </button>
             <div>
               <span className="font-black text-lg tracking-tight text-white block leading-tight">
                 দাপাঠশালা
@@ -139,6 +192,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           {/* Modern Login & Register Actions */}
           <div className="flex items-center gap-2 sm:gap-2.5 text-xs font-bold">
+
+            {isAdminLoggedIn && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (onAdminLogin) {
+                    onAdminLogin();
+                  } else {
+                    onSelectRole('parent');
+                    setTimeout(() => {
+                      window.dispatchEvent(new Event('dapathshala_open_admin_portal'));
+                    }, 120);
+                  }
+                }}
+                className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm border border-purple-400/40 cursor-pointer animate-in fade-in"
+                title="সুপার-অ্যাডমিন কন্ট্রোল সেন্টার"
+              >
+                <Crown className="w-3.5 h-3.5 text-amber-300" />
+                <span>অ্যাডমিন প্যানেল</span>
+              </button>
+            )}
 
             {currentParent ? (
               <div className="flex items-center gap-2">
@@ -401,6 +475,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         promptMessage={authPrompt}
         onClose={() => setIsAuthModalOpen(false)}
         onSuccess={handleAuthSuccess}
+      />
+
+      {/* Secret Admin Login Modal (Triggered by 20 consecutive clicks on marked icon) */}
+      <SecretAdminLoginModal
+        isOpen={showSecretAdminModal}
+        onClose={() => setShowSecretAdminModal(false)}
+        onSuccess={handleAdminSuccess}
       />
 
     </div>

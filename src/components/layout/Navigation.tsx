@@ -9,12 +9,15 @@ import {
   Mail,
   Clock,
   Info,
-  HelpCircle
+  HelpCircle,
+  Crown,
+  ShieldCheck
 } from 'lucide-react';
 import { AppNotification, UserRole } from '../../types';
 import { getStoredNotifications, saveStoredNotifications, addDismissedNotifId, clearAllNotifications } from '../../lib/storage';
 import { logoutParent } from '../../lib/parentAuth';
 import { logoutStudent } from '../../lib/studentAuth';
+import { SecretAdminLoginModal } from '../admin/SecretAdminLoginModal';
 
 interface NavigationProps {
   currentRole: UserRole;
@@ -28,6 +31,7 @@ interface NavigationProps {
   isHomeActive?: boolean;
   onToggleSidebar?: () => void;
   isSidebarOpen?: boolean;
+  onOpenAdminDashboard?: () => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
@@ -41,7 +45,8 @@ export const Navigation: React.FC<NavigationProps> = ({
   onOpenSettings,
   isHomeActive,
   onToggleSidebar,
-  isSidebarOpen
+  isSidebarOpen,
+  onOpenAdminDashboard
 }) => {
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -51,6 +56,54 @@ export const Navigation: React.FC<NavigationProps> = ({
   // Settings dropdown state (আইকনটিতে ক্লিক করলে ড্রপডাউন: ১. লগ-আউট ২. অন্যান্য)
   const [isSettingsMenuOpen, setIsSettingsMenuOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
+
+  // 20-clicks Secret Admin Trigger
+  const [adminClicks, setAdminClicks] = useState(0);
+  const [showSecretAdminModal, setShowSecretAdminModal] = useState(false);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
+    return localStorage.getItem('dapathshala_is_admin') === 'true';
+  });
+  const adminClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleLogoAdminClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (adminClickTimeoutRef.current) {
+      clearTimeout(adminClickTimeoutRef.current);
+    }
+
+    const nextCount = adminClicks + 1;
+    if (nextCount >= 20) {
+      setAdminClicks(0);
+      setShowSecretAdminModal(true);
+    } else {
+      setAdminClicks(nextCount);
+      if (nextCount === 1) {
+        adminClickTimeoutRef.current = setTimeout(() => {
+          setAdminClicks(0);
+          onNavigateHome?.();
+        }, 300);
+      } else {
+        adminClickTimeoutRef.current = setTimeout(() => {
+          setAdminClicks(0);
+        }, 4000);
+      }
+    }
+  };
+
+  const handleAdminSuccess = () => {
+    setIsAdminLoggedIn(true);
+    if (onOpenAdminDashboard) {
+      onOpenAdminDashboard();
+    } else {
+      onRoleChange('parent');
+      onNavigateDashboard?.();
+      setTimeout(() => {
+        window.dispatchEvent(new Event('dapathshala_open_admin_portal'));
+      }, 150);
+    }
+  };
 
   // Load notifications and listen for custom events
   // "যেগুলো একবার দেখা হয়ে যাবে সেগুলো নোটিফিকেশনে আর থাকার দরকার নেই।"
@@ -139,16 +192,12 @@ export const Navigation: React.FC<NavigationProps> = ({
             </button>
           )}
 
-          {/* Blue Home Square - Navigates directly to Landing Page */}
+          {/* Blue Home Square - Navigates directly to Landing Page (and 20-click admin trigger) */}
           <button
             type="button"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onNavigateHome?.();
-            }}
-            className="w-8.5 h-8.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white flex items-center justify-center shrink-0 rounded-lg transition-colors shadow-xs cursor-pointer z-10"
-            title="মূল হোমপেজ / ল্যান্ডিং পেজ"
+            onClick={handleLogoAdminClick}
+            className="w-8.5 h-8.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white flex items-center justify-center shrink-0 rounded-lg transition-all shadow-xs cursor-pointer z-10 select-none"
+            title="মূল হোমপেজ"
             aria-label="মূল হোমপেজে ফিরে যান"
           >
             <Home className="w-4.5 h-4.5 pointer-events-none" />
@@ -213,6 +262,24 @@ export const Navigation: React.FC<NavigationProps> = ({
 
         {/* Right Section: Notifications & Settings Link */}
         <div className="flex items-center gap-2 sm:gap-3">
+
+          {isAdminLoggedIn && (
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenAdminDashboard) {
+                  onOpenAdminDashboard();
+                } else {
+                  window.dispatchEvent(new Event('dapathshala_open_admin_portal'));
+                }
+              }}
+              className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-md border border-purple-400/40 cursor-pointer animate-in fade-in"
+              title="সুপার-অ্যাডমিন কন্ট্রোল সেন্টারে প্রবেশ করুন"
+            >
+              <Crown className="w-3.5 h-3.5 text-amber-300" />
+              <span>অ্যাডমিন</span>
+            </button>
+          )}
 
           {/* Notifications Bell */}
           <div className="relative shrink-0" ref={notifContainerRef}>
@@ -332,6 +399,18 @@ export const Navigation: React.FC<NavigationProps> = ({
                     className="w-full px-4 py-2.5 text-left text-xs sm:text-sm font-bold text-slate-700 hover:bg-slate-50 hover:text-blue-700 block transition-colors cursor-pointer border-t border-slate-100"
                   >
                     অন্যান্য
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSettingsMenuOpen(false);
+                      window.dispatchEvent(new Event('dapathshala_open_admin_portal'));
+                    }}
+                    className="w-full px-4 py-2 text-left text-[11px] font-bold text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer border-t border-slate-100 flex items-center justify-between"
+                  >
+                    <span>অ্যাডমিন প্রশ্ন আপলোড</span>
+                    <span className="text-[10px] text-amber-600 bg-amber-100 px-1 py-0.2 rounded font-mono">PIN</span>
                   </button>
                 </div>
               )}
@@ -517,6 +596,13 @@ export const Navigation: React.FC<NavigationProps> = ({
         </div>
       </div>
     )}
+
+    {/* Secret Admin Login Modal (Triggered by 20 consecutive clicks) */}
+    <SecretAdminLoginModal
+      isOpen={showSecretAdminModal}
+      onClose={() => setShowSecretAdminModal(false)}
+      onSuccess={handleAdminSuccess}
+    />
   </>
   );
 };

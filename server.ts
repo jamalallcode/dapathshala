@@ -43,6 +43,7 @@ app.get('/api/health', (_req, res) => {
 const TESTS_FILE = path.resolve(process.cwd(), '.tests_store.json');
 const SUBMISSIONS_FILE = path.resolve(process.cwd(), '.submissions_store.json');
 const PARENTS_FILE = path.resolve(process.cwd(), '.parents_store.json');
+const INSTITUTION_PAPERS_FILE = path.resolve(process.cwd(), '.institution_papers_store.json');
 
 let parentsStore: Record<string, any> = {};
 
@@ -322,6 +323,38 @@ app.get('/api/submissions/:pin', (req, res) => {
   res.status(404).json({ error: 'Submission not found' });
 });
 
+// API: Get All Institution Papers
+app.get('/api/institution-papers', (_req, res) => {
+  const papers = loadJson<any[]>(INSTITUTION_PAPERS_FILE, []);
+  res.json(papers);
+});
+
+// API: Save or Bulk Upload Institution Papers (Admin)
+app.post('/api/institution-papers/bulk', (req, res) => {
+  const incoming = req.body;
+  if (!incoming) {
+    return res.status(400).json({ error: 'No data provided' });
+  }
+  const toAdd = Array.isArray(incoming) ? incoming : [incoming];
+  const existing = loadJson<any[]>(INSTITUTION_PAPERS_FILE, []);
+  const map = new Map<string, any>();
+  existing.forEach((p: any) => { if (p && p.id) map.set(p.id, p); });
+  toAdd.forEach((p: any) => { if (p && p.id) map.set(p.id, p); });
+  const updated = Array.from(map.values());
+  saveJson(INSTITUTION_PAPERS_FILE, updated);
+  console.log(`[Admin Bulk Upload] Saved ${toAdd.length} institution papers. Total: ${updated.length}`);
+  res.json({ success: true, count: toAdd.length, total: updated.length });
+});
+
+// API: Delete an Institution Paper
+app.delete('/api/institution-papers/:id', (req, res) => {
+  const id = String(req.params.id).trim();
+  const existing = loadJson<any[]>(INSTITUTION_PAPERS_FILE, []);
+  const filtered = existing.filter((p: any) => p && p.id !== id);
+  saveJson(INSTITUTION_PAPERS_FILE, filtered);
+  res.json({ success: true, remaining: filtered.length });
+});
+
 // API: Parent Registration (Phone, Password & Name)
 app.post('/api/auth/parent-register', (req, res) => {
   const { phone, password, name, id } = req.body || {};
@@ -389,6 +422,221 @@ app.post('/api/auth/parent-login', (req, res) => {
   });
 });
 
+// Persistent config & notice stores
+const NOTICE_FILE = path.resolve(process.cwd(), '.notice_store.json');
+const SYSTEM_CONFIG_FILE = path.resolve(process.cwd(), '.system_config_store.json');
+
+// --- ADMIN MASTER APIS ---
+
+// API: Get All Parents with Activity Stats (Admin)
+app.get('/api/admin/parents', (_req, res) => {
+  const parents = loadJson<Record<string, any>>(PARENTS_FILE, {});
+  const tests = getMergedTests();
+  const subs = getMergedSubmissions();
+
+  const parentsList = Object.values(parents).map((p: any) => {
+    const parentPhone = String(p.phone || '').trim();
+    // Count exams created by this parent
+    const createdExams = Object.values(tests).filter((t: any) => t && t.parentPhone === parentPhone);
+    const pinList = new Set(createdExams.map((t: any) => String(t.pin || t.id)));
+    // Count student submissions for this parent's tests
+    const parentSubs = Object.values(subs).filter((s: any) => pinList.has(String(s.pin || s.id)));
+
+    return {
+      id: p.id,
+      phone: p.phone,
+      name: p.name || 'নাম বিহীন',
+      childName: p.childName || '',
+      childClass: p.childClass || '',
+      createdAt: p.createdAt || new Date().toISOString(),
+      status: p.status || 'active', // 'active' | 'suspended'
+      examsCreated: createdExams.length,
+      submissionsReceived: parentSubs.length,
+      lastActive: p.lastActive || p.createdAt
+    };
+  });
+
+  res.json(parentsList);
+});
+
+// API: Update Parent Status (Admin can block/suspend or activate parent)
+app.post('/api/admin/parents/:phone/status', (req, res) => {
+  const phone = String(req.params.phone).trim();
+  const { status } = req.body || {};
+  if (!status || !['active', 'suspended'].includes(status)) {
+    return res.status(400).json({ error: 'সঠিক স্ট্যাটাস প্রদান করুন (active বা suspended)' });
+  }
+  const parents = loadJson<Record<string, any>>(PARENTS_FILE, {});
+  if (!parents[phone]) {
+    return res.status(404).json({ error: 'অভিভাবক অ্যাকাউন্ট পাওয়া যায়নি' });
+  }
+  parents[phone].status = status;
+  parentsStore[phone] = parents[phone];
+  saveJson(PARENTS_FILE, parents);
+  res.json({ success: true, phone, status });
+});
+
+// API: Reset Parent Password (Admin)
+app.post('/api/admin/parents/:phone/reset-password', (req, res) => {
+  const phone = String(req.params.phone).trim();
+  const { newPassword } = req.body || {};
+  if (!newPassword || String(newPassword).trim().length < 4) {
+    return res.status(400).json({ error: 'পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে' });
+  }
+  const parents = loadJson<Record<string, any>>(PARENTS_FILE, {});
+  if (!parents[phone]) {
+    return res.status(404).json({ error: 'অভিভাবক অ্যাকাউন্ট পাওয়া যায়নি' });
+  }
+  parents[phone].password = String(newPassword).trim();
+  parentsStore[phone] = parents[phone];
+  saveJson(PARENTS_FILE, parents);
+  res.json({ success: true, message: 'পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে' });
+});
+
+// API: Delete Parent Account (Admin)
+app.delete('/api/admin/parents/:phone', (req, res) => {
+  const phone = String(req.params.phone).trim();
+  const parents = loadJson<Record<string, any>>(PARENTS_FILE, {});
+  if (parents[phone]) {
+    delete parents[phone];
+    delete parentsStore[phone];
+    saveJson(PARENTS_FILE, parents);
+  }
+  res.json({ success: true, message: 'অভিভাবক অ্যাকাউন্ট মুছে ফেলা হয়েছে' });
+});
+
+// API: Master Analytics & System Stats (Admin)
+app.get('/api/admin/stats', (_req, res) => {
+  const parents = loadJson<Record<string, any>>(PARENTS_FILE, {});
+  const tests = getMergedTests();
+  const subs = getMergedSubmissions();
+  const institutionPapers = loadJson<any[]>(INSTITUTION_PAPERS_FILE, []);
+
+  const totalParents = Object.keys(parents).length;
+  const allTestsList = Object.values(tests);
+  const allSubsList = Object.values(subs);
+
+  let totalProctoringFlags = 0;
+  let unreviewedCount = 0;
+
+  allSubsList.forEach((s: any) => {
+    if (Array.isArray(s.proctoringFlags)) {
+      totalProctoringFlags += s.proctoringFlags.length;
+    }
+    if (s.status === 'submitted') {
+      unreviewedCount++;
+    }
+  });
+
+  res.json({
+    totalParents,
+    totalExams: allTestsList.length,
+    totalSubmissions: allSubsList.length,
+    totalInstitutionPapers: institutionPapers.length,
+    unreviewedSubmissions: unreviewedCount,
+    totalProctoringFlags,
+    serverUptimeSeconds: Math.floor(process.uptime()),
+    status: 'operational',
+    aiStatus: 'online'
+  });
+});
+
+// API: Global Platform Broadcast Notice (Admin)
+app.get('/api/admin/notice', (_req, res) => {
+  const notice = loadJson<any>(NOTICE_FILE, {
+    isActive: false,
+    title: '',
+    message: '',
+    type: 'info',
+    createdAt: ''
+  });
+  res.json(notice);
+});
+
+app.post('/api/admin/notice', (req, res) => {
+  const { title, message, type, isActive } = req.body || {};
+  const notice = {
+    title: title || '',
+    message: message || '',
+    type: type || 'info', // 'info' | 'warning' | 'alert'
+    isActive: Boolean(isActive),
+    updatedAt: new Date().toISOString()
+  };
+  saveJson(NOTICE_FILE, notice);
+  res.json({ success: true, notice });
+});
+
+// API: System Maintenance Mode (Admin)
+app.get('/api/admin/maintenance', (_req, res) => {
+  const config = loadJson<any>(SYSTEM_CONFIG_FILE, {
+    maintenanceMode: false,
+    message: 'দাপাঠশালা পোর্টাল বর্তমানে রক্ষণাবেক্ষণে রয়েছে। শীঘ্রই ফিরে আসছি।'
+  });
+  res.json(config);
+});
+
+app.post('/api/admin/maintenance', (req, res) => {
+  const { maintenanceMode, message } = req.body || {};
+  const config = {
+    maintenanceMode: Boolean(maintenanceMode),
+    message: message || 'দাপাঠশালা পোর্টাল বর্তমানে রক্ষণাবেক্ষণে রয়েছে। শীঘ্রই ফিরে আসছি।',
+    updatedAt: new Date().toISOString()
+  };
+  saveJson(SYSTEM_CONFIG_FILE, config);
+  res.json({ success: true, config });
+});
+
+// API: Full Platform Database Backup & Restore (Admin)
+app.get('/api/admin/backup', (_req, res) => {
+  const parents = loadJson<Record<string, any>>(PARENTS_FILE, {});
+  const tests = getMergedTests();
+  const subs = getMergedSubmissions();
+  const papers = loadJson<any[]>(INSTITUTION_PAPERS_FILE, []);
+  const notice = loadJson<any>(NOTICE_FILE, {});
+
+  const backupData = {
+    version: '1.0',
+    timestamp: new Date().toISOString(),
+    parents,
+    tests,
+    submissions: subs,
+    institutionPapers: papers,
+    notice
+  };
+
+  res.setHeader('Content-Disposition', `attachment; filename=dapathshala_backup_${Date.now()}.json`);
+  res.setHeader('Content-Type', 'application/json');
+  res.json(backupData);
+});
+
+app.post('/api/admin/restore', (req, res) => {
+  const backup = req.body;
+  if (!backup || typeof backup !== 'object') {
+    return res.status(400).json({ error: 'অবৈধ ব্যাকআপ ফাইল' });
+  }
+
+  if (backup.parents) {
+    parentsStore = backup.parents;
+    saveJson(PARENTS_FILE, backup.parents);
+  }
+  if (backup.tests) {
+    testsStore = backup.tests;
+    saveJson(TESTS_FILE, backup.tests);
+  }
+  if (backup.submissions) {
+    submissionsStore = backup.submissions;
+    saveJson(SUBMISSIONS_FILE, backup.submissions);
+  }
+  if (backup.institutionPapers && Array.isArray(backup.institutionPapers)) {
+    saveJson(INSTITUTION_PAPERS_FILE, backup.institutionPapers);
+  }
+  if (backup.notice) {
+    saveJson(NOTICE_FILE, backup.notice);
+  }
+
+  res.json({ success: true, message: 'সম্পূর্ণ ডেটা সফলভাবে রিস্টোর করা হয়েছে' });
+});
+
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
   if (!isProd) {
@@ -433,33 +681,54 @@ async function startServer() {
     });
   }
 
-  const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Dapathshala Full-Stack server running on port ${PORT}`);
-  });
+  let currentServer: any = null;
+  let retryCount = 0;
+  const maxRetries = 6;
 
-  server.on('error', (err: any) => {
-    console.error('Server listen error:', err?.message || err);
-    if (err?.code === 'EADDRINUSE') {
-      console.warn(`[Port Conflict] Port ${PORT} is currently occupied. Retrying in 1.5s...`);
-      setTimeout(() => {
-        try {
-          server.close();
-        } catch {}
-        server.listen(PORT, '0.0.0.0');
-      }, 1500);
-    }
-  });
+  function bindServer() {
+    currentServer = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Dapathshala Full-Stack server running on port ${PORT}`);
+    });
+
+    currentServer.on('error', (err: any) => {
+      if (err?.code === 'EADDRINUSE') {
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.warn(`[Port Conflict] Port ${PORT} in use, waiting for release (retry ${retryCount}/${maxRetries})...`);
+          try {
+            currentServer?.close();
+          } catch {}
+          setTimeout(() => {
+            bindServer();
+          }, 1200);
+          return;
+        }
+        console.warn(`[Port Conflict] Port ${PORT} remained busy after ${maxRetries} attempts. Exiting cleanly for fresh restart.`);
+        process.exit(1);
+      } else {
+        console.error('Server listen error:', err?.message || err);
+        process.exit(1);
+      }
+    });
+  }
+
+  bindServer();
 
   const gracefulShutdown = (signal: string) => {
     console.log(`Received ${signal}, closing server gracefully...`);
-    server.close(() => {
-      console.log('Server stopped cleanly.');
+    if (currentServer) {
+      currentServer.close(() => {
+        console.log('Server stopped cleanly.');
+        process.exit(0);
+      });
+      setTimeout(() => process.exit(0), 3000);
+    } else {
       process.exit(0);
-    });
+    }
   };
 
-  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.once('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 startServer().catch((err) => {

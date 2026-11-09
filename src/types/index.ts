@@ -1,4 +1,4 @@
-export type UserRole = 'parent' | 'student';
+export type UserRole = 'parent' | 'student' | 'admin';
 
 export interface ExamQuestion {
   id: string;
@@ -57,5 +57,39 @@ export interface AppNotification {
   time: string;
   testId?: string;
   isRead: boolean;
-  forRole: 'parent' | 'student';
+  forRole: 'parent' | 'student' | 'admin';
 }
+
+export interface AdminSystemStats {
+  totalParents: number;
+  totalExams: number;
+  totalSubmissions: number;
+  totalInstitutionPapers: number;
+  unreviewedSubmissions: number;
+  totalProctoringFlags: number;
+  serverUptimeSeconds: number;
+  status: string;
+  aiStatus: string;
+}
+
+export interface ParentAccountSummary {
+  id: string;
+  phone: string;
+  name: string;
+  childName?: string;
+  childClass?: string;
+  createdAt: string;
+  status: 'active' | 'suspended';
+  examsCreated: number;
+  submissionsReceived: number;
+  lastActive?: string;
+}
+
+export interface AdminBroadcastNotice {
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'alert';
+  isActive: boolean;
+  updatedAt?: string;
+}
+

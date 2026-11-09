@@ -8,7 +8,18 @@ import {
   BookOpen,
   Key,
   GraduationCap,
-  LogOut
+  LogOut,
+  Crown,
+  Building2,
+  Users,
+  FileText,
+  ShieldCheck,
+  Radio,
+  Settings,
+  Database,
+  BarChart3,
+  Sliders,
+  Sparkles
 } from 'lucide-react';
 import { UserRole, AssignedTest } from '../../types';
 import { getCurrentParent, ParentUser, updateParentProfile } from '../../lib/parentAuth';
@@ -22,7 +33,7 @@ export interface SidebarProps {
   isResizing?: boolean;
   currentRole: UserRole;
   onRoleChange: (role: UserRole) => void;
-  activeView: 'landing' | 'dashboard' | 'exam' | 'review';
+  activeView: 'landing' | 'dashboard' | 'exam' | 'review' | 'admin';
   onNavigateHome: () => void;
   onNavigateDashboard: () => void;
   parentTab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games';
@@ -30,6 +41,10 @@ export interface SidebarProps {
   onOpenCreateExam: () => void;
   onOpenSettings?: () => void;
   onDirectStartExam?: (test: AssignedTest) => void;
+  // Admin Navigation Props
+  adminTab?: 'overview' | 'papers' | 'users' | 'exams' | 'proctoring' | 'notice' | 'system';
+  onSelectAdminTab?: (tab: 'overview' | 'papers' | 'users' | 'exams' | 'proctoring' | 'notice' | 'system') => void;
+  onOpenAdminDashboard?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -46,10 +61,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
   parentTab,
   onSelectParentTab,
   onOpenCreateExam,
-  onOpenSettings
+  onOpenSettings,
+  adminTab = 'overview',
+  onSelectAdminTab,
+  onOpenAdminDashboard
 }) => {
   const [parentUser, setParentUser] = useState<ParentUser | null>(() => getCurrentParent());
   const [studentUser, setStudentUser] = useState<StudentUser | null>(() => getCurrentStudent());
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
+    return localStorage.getItem('dapathshala_is_admin') === 'true';
+  });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const getFirstLetter = (name?: string): string => {
@@ -221,11 +242,172 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* ======================================================== */}
-        {/* 2. ACADEMIC NAVIGATION MENU (Specific to Dapathshala)      */}
+        {/* 2. NAVIGATION MENU (Conditional Admin / Parent / Student) */}
         {/* ======================================================== */}
         <div className="flex-1 overflow-y-auto py-3 space-y-1 text-sm font-semibold">
           
-          {currentRole === 'parent' ? (
+          {/* Admin Switcher Bar (If Admin is Logged In) */}
+          {isAdminLoggedIn && (
+            <div className="px-3 pb-2 mb-2 border-b border-purple-900/40">
+              <div className="flex items-center gap-1 bg-[#12192e] p-1 rounded-xl border border-purple-900/50">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleLinkClick(() => {
+                      onOpenAdminDashboard?.();
+                    });
+                  }}
+                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    activeView === 'admin'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-purple-300 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  <Crown className="w-3.5 h-3.5 text-amber-300" />
+                  <span>অ্যাডমিন</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleLinkClick(() => {
+                      onRoleChange('parent');
+                      onNavigateDashboard();
+                    });
+                  }}
+                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    activeView !== 'admin'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>অভিভাবক</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* VIEW A: DEDICATED SUPER-ADMIN CONTROLLING SUITE */}
+          {activeView === 'admin' ? (
+            <div className="space-y-0.5">
+              <div className="px-3 py-1 text-[10px] font-black uppercase text-purple-400 tracking-wider">
+                👑 সুপার-অ্যাডমিন কন্ট্রোল
+              </div>
+
+              {/* 1. মাস্টার ওভারভিউ */}
+              <button
+                type="button"
+                onClick={() => handleLinkClick(() => onSelectAdminTab?.('overview'))}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
+                  adminTab === 'overview'
+                    ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
+                    : 'hover:bg-slate-800/60 text-slate-300 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 truncate min-w-0">
+                  <BarChart3 className="w-4.5 h-4.5 text-purple-400 shrink-0" />
+                  <span className="truncate">মাস্টার ওভারভিউ</span>
+                </div>
+              </button>
+
+              {/* 2. কেন্দ্রীয় প্রশ্নব্যাংক */}
+              <button
+                type="button"
+                onClick={() => handleLinkClick(() => onSelectAdminTab?.('papers'))}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
+                  adminTab === 'papers'
+                    ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
+                    : 'hover:bg-slate-800/60 text-slate-300 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 truncate min-w-0">
+                  <Building2 className="w-4.5 h-4.5 text-amber-400 shrink-0" />
+                  <span className="truncate">কেন্দ্রীয় প্রশ্নব্যাংক</span>
+                </div>
+              </button>
+
+              {/* 3. ইউজার ও অ্যাকাউন্ট */}
+              <button
+                type="button"
+                onClick={() => handleLinkClick(() => onSelectAdminTab?.('users'))}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
+                  adminTab === 'users'
+                    ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
+                    : 'hover:bg-slate-800/60 text-slate-300 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 truncate min-w-0">
+                  <Users className="w-4.5 h-4.5 text-blue-400 shrink-0" />
+                  <span className="truncate">ব্যবহারকারী ও একাউন্ট</span>
+                </div>
+              </button>
+
+              {/* 4. গ্লোবাল পরীক্ষা ও খাতা */}
+              <button
+                type="button"
+                onClick={() => handleLinkClick(() => onSelectAdminTab?.('exams'))}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
+                  adminTab === 'exams'
+                    ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
+                    : 'hover:bg-slate-800/60 text-slate-300 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 truncate min-w-0">
+                  <FileText className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
+                  <span className="truncate">গ্লোবাল পরীক্ষা ও খাতা</span>
+                </div>
+              </button>
+
+              {/* 5. প্রক্টরিং সিকিউরিটি */}
+              <button
+                type="button"
+                onClick={() => handleLinkClick(() => onSelectAdminTab?.('proctoring'))}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
+                  adminTab === 'proctoring'
+                    ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
+                    : 'hover:bg-slate-800/60 text-slate-300 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 truncate min-w-0">
+                  <ShieldCheck className="w-4.5 h-4.5 text-rose-400 shrink-0" />
+                  <span className="truncate">প্রক্টরিং সিকিউরিটি</span>
+                </div>
+              </button>
+
+              {/* 6. নোটিশ ব্রডকাস্ট */}
+              <button
+                type="button"
+                onClick={() => handleLinkClick(() => onSelectAdminTab?.('notice'))}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
+                  adminTab === 'notice'
+                    ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
+                    : 'hover:bg-slate-800/60 text-slate-300 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 truncate min-w-0">
+                  <Radio className="w-4.5 h-4.5 text-amber-300 shrink-0" />
+                  <span className="truncate">নোটিশ ব্রডকাস্ট</span>
+                </div>
+              </button>
+
+              {/* 7. সিস্টেম ও ব্যাকআপ */}
+              <button
+                type="button"
+                onClick={() => handleLinkClick(() => onSelectAdminTab?.('system'))}
+                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
+                  adminTab === 'system'
+                    ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
+                    : 'hover:bg-slate-800/60 text-slate-300 hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 truncate min-w-0">
+                  <Settings className="w-4.5 h-4.5 text-teal-400 shrink-0" />
+                  <span className="truncate">সিস্টেম ও ব্যাকআপ</span>
+                </div>
+              </button>
+
+            </div>
+          ) : currentRole === 'parent' ? (
             <>
               {/* Menu: প্রশ্নপত্র তৈরি */}
               <div>
@@ -294,6 +476,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
                 </button>
               </div>
+
+              {/* Exclusive Admin Quick Access Card for Admin Users */}
+              {isAdminLoggedIn && (
+                <div className="pt-3 px-3 mt-2 border-t border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => handleLinkClick(() => onOpenAdminDashboard?.())}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:from-purple-800 hover:to-indigo-800 border border-purple-500/40 text-white font-bold text-xs transition-all shadow-md cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Crown className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
+                      <span>অ্যাডমিন ড্যাশবোর্ড</span>
+                    </div>
+                    <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-1.5 py-0.2 rounded-full">
+                      CONTROL
+                    </span>
+                  </button>
+                </div>
+              )}
             </>
           ) : (
             <>

@@ -17,12 +17,18 @@ import {
 } from './lib/storage';
 import { StudentAuthModal } from './components/auth/StudentAuthModal';
 import { isStudentLoggedIn, StudentUser } from './lib/studentAuth';
+import { AdminDashboard } from './components/admin/AdminDashboard';
+import { Bell } from 'lucide-react';
 
 export function App() {
   const [currentRole, setCurrentRole] = useState<UserRole>('parent');
-  const [activeView, setActiveView] = useState<'landing' | 'dashboard' | 'exam' | 'review'>('landing');
+  const [activeView, setActiveView] = useState<'landing' | 'dashboard' | 'exam' | 'review' | 'admin'>('landing');
   const [activeTest, setActiveTest] = useState<AssignedTest | null>(null);
   
+  // Admin specific navigation tab
+  const [adminActiveTab, setAdminActiveTab] = useState<'overview' | 'papers' | 'users' | 'exams' | 'proctoring' | 'notice' | 'system'>('overview');
+  const [broadcastNotice, setBroadcastNotice] = useState<any>(null);
+
   // Student registration & login modal state
   const [isStudentAuthModalOpen, setIsStudentAuthModalOpen] = useState(false);
   const [studentAuthPrompt, setStudentAuthPrompt] = useState<string | undefined>(undefined);
@@ -82,10 +88,45 @@ export function App() {
     };
   }, [isResizingSidebar, sidebarWidth]);
   
-  // Coordinated Dashboard state for sidebar control
   const [parentActiveTab, setParentActiveTab] = useState<'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games'>('assigned');
   const [showCreateModalExternal, setShowCreateModalExternal] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+
+  // Global Notice Fetcher & Listener
+  useEffect(() => {
+    const fetchNotice = async () => {
+      try {
+        const res = await fetch('/api/admin/notice');
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.isActive && data.message) {
+            setBroadcastNotice(data);
+          } else {
+            setBroadcastNotice(null);
+          }
+        }
+      } catch {}
+    };
+    fetchNotice();
+    window.addEventListener('dapathshala_notice_updated', fetchNotice);
+    return () => {
+      window.removeEventListener('dapathshala_notice_updated', fetchNotice);
+    };
+  }, []);
+
+  // Listen to secret or direct admin entry event
+  useEffect(() => {
+    const handleOpenAdminPortal = () => {
+      setActiveView('admin');
+      try {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      } catch {}
+    };
+    window.addEventListener('dapathshala_open_admin_portal', handleOpenAdminPortal);
+    return () => {
+      window.removeEventListener('dapathshala_open_admin_portal', handleOpenAdminPortal);
+    };
+  }, []);
 
   // Check URL query parameters on load across devices (e.g. ?pin=997080 or ?reviewPin=997080)
   useEffect(() => {
@@ -350,6 +391,13 @@ export function App() {
     setShowCreateModalExternal(true);
   };
 
+  const handleAdminLogin = () => {
+    setActiveView('admin');
+    try {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+    } catch {}
+  };
+
   const handleSelectParentTabFromSidebar = (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings') => {
     setCurrentRole('parent');
     setActiveView('dashboard');
@@ -389,6 +437,12 @@ export function App() {
           onOpenCreateExam={handleOpenCreateExamFromSidebar}
           onOpenSettings={() => setIsSettingsModalOpen(true)}
           onDirectStartExam={handleDirectStartExam}
+          adminTab={adminActiveTab}
+          onSelectAdminTab={(tab) => {
+            setAdminActiveTab(tab);
+            setActiveView('admin');
+          }}
+          onOpenAdminDashboard={() => setActiveView('admin')}
         />
       )}
 
@@ -399,8 +453,22 @@ export function App() {
         isResizingSidebar ? '' : 'transition-[padding-left] duration-75'
       }`}>
 
+        {/* Global Live Platform Notice Banner (Broadcasted by Super-Admin) */}
+        {broadcastNotice && activeView !== 'admin' && (
+          <div className={`px-4 py-2 text-xs font-bold text-center flex items-center justify-center gap-2 border-b shadow-2xs z-30 ${
+            broadcastNotice.type === 'alert'
+              ? 'bg-rose-600 text-white border-rose-700'
+              : broadcastNotice.type === 'warning'
+              ? 'bg-amber-500 text-slate-950 border-amber-600'
+              : 'bg-blue-600 text-white border-blue-700'
+          }`}>
+            <Bell className="w-4 h-4 shrink-0 animate-bounce" />
+            <span><strong>{broadcastNotice.title}:</strong> {broadcastNotice.message}</span>
+          </div>
+        )}
+
         {/* Top Navbar - Fixed/Sticky at top in dashboard view */}
-        {activeView !== 'landing' && activeView !== 'exam' && (
+        {activeView !== 'landing' && activeView !== 'exam' && activeView !== 'admin' && (
           <Navigation
             currentRole={currentRole}
             onRoleChange={handleRoleChange}
@@ -413,6 +481,7 @@ export function App() {
             isHomeActive={false}
             onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
             isSidebarOpen={isSidebarOpen}
+            onOpenAdminDashboard={() => setActiveView('admin')}
           />
         )}
 
@@ -423,6 +492,17 @@ export function App() {
               onSelectRole={handleSelectRoleFromLanding}
               onOpenExamWithPin={handleOpenExamWithPinFromLanding}
               onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
+              onAdminLogin={handleAdminLogin}
+            />
+          ) : activeView === 'admin' ? (
+            <AdminDashboard
+              onExitAdmin={() => {
+                setActiveView('dashboard');
+                setCurrentRole('parent');
+              }}
+              onNavigateHome={handleNavigateHome}
+              onOpenTestPreview={handleOpenExam}
+              onOpenReviewModal={handleOpenReview}
             />
           ) : activeView === 'exam' && activeTest ? (
             <StartExamScreen
@@ -459,7 +539,7 @@ export function App() {
         </main>
 
         {/* Footer for Dashboard / Exam / Review screens */}
-        {activeView !== 'landing' && (
+        {activeView !== 'landing' && activeView !== 'admin' && (
           <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
             <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
               <p>© {new Date().getFullYear()} দাপাঠশালা পোর্টাল • একাডেমিক হাব</p>
