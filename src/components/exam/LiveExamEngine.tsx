@@ -418,7 +418,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     };
   }, [isReviewOnly, isSubmitted, violationCount]);
 
-  // Real-time AI Pupil Gaze & Note/Book Reading Detector (running every 280ms)
+  // Real-time AI Bilateral Eye Pair & Profile Gaze Detector (running every 220ms)
   useEffect(() => {
     if (isReviewOnly || isSubmitted || !cameraActive) return;
 
@@ -453,12 +453,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               const g = data[idx + 1];
               const b = data[idx + 2];
 
-              // Skin & face luminosity condition: robust to monitor glow, white LCD backlighting, and dark rooms
+              // Skin & face luminosity condition: robust to mobile screens, backlighting, shadows
               const maxC = Math.max(r, g, b);
               const minC = Math.min(r, g, b);
               const isSkinOrFace = (
-                (r > 40 && g > 25 && b > 15 && (r >= g * 0.88) && (maxC - minC > 6)) ||
-                (r > 60 && g > 45 && b > 35 && Math.abs(r - g) < 40 && r >= b * 0.80)
+                (r > 38 && g > 22 && b > 14 && (r >= g * 0.84) && (maxC - minC > 5)) ||
+                (r > 52 && g > 40 && b > 30 && Math.abs(r - g) < 45 && r >= b * 0.75)
               );
 
               if (isSkinOrFace) {
@@ -473,12 +473,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             }
           }
 
-          if (faceSkinCount > 35) {
+          if (faceSkinCount > 25) {
             hasCalibratedFaceRef.current = true;
           }
 
           const now = Date.now();
-          const canTriggerViolation = now - lastViolationTimeRef.current > 1100;
+          const canTriggerViolation = now - lastViolationTimeRef.current > 1000;
 
           // Manual test simulation button
           if (isSimulatingSuspicious) {
@@ -490,101 +490,110 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             return;
           }
 
-          // Case A: Face disappeared or student ducked completely out of frame into a book/lap
-          if (hasCalibratedFaceRef.current && faceSkinCount < 25) {
+          // Case A: Face missing or student ducked completely out of frame
+          if (hasCalibratedFaceRef.current && faceSkinCount < 20) {
+            consecutiveAwayCountRef.current++;
             setGazeStatus('looking_away');
-            if (canTriggerViolation) {
+            if (consecutiveAwayCountRef.current >= 2 && canTriggerViolation) {
               lastViolationTimeRef.current = now;
               triggerSuspiciousFlag('স্ক্রিন থেকে চোখ ও মুখ সরানো হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে পরীক্ষা দিন।');
             }
             return;
           }
 
-          if (faceSkinCount >= 25) {
-            const currentFaceCentroidY = weightedFaceY / faceSkinCount; // 0 to 75
-            const currentFaceCentroidX = weightedFaceX / faceSkinCount; // 0 to 100
-
+          if (faceSkinCount >= 20) {
             const faceH = Math.max(faceMaxY - faceMinY, 15);
             const faceW = Math.max(faceMaxX - faceMinX, 15);
 
-            // Step 2: Extract Eye & Pupil Zone within the upper face
-            const eyeTop = Math.max(0, Math.floor(faceMinY + faceH * 0.18));
-            const eyeBottom = Math.min(74, Math.floor(faceMinY + faceH * 0.46));
-            const eyeLeft = Math.max(0, Math.floor(faceMinX + faceW * 0.14));
-            const eyeRight = Math.min(99, Math.floor(faceMaxX - faceW * 0.14));
+            // Step 2: Bilateral Eye Detection (Left Eye Zone vs Right Eye Zone)
+            // When facing the screen forward, BOTH eyes must be visible in the left and right upper face!
+            const eyeTop = Math.max(0, Math.floor(faceMinY + faceH * 0.16));
+            const eyeBottom = Math.min(74, Math.floor(faceMinY + faceH * 0.48));
+            
+            const leftEyeLeft = Math.max(0, Math.floor(faceMinX + faceW * 0.10));
+            const leftEyeRight = Math.min(99, Math.floor(faceMinX + faceW * 0.46));
 
-            let darkPupilCount = 0;
-            let weightedPupilY = 0;
-            let weightedPupilX = 0;
+            const rightEyeLeft = Math.max(0, Math.floor(faceMinX + faceW * 0.54));
+            const rightEyeRight = Math.min(99, Math.floor(faceMinX + faceW * 0.90));
 
+            let leftDarkCount = 0;
+            let leftDarkY = 0;
+            let leftDarkX = 0;
+
+            let rightDarkCount = 0;
+            let rightDarkY = 0;
+            let rightDarkX = 0;
+
+            // Scan Left Eye Zone
             for (let ey = eyeTop; ey <= eyeBottom; ey++) {
-              for (let ex = eyeLeft; ex <= eyeRight; ex++) {
+              for (let ex = leftEyeLeft; ex <= leftEyeRight; ex++) {
                 const pIdx = (ey * 100 + ex) * 4;
-                const pr = data[pIdx];
-                const pg = data[pIdx + 1];
-                const pb = data[pIdx + 2];
-                const lum = 0.299 * pr + 0.587 * pg + 0.114 * pb;
-
-                // Pupil / iris / dark eyelash detector
-                if (lum < 78) {
-                  darkPupilCount++;
-                  weightedPupilY += ey;
-                  weightedPupilX += ex;
+                const lum = 0.299 * data[pIdx] + 0.587 * data[pIdx + 1] + 0.114 * data[pIdx + 2];
+                if (lum < 82) {
+                  leftDarkCount++;
+                  leftDarkY += ey;
+                  leftDarkX += ex;
                 }
               }
             }
 
-            // Relative pupil position inside the eye zone
-            let pupilRelY = 0.44;
-            let pupilRelX = 0.50;
-            if (darkPupilCount > 3 && (eyeBottom > eyeTop) && (eyeRight > eyeLeft)) {
-              pupilRelY = (weightedPupilY / darkPupilCount - eyeTop) / (eyeBottom - eyeTop);
-              pupilRelX = (weightedPupilX / darkPupilCount - eyeLeft) / (eyeRight - eyeLeft);
-            }
-
-            // Adaptive Baseline Calibration: continuously learn the student's natural looking-at-screen posture
-            if (calibrationSamplesCountRef.current < 10) {
-              calibrationSamplesCountRef.current++;
-              if (baselineFaceYRef.current === null) {
-                baselineFaceYRef.current = currentFaceCentroidY;
-                baselineFaceXRef.current = currentFaceCentroidX;
-                baselinePupilYRef.current = pupilRelY;
-                baselinePupilXRef.current = pupilRelX;
-              } else {
-                baselineFaceYRef.current = baselineFaceYRef.current * 0.7 + currentFaceCentroidY * 0.3;
-                baselineFaceXRef.current = baselineFaceXRef.current * 0.7 + currentFaceCentroidX * 0.3;
-                baselinePupilYRef.current = baselinePupilYRef.current * 0.7 + pupilRelY * 0.3;
-                baselinePupilXRef.current = baselinePupilXRef.current * 0.7 + pupilRelX * 0.3;
+            // Scan Right Eye Zone
+            for (let ey = eyeTop; ey <= eyeBottom; ey++) {
+              for (let ex = rightEyeLeft; ex <= rightEyeRight; ex++) {
+                const pIdx = (ey * 100 + ex) * 4;
+                const lum = 0.299 * data[pIdx] + 0.587 * data[pIdx + 1] + 0.114 * data[pIdx + 2];
+                if (lum < 82) {
+                  rightDarkCount++;
+                  rightDarkY += ey;
+                  rightDarkX += ex;
+                }
               }
             }
 
-            const baseFaceY = baselineFaceYRef.current ?? 34;
-            const baseFaceX = baselineFaceXRef.current ?? 50;
-            const basePupilY = baselinePupilYRef.current ?? 0.43;
-            const basePupilX = baselinePupilXRef.current ?? 0.50;
+            // A front-facing head ALWAYS sees both eye features
+            const leftEyeDetected = leftDarkCount >= 3;
+            const rightEyeDetected = rightDarkCount >= 3;
 
-            // Ultra-Strict Cheating Detection:
-            // 1. Looking Down with Eyes or Head (pupils roll down towards desk/book, or head tilts down)
-            const isLookingDownEyes = pupilRelY > (basePupilY + 0.055) || pupilRelY > 0.52;
-            const isLookingDownHead = currentFaceCentroidY > (baseFaceY + 2.0) || currentFaceCentroidY > 35.5;
+            // Relative pupil positions inside each eye box
+            const leftPupilRelY = leftDarkCount > 0 ? (leftDarkY / leftDarkCount - eyeTop) / (eyeBottom - eyeTop) : 0.5;
+            const rightPupilRelY = rightDarkCount > 0 ? (rightDarkY / rightDarkCount - eyeTop) / (eyeBottom - eyeTop) : 0.5;
+            const avgPupilRelY = (leftPupilRelY + rightPupilRelY) / 2;
 
-            // 2. Looking Left or Right (pupils shift to side, or head turns sideways)
-            const isLookingAwayEyes = Math.abs(pupilRelX - basePupilX) > 0.065 || pupilRelX < 0.42 || pupilRelX > 0.58;
-            const isLookingAwayHead = Math.abs(currentFaceCentroidX - baseFaceX) > 3.8 || currentFaceCentroidX < 39 || currentFaceCentroidX > 61;
+            const leftPupilRelX = leftDarkCount > 0 ? (leftDarkX / leftDarkCount - leftEyeLeft) / Math.max(leftEyeRight - leftEyeLeft, 1) : 0.5;
+            const rightPupilRelX = rightDarkCount > 0 ? (rightDarkX / rightDarkCount - rightEyeLeft) / Math.max(rightEyeRight - rightEyeLeft, 1) : 0.5;
+            const avgPupilRelX = (leftPupilRelX + rightPupilRelX) / 2;
 
-            if (isLookingDownEyes || isLookingDownHead) {
-              setGazeStatus('looking_down');
-              if (canTriggerViolation) {
-                lastViolationTimeRef.current = now;
-                triggerSuspiciousFlag('দৃষ্টি নিচে নামিয়ে বই বা নোট পড়ার চেষ্টা সনাক্ত হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে উত্তর দিন।');
-              }
-            } else if (isLookingAwayEyes || isLookingAwayHead) {
+            // Check 1: Head Turned Sideways in Profile (Exact case from user photo)
+            // In profile view: one eye is occluded, or eye asymmetry ratio is extreme (> 3.5x)
+            const isProfileHeadTurn = (!leftEyeDetected || !rightEyeDetected) || 
+              (leftDarkCount > 0 && rightDarkCount > 0 && (leftDarkCount / rightDarkCount > 3.5 || rightDarkCount / leftDarkCount > 3.5));
+
+            // Check 2: Eyes Glancing Left or Right (Pupils shifted horizontally)
+            const isLookingSideways = avgPupilRelX < 0.38 || avgPupilRelX > 0.62;
+
+            // Check 3: Eyes or Head Looking Down at Book/Notes
+            const isLookingDownAtBook = avgPupilRelY > 0.51 || (leftPupilRelY > 0.52 && rightPupilRelY > 0.52);
+
+            // Check 4: Head Pitched Downwards towards Desk/Lap
+            const currentFaceCentroidY = weightedFaceY / faceSkinCount;
+            const isHeadTiltedDown = currentFaceCentroidY > 36.0;
+
+            if (isProfileHeadTurn || isLookingSideways) {
+              consecutiveAwayCountRef.current++;
               setGazeStatus('looking_away');
-              if (canTriggerViolation) {
+              if (consecutiveAwayCountRef.current >= 2 && canTriggerViolation) {
                 lastViolationTimeRef.current = now;
                 triggerSuspiciousFlag('স্ক্রিন ছেড়ে অন্যদিকে তাকানোর চেষ্টা সনাক্ত হয়েছে! অনুগ্রহ করে স্ক্রিনের দিকে তাকিয়ে থাকুন।');
               }
+            } else if (isLookingDownAtBook || isHeadTiltedDown) {
+              consecutiveAwayCountRef.current++;
+              setGazeStatus('looking_down');
+              if (consecutiveAwayCountRef.current >= 2 && canTriggerViolation) {
+                lastViolationTimeRef.current = now;
+                triggerSuspiciousFlag('দৃষ্টি নিচে নামিয়ে বই বা নোট পড়ার চেষ্টা সনাক্ত হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে উত্তর দিন।');
+              }
             } else {
+              consecutiveAwayCountRef.current = 0;
               setGazeStatus('normal');
             }
           }
@@ -592,7 +601,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           // Canvas cross-origin or read error safe fallback
         }
       }
-    }, 280);
+    }, 220);
 
     return () => clearInterval(interval);
   }, [isReviewOnly, isSubmitted, cameraActive, isSimulatingSuspicious]);
