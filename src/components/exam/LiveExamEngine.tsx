@@ -60,7 +60,6 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [proctorLogs, setProctorLogs] = useState<string[]>([]);
   const [isSimulatingSuspicious, setIsSimulatingSuspicious] = useState(false);
-  const [showObservationModal, setShowObservationModal] = useState(false);
   const [isSpeakingAudio, setIsSpeakingAudio] = useState(false);
   const isViolatingRef = useRef<boolean>(false);
 
@@ -93,65 +92,66 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     2
   ) as 1 | 2 | 3 | 4;
 
+  // 4 Proctoring Strictness Levels (আন্তর্জাতিক অনলাইন পরীক্ষা স্ট্যান্ডার্ড - Pearson VUE / Mettl গাইডলাইন)
+  // প্রাকৃতিক মানবিক নড়াচড়ায় যেন কোনো মিথ্যা সতর্কবার্তা না আসে, এবং কেবল একটানা সচেতন অন্যদিকে তাকালে সতর্ক করা হয়
   const proctorConfig = {
     1: {
       levelNum: 1,
       name: 'লেভেল ১ (মৃদু)',
       tag: 'সহনশীল',
-      featureSkewThreshold: 0.18,
-      skinAsymmetryThreshold: 0.35,
-      yawCentroidThreshold: 12.0,
-      pitchDownThreshold: 9.5,
-      sideGlanceDev: 0.24,
-      consecutiveRequired: 3,
+      featureSkewThreshold: 0.25,
+      skinAsymmetryThreshold: 0.42,
+      yawCentroidThreshold: 15.0,
+      pitchDownThreshold: 12.0,
+      sideGlanceDev: 0.30,
+      consecutiveRequired: 10, // ~1.4s sustained look-away
     },
     2: {
       levelNum: 2,
       name: 'লেভেল ২ (মাঝারি)',
       tag: 'স্ট্যান্ডার্ড',
-      featureSkewThreshold: 0.15,
-      skinAsymmetryThreshold: 0.30,
-      yawCentroidThreshold: 9.0,
-      pitchDownThreshold: 8.0,
-      sideGlanceDev: 0.20,
-      consecutiveRequired: 2,
+      featureSkewThreshold: 0.21,
+      skinAsymmetryThreshold: 0.38,
+      yawCentroidThreshold: 12.0,
+      pitchDownThreshold: 10.0,
+      sideGlanceDev: 0.26,
+      consecutiveRequired: 8, // ~1.1s sustained look-away
     },
     3: {
       levelNum: 3,
-      name: 'লেভেল ৩ (কঠোর - আড় চোখ সনাক্ত)',
+      name: 'লেভেল ৩ (কঠোর)',
       tag: 'কঠোর',
-      featureSkewThreshold: 0.13,
-      skinAsymmetryThreshold: 0.27,
-      yawCentroidThreshold: 7.0,
-      pitchDownThreshold: 7.0,
-      sideGlanceDev: 0.18,
-      consecutiveRequired: 2,
+      featureSkewThreshold: 0.18,
+      skinAsymmetryThreshold: 0.34,
+      yawCentroidThreshold: 9.5,
+      pitchDownThreshold: 8.5,
+      sideGlanceDev: 0.23,
+      consecutiveRequired: 7, // ~1.0s sustained look-away
     },
     4: {
       levelNum: 4,
-      name: 'লেভেল ৪ (সর্বোচ্চ কঠোর - অতি-সংবেদনশীল)',
+      name: 'লেভেল ৪ (সর্বোচ্চ কঠোর - আন্তর্জাতিক প্রোটোকল)',
       tag: 'অতি-সংবেদনশীল',
-      // Calibrated: frontal face has skew ~0.04-0.07; turned head has skew ~0.16-0.35
-      // 0.11 accurately catches every head turn while never triggering on a straight face
-      featureSkewThreshold: 0.11,
-      // Calibrated: natural room lighting creates asymmetry ~0.10-0.18; turned face creates ~0.32-0.45
-      // 0.25 prevents room lighting false positives
-      skinAsymmetryThreshold: 0.25,
-      yawCentroidThreshold: 5.5,
-      pitchDownThreshold: 6.0,
-      sideGlanceDev: 0.17,
-      consecutiveRequired: 2, // 2 consecutive frames (~280ms) filters single-frame pixel noise & auto-exposure flicker
+      // Calibrated: frontal face has skew ~0.04-0.08; turned head has skew ~0.18-0.35
+      // 0.16 accurately catches every real head turn while allowing natural question reading
+      featureSkewThreshold: 0.16,
+      // 0.32 prevents room lighting/shadow false positives while catching true profile rotation
+      skinAsymmetryThreshold: 0.32,
+      yawCentroidThreshold: 8.5,
+      pitchDownThreshold: 7.5,
+      sideGlanceDev: 0.21,
+      consecutiveRequired: 6, // ~840ms sustained (filters micro-movements, blinks, and normal head sways)
     },
   }[effectiveProctoringLevel] || {
     levelNum: 2,
     name: 'লেভেল ২ (মাঝারি)',
     tag: 'স্ট্যান্ডার্ড',
-    featureSkewThreshold: 0.15,
-    skinAsymmetryThreshold: 0.30,
-    yawCentroidThreshold: 9.0,
-    pitchDownThreshold: 8.0,
-    sideGlanceDev: 0.20,
-    consecutiveRequired: 2,
+    featureSkewThreshold: 0.21,
+    skinAsymmetryThreshold: 0.38,
+    yawCentroidThreshold: 12.0,
+    pitchDownThreshold: 10.0,
+    sideGlanceDev: 0.26,
+    consecutiveRequired: 8,
   };
 
   // Spoken Voice Audio Alert (বাংলা কণ্ঠস্বরে অডিও আকারে সতর্কবার্তা)
@@ -646,14 +646,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           }
         }
 
-        // Case A: Face completely missing from camera frame (ducked or left seat)
+        // Case A: Face completely missing from camera frame (ducked or left seat for > 1.4s)
         if (faceSkinCount < 16) {
           faceMissingConsecutiveRef.current++;
-          if (faceMissingConsecutiveRef.current >= 2) {
+          if (faceMissingConsecutiveRef.current >= 10) {
             setGazeStatus('face_missing');
             setHeadStatus('turned');
             const isNewEvent = !isViolatingRef.current;
-            if (isNewEvent || now - lastViolationTimeRef.current > 3000) {
+            if (isNewEvent || now - lastViolationTimeRef.current > 6500) {
               lastViolationTimeRef.current = now;
               isViolatingRef.current = true;
               handleGazeAway('ক্যামেরা ফ্রেমে মুখ সনাক্ত হয়নি / দৃষ্টি বাইরে');
@@ -778,16 +778,16 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         // OR combines moderate skew with marked cheek asymmetry (both signals agreeing).
         // Directional room lighting alone (asymmetry ~0.10-0.18) without feature skew will NEVER trigger!
         const isStrongFeatureTurn = featureSkew > proctorConfig.featureSkewThreshold;
-        const isCombinedTurn = (featureSkew > (proctorConfig.featureSkewThreshold * 0.72)) && (skinAsymmetry > proctorConfig.skinAsymmetryThreshold);
-        const isExtremeAsymmetryTurn = (skinAsymmetry > 0.38) && (featureSkew > 0.07);
-        const isTurnedByProfileRatio = (faceW / faceH < 0.50);
+        const isCombinedTurn = (featureSkew > (proctorConfig.featureSkewThreshold * 0.75)) && (skinAsymmetry > proctorConfig.skinAsymmetryThreshold);
+        const isExtremeAsymmetryTurn = (skinAsymmetry > 0.44) && (featureSkew > 0.10);
+        const isTurnedByProfileRatio = (faceW / faceH < 0.48);
         const isTurnedByCentroidShift = (Math.abs(centroidX - baseX) > proctorConfig.yawCentroidThreshold);
         const isTurnedBackwards = upperDarkHairCount > 130 && faceSkinCount < 35;
 
         const isHeadTurned = isStrongFeatureTurn || isCombinedTurn || isExtremeAsymmetryTurn || isTurnedByProfileRatio || isTurnedByCentroidShift || isTurnedBackwards;
 
         // 5. Head Pitched Downwards toward desk or lap (বই বা নোট দেখার চেষ্টা)
-        const isHeadDownAtDesk = (centroidY > baseY + proctorConfig.pitchDownThreshold) || (faceMinY > 26 && faceH < 30);
+        const isHeadDownAtDesk = (centroidY > baseY + proctorConfig.pitchDownThreshold) || (faceMinY > 28 && faceH < 28);
 
         if (isHeadTurned) {
           headTurnConsecutiveRef.current++;
@@ -797,7 +797,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           setGazeStatus('looking_away');
 
           const isNewTurn = !isViolatingRef.current;
-          if (headTurnConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 4000)) {
+          if (headTurnConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 7000)) {
             lastViolationTimeRef.current = now;
             isViolatingRef.current = true;
             handleGazeAway('মাথা ও দৃষ্টি অন্যদিকে ঘোরানো সনাক্ত হয়েছে');
@@ -810,7 +810,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           setGazeStatus('side_glance');
 
           const isNewTurn = !isViolatingRef.current;
-          if (sideGlanceConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 4000)) {
+          if (sideGlanceConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 7000)) {
             lastViolationTimeRef.current = now;
             isViolatingRef.current = true;
             handleGazeAway('আড় চোখে এদিক-সেদিক তাকানো সনাক্ত হয়েছে');
@@ -823,7 +823,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           setGazeStatus('looking_down');
 
           const isNewTurn = !isViolatingRef.current;
-          if (lookDownConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 4000)) {
+          if (lookDownConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 7000)) {
             lastViolationTimeRef.current = now;
             isViolatingRef.current = true;
             handleGazeAway('দৃষ্টি নিচে নামিয়ে বই বা নোট দেখার চেষ্টা সনাক্ত হয়েছে');
@@ -835,6 +835,13 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           isViolatingRef.current = false;
           setHeadStatus('forward');
           setGazeStatus('normal');
+
+          // International Standard: Continuous smooth adaptive baseline
+          // Absorbs natural sitting posture micro-drifts so a relaxed examinee never gets false alarms
+          if (hasCalibratedFaceRef.current && centroidX > 22 && centroidX < 58 && centroidY > 12 && centroidY < 42) {
+            baselineFaceXRef.current = (baselineFaceXRef.current! * 0.985) + (centroidX * 0.015);
+            baselineFaceYRef.current = (baselineFaceYRef.current! * 0.985) + (centroidY * 0.015);
+          }
         }
 
       } catch (err) {
@@ -874,14 +881,13 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       return;
     }
 
-    // Every 3 warnings (3rd, 6th, 9th, 12th...), trigger voice audio announcement and modal
+    // Every 3 warnings (3rd, 6th, 9th, 12th...), trigger voice audio announcement without blocking modal
     if (next % 3 === 0) {
-      setShowObservationModal(true);
-      setLastWarning("“প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।”");
+      setLastWarning(`“প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।” (সতর্কতা: ${next}/৫০)`);
       speakObservationAudio("প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।");
       setTimeout(() => {
         setLastWarning(null);
-      }, 6000);
+      }, 5500);
     } else {
       // Immediate floating warning banner on other warnings (1, 2, 4, 5, 7, 8...)
       setLastWarning(`⚠️ ${reason}! সতর্কতা: ${next}/৫০ (অনুগ্রহ করে প্রশ্নপত্রে দৃষ্টি রাখুন)`);
@@ -1091,86 +1097,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         </div>
       )}
 
-      {/* 3-Warning Periodic Observation Alert Modal with Spoken Voice Audio */}
-      {showObservationModal && !isReviewOnly && !isSubmitted && (
-        <div className="fixed inset-0 z-[120] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-          <div className="max-w-lg w-full bg-slate-900 border-2 border-amber-500 rounded-3xl p-6 sm:p-8 text-center text-white space-y-5 shadow-2xl shadow-amber-500/25 ring-4 ring-amber-500/30 animate-in zoom-in-95">
-            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto border-2 border-amber-500/40 animate-pulse">
-              <Eye className="w-9 h-9" />
-            </div>
-
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black border border-amber-500/40">
-                <ShieldAlert className="w-4 h-4 text-amber-400" />
-                <span>প্রক্টরিং সতর্কতা ({violationCount}/৫০)</span>
-              </div>
-
-              <h3 className="text-xl sm:text-2xl font-black text-amber-300 tracking-tight leading-snug">
-                “প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।”
-              </h3>
-
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-                ক্যামেরা সেন্সর দ্বারা আপনার মুখ ও চোখের দৃষ্টি সার্বক্ষণিক ট্র্যাক করা হচ্ছে। প্রশ্নপত্র ছাড়া অন্য কোনো দিকে তাকানো বা নজর সরানো কঠোর প্রক্টরিং নীতিমালার লঙ্ঘন।
-              </p>
-            </div>
-
-            {/* Spoken Voice Audio Player & Replay Bar */}
-            <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-between gap-3 text-amber-200">
-              <div className="flex items-center gap-2 text-xs font-bold text-left">
-                <div className="relative">
-                  <Volume2 className={`w-5 h-5 text-amber-400 ${isSpeakingAudio ? "animate-bounce" : ""}`} />
-                  {isSpeakingAudio && (
-                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
-                  )}
-                </div>
-                <div>
-                  <span className="block font-black text-amber-300">
-                    {isSpeakingAudio ? "🔊 অডিও বার্তা বাজছে..." : "🔊 সতর্কতামূলক অডিও বার্তা"}
-                  </span>
-                  <span className="text-[10px] text-slate-300 font-normal">
-                    {isSpeakingAudio ? "বাংলা কণ্ঠস্বরে বলা হচ্ছে" : "স্বয়ংক্রিয়ভাবে অডিও বার্তাটি শোনানো হচ্ছে"}
-                  </span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => speakObservationAudio("প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।")}
-                className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-md shrink-0"
-                title="বার্তাটি অডিও আকারে পুনরায় শুনুন"
-              >
-                <Play className="w-3.5 h-3.5 fill-current" />
-                <span>পুনরায় শুনুন</span>
-              </button>
-            </div>
-
-            <div className="p-3 rounded-2xl bg-slate-800/90 border border-slate-700 text-xs text-amber-200 font-semibold flex items-center justify-between">
-              <span className="text-slate-400">বর্তমান মোট সতর্কতা:</span>
-              <span className="text-amber-400 font-mono font-bold text-sm">{violationCount}/৫০ বার</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-                  window.speechSynthesis.cancel();
-                }
-                setIsSpeakingAudio(false);
-                setShowObservationModal(false);
-              }}
-              className="w-full py-3.5 px-5 rounded-2xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/30 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              <span>আমি বুঝতে পেরেছি • প্রশ্নপত্রে ফিরে যান</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Realtime Anti-Cheating Floating Warning */}
-      {lastWarning && !showObservationModal && (
+      {/* Realtime Anti-Cheating Floating Warning (Non-blocking notification bar at top) */}
+      {lastWarning && (
         <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-[110] bg-rose-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-black border-2 border-rose-300 ring-4 ring-rose-500/40 animate-bounce max-w-[92vw] sm:max-w-xl text-center">
-          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-200 animate-pulse" />
+          {isSpeakingAudio ? (
+            <Volume2 className="w-5 h-5 shrink-0 text-amber-300 animate-pulse" />
+          ) : (
+            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-200 animate-pulse" />
+          )}
           <span>{lastWarning}</span>
         </div>
       )}
