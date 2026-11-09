@@ -99,59 +99,56 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       levelNum: 1,
       name: 'লেভেল ১ (মৃদু)',
       tag: 'সহনশীল',
-      featureSkewThreshold: 0.25,
-      skinAsymmetryThreshold: 0.42,
-      yawCentroidThreshold: 15.0,
+      featureSkewThreshold: 0.20,
+      skinAsymmetryThreshold: 0.38,
+      yawCentroidThreshold: 10.0,
       pitchDownThreshold: 12.0,
-      sideGlanceDev: 0.30,
-      consecutiveRequired: 10, // ~1.4s sustained look-away
+      sideGlanceDev: 0.28,
+      consecutiveRequired: 5, // ~700ms sustained look-away
     },
     2: {
       levelNum: 2,
       name: 'লেভেল ২ (মাঝারি)',
       tag: 'স্ট্যান্ডার্ড',
-      featureSkewThreshold: 0.21,
-      skinAsymmetryThreshold: 0.38,
-      yawCentroidThreshold: 12.0,
+      featureSkewThreshold: 0.17,
+      skinAsymmetryThreshold: 0.32,
+      yawCentroidThreshold: 8.5,
       pitchDownThreshold: 10.0,
-      sideGlanceDev: 0.26,
-      consecutiveRequired: 8, // ~1.1s sustained look-away
+      sideGlanceDev: 0.25,
+      consecutiveRequired: 4, // ~560ms sustained look-away
     },
     3: {
       levelNum: 3,
       name: 'লেভেল ৩ (কঠোর)',
       tag: 'কঠোর',
-      featureSkewThreshold: 0.18,
-      skinAsymmetryThreshold: 0.34,
-      yawCentroidThreshold: 9.5,
+      featureSkewThreshold: 0.14,
+      skinAsymmetryThreshold: 0.28,
+      yawCentroidThreshold: 7.5,
       pitchDownThreshold: 8.5,
-      sideGlanceDev: 0.23,
-      consecutiveRequired: 7, // ~1.0s sustained look-away
+      sideGlanceDev: 0.22,
+      consecutiveRequired: 3, // ~420ms sustained look-away
     },
     4: {
       levelNum: 4,
       name: 'লেভেল ৪ (সর্বোচ্চ কঠোর - আন্তর্জাতিক প্রোটোকল)',
       tag: 'অতি-সংবেদনশীল',
-      // Calibrated: frontal face has skew ~0.04-0.08; turned head has skew ~0.18-0.35
-      // 0.16 accurately catches every real head turn while allowing natural question reading
-      featureSkewThreshold: 0.16,
-      // 0.32 prevents room lighting/shadow false positives while catching true profile rotation
-      skinAsymmetryThreshold: 0.32,
-      yawCentroidThreshold: 8.5,
+      featureSkewThreshold: 0.12,
+      skinAsymmetryThreshold: 0.24,
+      yawCentroidThreshold: 6.5,
       pitchDownThreshold: 7.5,
-      sideGlanceDev: 0.21,
-      consecutiveRequired: 6, // ~840ms sustained (filters micro-movements, blinks, and normal head sways)
+      sideGlanceDev: 0.19,
+      consecutiveRequired: 2, // ~280ms sustained look-away
     },
   }[effectiveProctoringLevel] || {
     levelNum: 2,
     name: 'লেভেল ২ (মাঝারি)',
     tag: 'স্ট্যান্ডার্ড',
-    featureSkewThreshold: 0.21,
-    skinAsymmetryThreshold: 0.38,
-    yawCentroidThreshold: 12.0,
+    featureSkewThreshold: 0.17,
+    skinAsymmetryThreshold: 0.32,
+    yawCentroidThreshold: 8.5,
     pitchDownThreshold: 10.0,
-    sideGlanceDev: 0.26,
-    consecutiveRequired: 8,
+    sideGlanceDev: 0.25,
+    consecutiveRequired: 4,
   };
 
   // Spoken Voice Audio Alert (বাংলা কণ্ঠস্বরে অডিও আকারে সতর্কবার্তা)
@@ -684,23 +681,68 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         const baseX = baselineFaceXRef.current ?? 40;
         const baseY = baselineFaceYRef.current ?? 26;
 
-        // Analyze facial symmetry, cheek area, and dark features (eyes, nose, mouth)
-        let leftSkinCount = 0;
-        let rightSkinCount = 0;
+        // Isolate true HEAD region from bare shoulders, chest, or torso
+        // The head sits in the top 24-28 pixels from faceMinY
+        const headMaxY = Math.min(faceMinY + 26, 52);
+
+        let headSkinCount = 0;
+        let headWeightedX = 0;
+        let headMinX = 80, headMaxX = 0;
+        let headLeftSkin = 0; // skin in left half of frame (x < 40)
+        let headRightSkin = 0; // skin in right half of frame (x >= 40)
+        let headHairCount = 0;
+        let headHairWeightedX = 0;
+        let headSkinLumSum = 0;
+
+        for (let y = Math.max(0, faceMinY - 8); y <= headMaxY; y++) {
+          for (let x = 0; x < 80; x++) {
+            const idx = (y * 80 + x) * 4;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+            const lum = r * 0.299 + g * 0.587 + b * 0.114;
+
+            const isSkin = (
+              (r > 36 && g > 20 && b > 14 && r >= g && g >= b * 0.68 && (r - g) >= 3) ||
+              (r > 48 && g > 34 && b > 24 && Math.abs(r - g) < 55 && (r - b) >= 4) ||
+              (r > 72 && g > 48 && b > 32 && r > b)
+            );
+
+            if (y >= faceMinY && isSkin) {
+              headSkinCount++;
+              headWeightedX += x;
+              headSkinLumSum += lum;
+              if (x < headMinX) headMinX = x;
+              if (x > headMaxX) headMaxX = x;
+              if (x < 40) headLeftSkin++;
+              else headRightSkin++;
+            } else if (!isSkin && (lum < 68 || (r < 65 && g < 65 && b < 70))) {
+              headHairCount++;
+              headHairWeightedX += x;
+            }
+          }
+        }
+
+        const headCentroidX = headSkinCount > 0 ? (headWeightedX / headSkinCount) : centroidX;
+        const headW = Math.max(headMaxX - headMinX, 10);
+        const headMidX = (headMinX + headMaxX) / 2;
+        const avgSkinLum = headSkinCount > 0 ? (headSkinLumSum / headSkinCount) : 110;
+        const darkFeatureThreshold = Math.min(84, avgSkinLum * 0.75);
+
+        // 1. Cheek Skin Asymmetry inside the head region
+        let leftCheekSkin = 0;
+        let rightCheekSkin = 0;
         let darkFeatureCount = 0;
         let darkFeatureWeightedX = 0;
 
-        const featureTopY = Math.floor(faceMinY + faceH * 0.14);
-        const featureBottomY = Math.floor(faceMinY + faceH * 0.80);
-
-        // Eye band for glance tracking
-        const eyeTop = Math.floor(faceMinY + faceH * 0.15);
-        const eyeBottom = Math.floor(faceMinY + faceH * 0.45);
+        // Eye socket specific analysis
+        const eyeTop = Math.floor(faceMinY + 3);
+        const eyeBottom = Math.floor(faceMinY + 14);
         let leftEyeDarkX = 0, leftEyeDarkCount = 0;
         let rightEyeDarkX = 0, rightEyeDarkCount = 0;
 
-        for (let y = faceMinY; y <= faceMaxY; y++) {
-          for (let x = faceMinX; x <= faceMaxX; x++) {
+        for (let y = faceMinY; y <= headMaxY; y++) {
+          for (let x = headMinX; x <= headMaxX; x++) {
             const idx = (y * 80 + x) * 4;
             const r = data[idx];
             const g = data[idx + 1];
@@ -714,25 +756,20 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             );
 
             if (isSkin) {
-              if (x < faceMidX) {
-                leftSkinCount++;
-              } else {
-                rightSkinCount++;
-              }
+              if (x < headMidX) leftCheekSkin++;
+              else rightCheekSkin++;
             }
 
-            // Dark features (eyes, eyebrows, nostrils, lips)
-            if (y >= featureTopY && y <= featureBottomY) {
-              if (lum < 78 || (!isSkin && lum < 98)) {
-                darkFeatureCount++;
-                darkFeatureWeightedX += x;
-              }
+            // Dark features (eyes, eyebrows, nostrils, lips, ear contour)
+            if (lum < darkFeatureThreshold || (!isSkin && lum < 95)) {
+              darkFeatureCount++;
+              darkFeatureWeightedX += x;
             }
 
-            // Eye socket specific analysis
+            // Eye socket band
             if (y >= eyeTop && y <= eyeBottom) {
-              if (lum < 75) {
-                if (x < faceMidX) {
+              if (lum < darkFeatureThreshold) {
+                if (x < headMidX) {
                   leftEyeDarkX += x;
                   leftEyeDarkCount++;
                 } else {
@@ -744,47 +781,61 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           }
         }
 
-        // 1. Cheek Skin Distribution Asymmetry (Turning head sideways exposes one cheek while hiding the other)
-        const totalCheekSkin = leftSkinCount + rightSkinCount;
-        const skinAsymmetry = totalCheekSkin > 20
-          ? Math.abs(leftSkinCount - rightSkinCount) / totalCheekSkin
+        // Cheek skin distribution asymmetry (inside the isolated head)
+        const totalHeadCheek = leftCheekSkin + rightCheekSkin;
+        const skinAsymmetry = totalHeadCheek > 15
+          ? Math.abs(leftCheekSkin - rightCheekSkin) / totalHeadCheek
           : 0;
 
-        // 2. Feature Skew (Nose and eyes cluster shift away from geometric midpoint when head rotates)
+        // Feature skew inside the isolated head
         let featureSkew = 0;
-        if (darkFeatureCount >= 5) {
+        if (darkFeatureCount >= 3) {
           const featureCenterX = darkFeatureWeightedX / darkFeatureCount;
-          featureSkew = Math.abs(featureCenterX - faceMidX) / faceW;
+          featureSkew = Math.abs(featureCenterX - headMidX) / headW;
         }
 
-        // 3. Eye Pupil Lateral Glance (আড় চোখে এদিক-সেদিক তাকানো)
+        // Lateral Glance (আড় চোখে এদিক-সেদিক তাকানো)
         let isSideGlance = false;
         if (leftEyeDarkCount >= 2 && rightEyeDarkCount >= 2) {
           const leftEyeCenter = leftEyeDarkX / leftEyeDarkCount;
           const rightEyeCenter = rightEyeDarkX / rightEyeDarkCount;
-          const leftEyeRel = (leftEyeCenter - faceMinX) / faceW;
-          const rightEyeRel = (rightEyeCenter - faceMinX) / faceW;
+          const leftEyeRel = (leftEyeCenter - headMinX) / headW;
+          const rightEyeRel = (rightEyeCenter - headMinX) / headW;
           const avgEyeRel = (leftEyeRel + rightEyeRel) / 2;
           
           if (avgEyeRel < (0.5 - proctorConfig.sideGlanceDev) || avgEyeRel > (0.5 + proctorConfig.sideGlanceDev)) {
             isSideGlance = true;
           }
-        } else if ((leftEyeDarkCount >= 4 && rightEyeDarkCount === 0) || (rightEyeDarkCount >= 4 && leftEyeDarkCount === 0)) {
+        } else if ((leftEyeDarkCount >= 3 && rightEyeDarkCount === 0) || (rightEyeDarkCount >= 3 && leftEyeDarkCount === 0)) {
           isSideGlance = true;
         }
 
-        // 4. Head Turned Sideways or Backwards (মাথা সম্পূর্ণ অন্যদিকে ঘুরানো)
-        // Multi-Factor Detection: True head rotation shifts nose/eyes away from center (> threshold)
-        // OR combines moderate skew with marked cheek asymmetry (both signals agreeing).
-        // Directional room lighting alone (asymmetry ~0.10-0.18) without feature skew will NEVER trigger!
-        const isStrongFeatureTurn = featureSkew > proctorConfig.featureSkewThreshold;
-        const isCombinedTurn = (featureSkew > (proctorConfig.featureSkewThreshold * 0.75)) && (skinAsymmetry > proctorConfig.skinAsymmetryThreshold);
-        const isExtremeAsymmetryTurn = (skinAsymmetry > 0.44) && (featureSkew > 0.10);
-        const isTurnedByProfileRatio = (faceW / faceH < 0.48);
-        const isTurnedByCentroidShift = (Math.abs(centroidX - baseX) > proctorConfig.yawCentroidThreshold);
-        const isTurnedBackwards = upperDarkHairCount > 130 && faceSkinCount < 35;
+        // Head Profile Hair vs Face Yaw (In profile view, face skin and hair are on opposite horizontal sides)
+        let isProfileHairYaw = false;
+        if (headHairCount > 12 && headSkinCount > 20) {
+          const hairCenterX = headHairWeightedX / headHairCount;
+          if (Math.abs(headCentroidX - hairCenterX) > 6.5) {
+            isProfileHairYaw = true;
+          }
+        }
 
-        const isHeadTurned = isStrongFeatureTurn || isCombinedTurn || isExtremeAsymmetryTurn || isTurnedByProfileRatio || isTurnedByCentroidShift || isTurnedBackwards;
+        // Head Screen Side Shift (head skin concentrated almost entirely on one side of frame)
+        const headScreenAsymmetry = headSkinCount > 20
+          ? Math.abs(headLeftSkin - headRightSkin) / headSkinCount
+          : 0;
+
+        // Head Centroid lateral shift away from forward baseline
+        const headCentroidShift = Math.abs(headCentroidX - baseX);
+
+        // Head Turned Sideways, Profile or Backwards
+        const isStrongFeatureTurn = featureSkew > proctorConfig.featureSkewThreshold;
+        const isCombinedTurn = (featureSkew > (proctorConfig.featureSkewThreshold * 0.70)) && (skinAsymmetry > (proctorConfig.skinAsymmetryThreshold * 0.70));
+        const isExtremeAsymmetryTurn = (skinAsymmetry > 0.38);
+        const isTurnedByCentroidShift = headCentroidShift > proctorConfig.yawCentroidThreshold;
+        const isTurnedByScreenShift = headScreenAsymmetry > 0.46;
+        const isTurnedBackwards = upperDarkHairCount > 110 && headSkinCount < 30;
+
+        const isHeadTurned = isStrongFeatureTurn || isCombinedTurn || isExtremeAsymmetryTurn || isTurnedByCentroidShift || isTurnedByScreenShift || isProfileHairYaw || isTurnedBackwards;
 
         if (isHeadTurned) {
           headTurnConsecutiveRef.current++;
@@ -794,7 +845,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           setGazeStatus('looking_away');
 
           const isNewTurn = !isViolatingRef.current;
-          if (headTurnConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 7000)) {
+          if (headTurnConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 4200)) {
             lastViolationTimeRef.current = now;
             isViolatingRef.current = true;
             handleGazeAway('মাথা ও দৃষ্টি অন্যদিকে ঘোরানো সনাক্ত হয়েছে');
@@ -807,7 +858,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           setGazeStatus('side_glance');
 
           const isNewTurn = !isViolatingRef.current;
-          if (sideGlanceConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 7000)) {
+          if (sideGlanceConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 4200)) {
             lastViolationTimeRef.current = now;
             isViolatingRef.current = true;
             handleGazeAway('আড় চোখে এদিক-সেদিক তাকানো সনাক্ত হয়েছে');
@@ -1252,11 +1303,20 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 </button>
               </div>
 
+              {/* Permanent Warning Advisory Notice inside Floating Camera Window */}
+              <div className="w-full mt-1.5 p-1.5 rounded-xl bg-gradient-to-br from-amber-950/95 via-rose-950/90 to-amber-950/95 border border-amber-500/70 text-amber-200 text-[7.5px] sm:text-[8px] font-bold leading-relaxed text-center shadow-xs">
+                <div className="flex items-center justify-center gap-1 text-[7px] text-amber-400 font-black mb-0.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
+                  <span className="uppercase tracking-wider">সার্বক্ষণিক প্রক্টরিং নির্দেশনা</span>
+                </div>
+                “দয়া করে নকল করার কোন চেষ্টা করবেন না। যদি করেন তাহলে সেটি রেকর্ড করা হবে এবং আপনার অভিভাবকের নিকট তা পাঠিয়ে দেওয়া হবে।”
+              </div>
+
               {!cameraActive && (
                 <button
                   type="button"
                   onClick={requestWebcamAccess}
-                  className="w-full py-1 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[8px] sm:text-[8.5px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-xs mt-0.5"
+                  className="w-full py-1 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[8px] sm:text-[8.5px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-xs mt-1"
                 >
                   <Camera className="w-2.5 h-2.5" />
                   <span>ক্যামেরা অন করুন</span>
@@ -1361,6 +1421,29 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           </div>
         )}
       </div>
+
+      {/* Permanent Anti-Cheating Advisory Notice (Always visible on screen during exam) */}
+      {!isReviewOnly && !isSubmitted && (
+        <div className="bg-gradient-to-r from-amber-50 via-rose-50/70 to-amber-50 border-2 border-amber-300/90 rounded-2xl p-3.5 sm:p-4.5 shadow-xs flex items-start sm:items-center gap-3 sm:gap-4 text-slate-800 transition-all">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm border border-amber-300">
+            <ShieldAlert className="w-5 h-5 sm:w-6 sm:h-6 animate-pulse" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-950 bg-amber-200/90 px-2 py-0.5 rounded-md border border-amber-300 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping"></span>
+                সার্বক্ষণিক অ্যান্টি-চিটিং নজরদারি
+              </span>
+              <span className="text-[10px] text-slate-500 font-semibold hidden md:inline">
+                • ওয়েবক্যাম ও সিস্টেম অ্যাক্টিভিটি স্বয়ংক্রিয়ভাবে রেকর্ড হচ্ছে
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm md:text-[14.5px] font-black text-slate-900 leading-snug">
+              “দয়া করে নকল করার কোন চেষ্টা করবেন না। যদি করেন তাহলে সেটি রেকর্ড করা হবে এবং আপনার অভিভাবকের নিকট তা পাঠিয়ে দেওয়া হবে।”
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Parent Feedback & Approved Score Banner (When Reviewed) */}
       {(isReviewOnly || isReviewed) && test.parentComment && (
