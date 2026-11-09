@@ -2779,11 +2779,11 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* MODAL 2: GRADING & PARENT FEEDBACK MODAL                 */}
       {/* ======================================================== */}
       {reviewTest && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-2xl w-full border border-slate-200 shadow-2xl space-y-5 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
+        <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-xs overflow-y-auto p-3 sm:p-6 flex justify-center items-start">
+          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-2xl w-full border border-slate-200 shadow-2xl space-y-5 my-4 sm:my-8 relative">
+            <div className="flex items-start justify-between pb-3 border-b border-slate-100 gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2 mb-1.5">
                   <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800">
                     খাতা মূল্যায়ন ও মন্তব্য
                   </span>
@@ -2792,16 +2792,17 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                     <span>জমার সময়: {formatSubmissionDateTime(reviewTest)}</span>
                   </span>
                 </div>
-                <h3 className="text-lg font-black text-slate-900 mt-1">
+                <h3 className="text-base sm:text-lg font-black text-slate-900 leading-snug">
                   {reviewTest.title}
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setReviewTest(null)}
-                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700"
+                className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 shrink-0 cursor-pointer"
+                title="বন্ধ করুন"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 

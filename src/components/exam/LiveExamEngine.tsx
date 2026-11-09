@@ -61,24 +61,45 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const submitSectionRef = useRef<HTMLDivElement | null>(null);
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const fallbackAnimationRef = useRef<number | null>(null);
+  const hasCalibratedFaceRef = useRef<boolean>(false);
+  const consecutiveAwayCountRef = useRef<number>(0);
+  const lastViolationTimeRef = useRef<number>(0);
 
-  // Soft Warning Audio Beep
+  // Sharp Anti-Cheating Audible Warning Alarm (Two-tone alert)
   const playWarningBeep = () => {
     try {
       const AudioCtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtxClass) return;
       const audioCtx = new AudioCtxClass();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(480, audioCtx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.22);
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.22);
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      // First beep pulse
+      const osc1 = audioCtx.createOscillator();
+      const gain1 = audioCtx.createGain();
+      osc1.type = 'sawtooth';
+      osc1.frequency.setValueAtTime(750, audioCtx.currentTime);
+      osc1.frequency.exponentialRampToValueAtTime(980, audioCtx.currentTime + 0.12);
+      gain1.gain.setValueAtTime(0.35, audioCtx.currentTime);
+      gain1.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+      osc1.connect(gain1);
+      gain1.connect(audioCtx.destination);
+      osc1.start(audioCtx.currentTime);
+      osc1.stop(audioCtx.currentTime + 0.15);
+
+      // Second sharp alert pulse
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      osc2.type = 'sawtooth';
+      osc2.frequency.setValueAtTime(980, audioCtx.currentTime + 0.18);
+      osc2.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.32);
+      gain2.gain.setValueAtTime(0.35, audioCtx.currentTime + 0.18);
+      gain2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+      osc2.start(audioCtx.currentTime + 0.18);
+      osc2.stop(audioCtx.currentTime + 0.35);
     } catch {}
   };
 
@@ -391,7 +412,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     };
   }, [isReviewOnly, isSubmitted, violationCount]);
 
-  // Real-time AI Gaze & Note/Book Reading Detector (running every 1.5 seconds)
+  // Real-time AI Gaze & Note/Book Reading Detector (running every 900ms)
   useEffect(() => {
     if (isReviewOnly || isSubmitted || !cameraActive) return;
 
@@ -424,8 +445,10 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               const g = data[idx + 1];
               const b = data[idx + 2];
 
-              // Skin-tone / face luminosity heuristic
-              const isSkin = r > 70 && g > 45 && b > 25 && r > b && (r - g) > 12;
+              // Robust skin-tone / face luminosity heuristic
+              const maxVal = Math.max(r, g, b);
+              const minVal = Math.min(r, g, b);
+              const isSkin = r > 50 && g > 30 && b > 15 && (maxVal - minVal) > 10 && r >= g && r >= b;
               if (isSkin) {
                 totalWeight++;
                 weightedY += y;
@@ -435,18 +458,60 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           }
 
           if (totalWeight > 40) {
-            const centroidY = weightedY / totalWeight; // 0 to 60
-            const centroidX = weightedX / totalWeight; // 0 to 80
+            hasCalibratedFaceRef.current = true;
+          }
 
-            // If head/face centroid is tilted down towards desk (reading notes/books):
-            // Normal upright posture is Y in [15, 34]. Y > 38 indicates looking down at desk
-            if (centroidY > 38 || isSimulatingSuspicious) {
-              setGazeStatus('looking_down');
+          const now = Date.now();
+          const canTriggerViolation = now - lastViolationTimeRef.current > 2600;
+
+          // Manual test simulation button
+          if (isSimulatingSuspicious) {
+            setGazeStatus('looking_down');
+            if (canTriggerViolation) {
+              lastViolationTimeRef.current = now;
               triggerSuspiciousFlag('দৃষ্টি নিচে নামিয়ে বই বা নোট পড়ার চেষ্টা সনাক্ত হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে উত্তর দিন।');
-            } else if (centroidX < 18 || centroidX > 62) {
+            }
+            return;
+          }
+
+          // If face was previously detected but now absent (student looked down into lap/book, face obscured, or turned away)
+          if (hasCalibratedFaceRef.current && totalWeight < 25) {
+            consecutiveAwayCountRef.current += 1;
+            if (consecutiveAwayCountRef.current >= 2) {
               setGazeStatus('looking_away');
-              triggerSuspiciousFlag('স্ক্রিন ছেড়ে অন্য দিকে তাকানোর চেষ্টা সনাক্ত হয়েছে! অনুগ্রহ করে স্ক্রিনের দিকে তাকিয়ে থাকুন।');
-            } else {
+              if (canTriggerViolation) {
+                lastViolationTimeRef.current = now;
+                triggerSuspiciousFlag('স্ক্রিন থেকে চোখ ও মুখ সরানো হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে পরীক্ষা দিন।');
+              }
+            }
+            return;
+          }
+
+          if (totalWeight >= 25) {
+            const centroidY = weightedY / totalWeight; // 0 to 60 (normal upright eye/face level is 18-29)
+            const centroidX = weightedX / totalWeight; // 0 to 80 (normal horizontal center is 28-52)
+
+            // Detected Looking Down: Head or gaze pitched downward towards notebook/desk
+            if (centroidY > 31) {
+              consecutiveAwayCountRef.current += 1;
+              setGazeStatus('looking_down');
+              if (canTriggerViolation) {
+                lastViolationTimeRef.current = now;
+                triggerSuspiciousFlag('দৃষ্টি নিচে নামিয়ে বই বা নোট পড়ার চেষ্টা সনাক্ত হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে উত্তর দিন।');
+              }
+            }
+            // Detected Looking Away: Head or gaze shifted left or right
+            else if (centroidX < 24 || centroidX > 56) {
+              consecutiveAwayCountRef.current += 1;
+              setGazeStatus('looking_away');
+              if (canTriggerViolation) {
+                lastViolationTimeRef.current = now;
+                triggerSuspiciousFlag('স্ক্রিন ছেড়ে অন্যদিকে তাকানোর চেষ্টা সনাক্ত হয়েছে! অনুগ্রহ করে স্ক্রিনের দিকে তাকিয়ে থাকুন।');
+              }
+            }
+            // Normal: Looking directly at exam screen
+            else {
+              consecutiveAwayCountRef.current = 0;
               setGazeStatus('normal');
             }
           }
@@ -454,7 +519,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           // Canvas cross-origin or read error safe fallback
         }
       }
-    }, 1800);
+    }, 900);
 
     return () => clearInterval(interval);
   }, [isReviewOnly, isSubmitted, cameraActive, isSimulatingSuspicious]);
@@ -681,8 +746,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
       {/* Realtime Anti-Cheating Floating Warning */}
       {lastWarning && (
-        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50 bg-rose-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2 text-xs sm:text-sm font-black border border-rose-400 animate-bounce">
-          <AlertTriangle className="w-5 h-5 shrink-0" />
+        <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-[110] bg-rose-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-black border-2 border-rose-300 ring-4 ring-rose-500/40 animate-bounce max-w-[92vw] sm:max-w-xl text-center">
+          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-200 animate-pulse" />
           <span>{lastWarning}</span>
         </div>
       )}
