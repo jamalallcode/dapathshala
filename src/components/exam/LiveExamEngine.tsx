@@ -64,6 +64,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const hasCalibratedFaceRef = useRef<boolean>(false);
   const consecutiveAwayCountRef = useRef<number>(0);
   const lastViolationTimeRef = useRef<number>(0);
+  const proctorLogsRef = useRef<string[]>([]);
+  const baselineFaceYRef = useRef<number | null>(null);
+  const baselineFaceXRef = useRef<number | null>(null);
+  const baselinePupilYRef = useRef<number | null>(null);
+  const baselinePupilXRef = useRef<number | null>(null);
+  const calibrationSamplesCountRef = useRef<number>(0);
 
   // Sharp Anti-Cheating Audible Warning Alarm (Two-tone alert)
   const playWarningBeep = () => {
@@ -412,7 +418,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     };
   }, [isReviewOnly, isSubmitted, violationCount]);
 
-  // Real-time AI Gaze & Note/Book Reading Detector (Ultra-strict proctoring running every 350ms)
+  // Real-time AI Pupil Gaze & Note/Book Reading Detector (running every 280ms)
   useEffect(() => {
     if (isReviewOnly || isSubmitted || !cameraActive) return;
 
@@ -422,47 +428,57 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         try {
           if (!analysisCanvasRef.current) {
             analysisCanvasRef.current = document.createElement('canvas');
-            analysisCanvasRef.current.width = 80;
-            analysisCanvasRef.current.height = 60;
+            analysisCanvasRef.current.width = 100;
+            analysisCanvasRef.current.height = 75;
           }
           const canvas = analysisCanvasRef.current;
           const ctx = canvas.getContext('2d', { willReadFrequently: true });
           if (!ctx) return;
 
-          ctx.drawImage(videoRef.current, 0, 0, 80, 60);
-          const imgData = ctx.getImageData(0, 0, 80, 60);
+          ctx.drawImage(videoRef.current, 0, 0, 100, 75);
+          const imgData = ctx.getImageData(0, 0, 100, 75);
           const data = imgData.data;
 
-          let totalWeight = 0;
-          let weightedY = 0;
-          let weightedX = 0;
+          let faceSkinCount = 0;
+          let weightedFaceY = 0;
+          let weightedFaceX = 0;
+          let faceMinY = 75, faceMaxY = 0;
+          let faceMinX = 100, faceMaxX = 0;
 
-          // Compute centroid of face / skin-tone cluster
-          for (let y = 0; y < 60; y++) {
-            for (let x = 0; x < 80; x++) {
-              const idx = (y * 80 + x) * 4;
+          // Step 1: Detect face region with broad lighting-invariant skin & facial luminosity
+          for (let y = 0; y < 75; y++) {
+            for (let x = 0; x < 100; x++) {
+              const idx = (y * 100 + x) * 4;
               const r = data[idx];
               const g = data[idx + 1];
               const b = data[idx + 2];
 
-              // Robust skin-tone / face luminosity heuristic
-              const maxVal = Math.max(r, g, b);
-              const minVal = Math.min(r, g, b);
-              const isSkin = r > 50 && g > 30 && b > 15 && (maxVal - minVal) > 10 && r >= g && r >= b;
-              if (isSkin) {
-                totalWeight++;
-                weightedY += y;
-                weightedX += x;
+              // Skin & face luminosity condition: robust to monitor glow, white LCD backlighting, and dark rooms
+              const maxC = Math.max(r, g, b);
+              const minC = Math.min(r, g, b);
+              const isSkinOrFace = (
+                (r > 40 && g > 25 && b > 15 && (r >= g * 0.88) && (maxC - minC > 6)) ||
+                (r > 60 && g > 45 && b > 35 && Math.abs(r - g) < 40 && r >= b * 0.80)
+              );
+
+              if (isSkinOrFace) {
+                faceSkinCount++;
+                weightedFaceY += y;
+                weightedFaceX += x;
+                if (y < faceMinY) faceMinY = y;
+                if (y > faceMaxY) faceMaxY = y;
+                if (x < faceMinX) faceMinX = x;
+                if (x > faceMaxX) faceMaxX = x;
               }
             }
           }
 
-          if (totalWeight > 35) {
+          if (faceSkinCount > 35) {
             hasCalibratedFaceRef.current = true;
           }
 
           const now = Date.now();
-          const canTriggerViolation = now - lastViolationTimeRef.current > 1400;
+          const canTriggerViolation = now - lastViolationTimeRef.current > 1100;
 
           // Manual test simulation button
           if (isSimulatingSuspicious) {
@@ -474,8 +490,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             return;
           }
 
-          // Strict Case 1: If face was previously seen but now absent / obscured (e.g. bowed head into lap/book, face covered)
-          if (hasCalibratedFaceRef.current && totalWeight < 28) {
+          // Case A: Face disappeared or student ducked completely out of frame into a book/lap
+          if (hasCalibratedFaceRef.current && faceSkinCount < 25) {
             setGazeStatus('looking_away');
             if (canTriggerViolation) {
               lastViolationTimeRef.current = now;
@@ -484,28 +500,91 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             return;
           }
 
-          if (totalWeight >= 28) {
-            const centroidY = weightedY / totalWeight; // 0 to 60 (normal eye/screen center is 19-26)
-            const centroidX = weightedX / totalWeight; // 0 to 80 (normal horizontal center is 33-47)
+          if (faceSkinCount >= 25) {
+            const currentFaceCentroidY = weightedFaceY / faceSkinCount; // 0 to 75
+            const currentFaceCentroidX = weightedFaceX / faceSkinCount; // 0 to 100
 
-            // Strict Case 2: Detected Looking Down at desk, notebook or book (Y >= 27.2)
-            if (centroidY >= 27.2) {
+            const faceH = Math.max(faceMaxY - faceMinY, 15);
+            const faceW = Math.max(faceMaxX - faceMinX, 15);
+
+            // Step 2: Extract Eye & Pupil Zone within the upper face
+            const eyeTop = Math.max(0, Math.floor(faceMinY + faceH * 0.18));
+            const eyeBottom = Math.min(74, Math.floor(faceMinY + faceH * 0.46));
+            const eyeLeft = Math.max(0, Math.floor(faceMinX + faceW * 0.14));
+            const eyeRight = Math.min(99, Math.floor(faceMaxX - faceW * 0.14));
+
+            let darkPupilCount = 0;
+            let weightedPupilY = 0;
+            let weightedPupilX = 0;
+
+            for (let ey = eyeTop; ey <= eyeBottom; ey++) {
+              for (let ex = eyeLeft; ex <= eyeRight; ex++) {
+                const pIdx = (ey * 100 + ex) * 4;
+                const pr = data[pIdx];
+                const pg = data[pIdx + 1];
+                const pb = data[pIdx + 2];
+                const lum = 0.299 * pr + 0.587 * pg + 0.114 * pb;
+
+                // Pupil / iris / dark eyelash detector
+                if (lum < 78) {
+                  darkPupilCount++;
+                  weightedPupilY += ey;
+                  weightedPupilX += ex;
+                }
+              }
+            }
+
+            // Relative pupil position inside the eye zone
+            let pupilRelY = 0.44;
+            let pupilRelX = 0.50;
+            if (darkPupilCount > 3 && (eyeBottom > eyeTop) && (eyeRight > eyeLeft)) {
+              pupilRelY = (weightedPupilY / darkPupilCount - eyeTop) / (eyeBottom - eyeTop);
+              pupilRelX = (weightedPupilX / darkPupilCount - eyeLeft) / (eyeRight - eyeLeft);
+            }
+
+            // Adaptive Baseline Calibration: continuously learn the student's natural looking-at-screen posture
+            if (calibrationSamplesCountRef.current < 10) {
+              calibrationSamplesCountRef.current++;
+              if (baselineFaceYRef.current === null) {
+                baselineFaceYRef.current = currentFaceCentroidY;
+                baselineFaceXRef.current = currentFaceCentroidX;
+                baselinePupilYRef.current = pupilRelY;
+                baselinePupilXRef.current = pupilRelX;
+              } else {
+                baselineFaceYRef.current = baselineFaceYRef.current * 0.7 + currentFaceCentroidY * 0.3;
+                baselineFaceXRef.current = baselineFaceXRef.current * 0.7 + currentFaceCentroidX * 0.3;
+                baselinePupilYRef.current = baselinePupilYRef.current * 0.7 + pupilRelY * 0.3;
+                baselinePupilXRef.current = baselinePupilXRef.current * 0.7 + pupilRelX * 0.3;
+              }
+            }
+
+            const baseFaceY = baselineFaceYRef.current ?? 34;
+            const baseFaceX = baselineFaceXRef.current ?? 50;
+            const basePupilY = baselinePupilYRef.current ?? 0.43;
+            const basePupilX = baselinePupilXRef.current ?? 0.50;
+
+            // Ultra-Strict Cheating Detection:
+            // 1. Looking Down with Eyes or Head (pupils roll down towards desk/book, or head tilts down)
+            const isLookingDownEyes = pupilRelY > (basePupilY + 0.055) || pupilRelY > 0.52;
+            const isLookingDownHead = currentFaceCentroidY > (baseFaceY + 2.0) || currentFaceCentroidY > 35.5;
+
+            // 2. Looking Left or Right (pupils shift to side, or head turns sideways)
+            const isLookingAwayEyes = Math.abs(pupilRelX - basePupilX) > 0.065 || pupilRelX < 0.42 || pupilRelX > 0.58;
+            const isLookingAwayHead = Math.abs(currentFaceCentroidX - baseFaceX) > 3.8 || currentFaceCentroidX < 39 || currentFaceCentroidX > 61;
+
+            if (isLookingDownEyes || isLookingDownHead) {
               setGazeStatus('looking_down');
               if (canTriggerViolation) {
                 lastViolationTimeRef.current = now;
                 triggerSuspiciousFlag('দৃষ্টি নিচে নামিয়ে বই বা নোট পড়ার চেষ্টা সনাক্ত হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে উত্তর দিন।');
               }
-            }
-            // Strict Case 3: Detected Looking Left or Right away from screen (X < 32 or X > 48)
-            else if (centroidX < 32 || centroidX > 48) {
+            } else if (isLookingAwayEyes || isLookingAwayHead) {
               setGazeStatus('looking_away');
               if (canTriggerViolation) {
                 lastViolationTimeRef.current = now;
                 triggerSuspiciousFlag('স্ক্রিন ছেড়ে অন্যদিকে তাকানোর চেষ্টা সনাক্ত হয়েছে! অনুগ্রহ করে স্ক্রিনের দিকে তাকিয়ে থাকুন।');
               }
-            }
-            // Normal: Upright & looking directly at exam screen
-            else {
+            } else {
               setGazeStatus('normal');
             }
           }
@@ -513,7 +592,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           // Canvas cross-origin or read error safe fallback
         }
       }
-    }, 350);
+    }, 280);
 
     return () => clearInterval(interval);
   }, [isReviewOnly, isSubmitted, cameraActive, isSimulatingSuspicious]);
@@ -527,7 +606,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       const next = prev + 1;
       const logEntry = `[${nowTime}] ${reason} (সতর্কতা #${next})`;
       
-      setProctorLogs(logs => [...logs, logEntry]);
+      proctorLogsRef.current = [...proctorLogsRef.current, logEntry];
+      setProctorLogs([...proctorLogsRef.current]);
       setLastWarning(`⚠️ সতর্কতা (${next}/৫): ${reason}`);
       
       if (next >= 5) {
@@ -622,10 +702,11 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
     const calculatedScore = questionsList.length > 0 ? Math.round((correctCount / questionsList.length) * 100) : 0;
     
+    const recordedLogs = proctorLogsRef.current.length > 0 ? proctorLogsRef.current : proctorLogs;
     const finalFlags = isForcedByProctor 
-      ? ['৫ বার অসদুপায় / বই-নোট পড়ার চেষ্টার কারণে পরীক্ষা নির্ধারিত সময়ের পূর্বে স্বয়ংক্রিয়ভাবে জমা হয়েছে', ...proctorLogs]
-      : proctorLogs.length > 0
-      ? proctorLogs
+      ? ['৫ বার অসদুপায় / বই-নোট পড়ার চেষ্টার কারণে পরীক্ষা নির্ধারিত সময়ের পূর্বে স্বয়ংক্রিয়ভাবে জমা হয়েছে', ...recordedLogs]
+      : recordedLogs.length > 0
+      ? recordedLogs
       : violationCount > 0 
       ? [`${violationCount} বার দৃষ্টি অন্যদিকে বা ট্যাবে যাওয়ার চেষ্টা সনাক্ত হয়েছে`] 
       : [];
@@ -747,7 +828,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       {/* Floating Live Camera PIP Window during active exam - Moved to top-right on mobile so it NEVER blocks the submit button */}
       {!isReviewOnly && !isSubmitted && (
         <div className="fixed top-16 right-3 sm:top-auto sm:bottom-5 sm:right-5 z-40 transition-all duration-300">
-          {isCameraMinimized ? (
+          {/* Minimized Pill Button */}
+          {isCameraMinimized && (
             <button
               type="button"
               onClick={() => setIsCameraMinimized(false)}
@@ -759,91 +841,92 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               <span>লাইভ প্রক্টরিং সক্রিয়</span>
               <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded border border-slate-700">বড় করুন ⤢</span>
             </button>
-          ) : (
-            <div className="bg-slate-900 border-2 border-emerald-500 rounded-2xl p-2 shadow-2xl w-40 sm:w-56 flex flex-col items-center">
-              {/* Header with Minimize Button */}
-              <div className="w-full flex items-center justify-between pb-1 px-1 border-b border-slate-800 mb-1.5">
-                <div className="flex items-center gap-1.5 text-[9.5px] font-bold text-emerald-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-                  <span>ফ্রন্ট ক্যামেরা প্রক্টরিং</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCameraMinimized(true)}
-                  className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[9px] font-bold cursor-pointer border border-slate-700 transition-colors"
-                  title="ক্যামেরা ছোট করুন"
-                >
-                  মিনিমাইজ −
-                </button>
+          )}
+
+          {/* Camera Card - Always mounted so videoRef and frame analysis NEVER unmount */}
+          <div className={`${isCameraMinimized ? "hidden" : "flex"} bg-slate-900 border-2 border-emerald-500 rounded-2xl p-2 shadow-2xl w-40 sm:w-56 flex-col items-center`}>
+            {/* Header with Minimize Button */}
+            <div className="w-full flex items-center justify-between pb-1 px-1 border-b border-slate-800 mb-1.5">
+              <div className="flex items-center gap-1.5 text-[9.5px] font-bold text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                <span>ফ্রন্ট ক্যামেরা প্রক্টরিং</span>
               </div>
+              <button
+                type="button"
+                onClick={() => setIsCameraMinimized(true)}
+                className="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[9px] font-bold cursor-pointer border border-slate-700 transition-colors"
+                title="ক্যামেরা ছোট করুন"
+              >
+                মিনিমাইজ −
+              </button>
+            </div>
 
-              <div className="w-full h-24 sm:h-36 bg-slate-950 rounded-xl overflow-hidden relative flex items-center justify-center">
-                {cameraActive ? (
-                  <video 
-                    ref={(el) => {
-                      videoRef.current = el;
-                      if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
-                        attachStream(mediaStreamRef.current);
-                      }
-                    }}
-                    autoPlay 
-                    playsInline 
-                    muted 
-                    className="w-full h-full object-cover -scale-x-100"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center justify-center text-center p-2 text-slate-400">
-                    <Camera className="w-6 h-6 mb-1 text-emerald-400 animate-pulse" />
-                    <span className="text-[10px] font-bold">ক্যামেরা সক্রিয় হচ্ছে...</span>
-                  </div>
-                )}
+            <div className="w-full h-24 sm:h-36 bg-slate-950 rounded-xl overflow-hidden relative flex items-center justify-center">
+              {cameraActive ? (
+                <video 
+                  ref={(el) => {
+                    videoRef.current = el;
+                    if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
+                      attachStream(mediaStreamRef.current);
+                    }
+                  }}
+                  autoPlay 
+                  playsInline 
+                  muted 
+                  className="w-full h-full object-cover -scale-x-100"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center p-2 text-slate-400">
+                  <Camera className="w-6 h-6 mb-1 text-emerald-400 animate-pulse" />
+                  <span className="text-[10px] font-bold">ক্যামেরা সক্রিয় হচ্ছে...</span>
+                </div>
+              )}
 
-                {/* Live AI Proctor Bounding Box & Gaze Tracking HUD */}
-                <div className={`absolute inset-1.5 rounded-lg border-2 pointer-events-none transition-colors duration-300 flex flex-col justify-between p-1.5 ${
-                  gazeStatus === 'looking_down'
-                    ? 'border-rose-500 bg-rose-500/15 animate-pulse'
-                    : gazeStatus === 'looking_away'
-                    ? 'border-amber-500 bg-amber-500/15 animate-pulse'
-                    : 'border-emerald-400/80'
-                }`}>
-                  <div className="flex items-center justify-between">
-                    <span className={`text-[8px] sm:text-[8.5px] font-black px-1 sm:px-1.5 py-0.5 rounded shadow-sm ${
-                      gazeStatus === 'normal' 
-                        ? 'bg-emerald-950/85 text-emerald-300 border border-emerald-500/40' 
-                        : 'bg-rose-950/90 text-rose-200 border border-rose-500 animate-bounce'
-                    }`}>
-                      {gazeStatus === 'looking_down'
-                        ? '⚠️ দৃষ্টি বই/নোটে!'
-                        : gazeStatus === 'looking_away'
-                        ? '⚠️ দৃষ্টি অন্যদিকে!'
-                        : 'দৃষ্টি স্ক্রিনে ✓'}
-                    </span>
-                    <div className="flex items-center gap-1 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded-full text-[8px] sm:text-[9px] text-emerald-400 font-mono font-bold">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-                      <span>LIVE</span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-mono text-white/90 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded">
-                    <span>নকল প্রতিরোধ</span>
-                    <span>সতর্কতা: {violationCount}/৫</span>
+              {/* Live AI Proctor Bounding Box & Gaze Tracking HUD */}
+              <div className={`absolute inset-1.5 rounded-lg border-2 pointer-events-none transition-colors duration-300 flex flex-col justify-between p-1.5 ${
+                gazeStatus === 'looking_down'
+                  ? 'border-rose-500 bg-rose-500/15 animate-pulse'
+                  : gazeStatus === 'looking_away'
+                  ? 'border-amber-500 bg-amber-500/15 animate-pulse'
+                  : 'border-emerald-400/80'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span className={`text-[8px] sm:text-[8.5px] font-black px-1 sm:px-1.5 py-0.5 rounded shadow-sm ${
+                    gazeStatus === 'normal' 
+                      ? 'bg-emerald-950/85 text-emerald-300 border border-emerald-500/40' 
+                      : 'bg-rose-950/90 text-rose-200 border border-rose-500 animate-bounce'
+                  }`}>
+                    {gazeStatus === 'looking_down'
+                      ? '⚠️ দৃষ্টি বই/নোটে!'
+                      : gazeStatus === 'looking_away'
+                      ? '⚠️ দৃষ্টি অন্যদিকে!'
+                      : 'দৃষ্টি স্ক্রিনে ✓'}
+                  </span>
+                  <div className="flex items-center gap-1 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded-full text-[8px] sm:text-[9px] text-emerald-400 font-mono font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>LIVE</span>
                   </div>
                 </div>
-              </div>
 
-              {/* PIP Info & Interactive Book/Notes Test Button */}
-              <div className="w-full px-0.5 pt-1.5 flex flex-col gap-1 text-center">
-                <button
-                  type="button"
-                  onClick={simulateLookingAtNotes}
-                  className="w-full py-1 px-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-950 border border-slate-700 text-[8.5px] sm:text-[9px] text-amber-300 font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
-                  title="ক্লিক করে বই/নোট পড়ার সতর্কতা পরীক্ষা করুন"
-                >
-                  <span>📖 বই/নোট পড়ার টেস্ট</span>
-                </button>
+                <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-mono text-white/90 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded">
+                  <span>নকল প্রতিরোধ</span>
+                  <span>সতর্কতা: {violationCount}/৫</span>
+                </div>
               </div>
             </div>
-          )}
+
+            {/* PIP Info & Interactive Book/Notes Test Button */}
+            <div className="w-full px-0.5 pt-1.5 flex flex-col gap-1 text-center">
+              <button
+                type="button"
+                onClick={simulateLookingAtNotes}
+                className="w-full py-1 px-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-950 border border-slate-700 text-[8.5px] sm:text-[9px] text-amber-300 font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                title="ক্লিক করে বই/নোট পড়ার সতর্কতা পরীক্ষা করুন"
+              >
+                <span>📖 বই/নোট পড়ার টেস্ট</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
