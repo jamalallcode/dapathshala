@@ -49,8 +49,11 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement);
   const [isHoveringTopBar, setIsHoveringTopBar] = useState(false);
   
-  // Gaze & Note/Book Reading Detection States
-  const [gazeStatus, setGazeStatus] = useState<'normal' | 'looking_down' | 'looking_away'>('normal');
+  // Gaze, Head Direction & Motion Detection States
+  const [gazeStatus, setGazeStatus] = useState<'normal' | 'looking_down' | 'looking_away' | 'face_missing'>('normal');
+  const [headStatus, setHeadStatus] = useState<'forward' | 'turned'>('forward');
+  const [motionStatus, setMotionStatus] = useState<'normal' | 'excessive'>('normal');
+  const [motionPercent, setMotionPercent] = useState<number>(0);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [proctorLogs, setProctorLogs] = useState<string[]>([]);
   const [isSimulatingSuspicious, setIsSimulatingSuspicious] = useState(false);
@@ -62,13 +65,18 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const fallbackAnimationRef = useRef<number | null>(null);
   const hasCalibratedFaceRef = useRef<boolean>(false);
-  const consecutiveAwayCountRef = useRef<number>(0);
   const lastViolationTimeRef = useRef<number>(0);
   const proctorLogsRef = useRef<string[]>([]);
+  
+  // High-performance CV buffers and consecutive counter refs
+  const prevFrameDataRef = useRef<Uint8ClampedArray | null>(null);
+  const motionConsecutiveRef = useRef<number>(0);
+  const headTurnConsecutiveRef = useRef<number>(0);
+  const lookDownConsecutiveRef = useRef<number>(0);
+  const faceMissingConsecutiveRef = useRef<number>(0);
+  const isAnalyzingRef = useRef<boolean>(false);
   const baselineFaceYRef = useRef<number | null>(null);
   const baselineFaceXRef = useRef<number | null>(null);
-  const baselinePupilYRef = useRef<number | null>(null);
-  const baselinePupilXRef = useRef<number | null>(null);
   const calibrationSamplesCountRef = useRef<number>(0);
 
   // Sharp Anti-Cheating Audible Warning Alarm (Two-tone alert)
@@ -418,193 +426,218 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     };
   }, [isReviewOnly, isSubmitted, violationCount]);
 
-  // Real-time AI Bilateral Eye Pair & Profile Gaze Detector (running every 220ms)
+  // Explicit function to request hardware webcam on user click
+  const requestWebcamAccess = async () => {
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: 'user', 
+            width: { ideal: 480 }, 
+            height: { ideal: 360 } 
+          },
+          audio: false
+        });
+        if (mediaStreamRef.current) {
+          mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        }
+        mediaStreamRef.current = stream;
+        setCameraActive(true);
+        setCameraError(false);
+        attachStream(stream);
+      }
+    } catch (err) {
+      console.warn("User webcam request error:", err);
+      setCameraError(true);
+    }
+  };
+
+  // Real-time AI Automated Computer Vision Proctoring Engine (runs every 140ms ~7 FPS)
   useEffect(() => {
     if (isReviewOnly || isSubmitted || !cameraActive) return;
 
     const interval = setInterval(() => {
-      // Analyze current video frame if video is playing
-      if (videoRef.current && videoRef.current.readyState >= 2) {
-        try {
-          if (!analysisCanvasRef.current) {
-            analysisCanvasRef.current = document.createElement('canvas');
-            analysisCanvasRef.current.width = 100;
-            analysisCanvasRef.current.height = 75;
-          }
-          const canvas = analysisCanvasRef.current;
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          if (!ctx) return;
+      if (!videoRef.current || videoRef.current.readyState < 2 || isAnalyzingRef.current) return;
+      isAnalyzingRef.current = true;
 
-          ctx.drawImage(videoRef.current, 0, 0, 100, 75);
-          const imgData = ctx.getImageData(0, 0, 100, 75);
-          const data = imgData.data;
+      try {
+        if (!analysisCanvasRef.current) {
+          analysisCanvasRef.current = document.createElement('canvas');
+          analysisCanvasRef.current.width = 80;
+          analysisCanvasRef.current.height = 60;
+        }
+        const canvas = analysisCanvasRef.current;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) {
+          isAnalyzingRef.current = false;
+          return;
+        }
 
-          let faceSkinCount = 0;
-          let weightedFaceY = 0;
-          let weightedFaceX = 0;
-          let faceMinY = 75, faceMaxY = 0;
-          let faceMinX = 100, faceMaxX = 0;
+        ctx.drawImage(videoRef.current, 0, 0, 80, 60);
+        const imgData = ctx.getImageData(0, 0, 80, 60);
+        const data = imgData.data;
+        const totalPixels = 80 * 60;
 
-          // Step 1: Detect face region with broad lighting-invariant skin & facial luminosity
-          for (let y = 0; y < 75; y++) {
-            for (let x = 0; x < 100; x++) {
-              const idx = (y * 100 + x) * 4;
-              const r = data[idx];
-              const g = data[idx + 1];
-              const b = data[idx + 2];
+        // -------------------------------------------------------------
+        // 1. REAL-TIME MOTION DIFFERENCING (অতিরিক্ত নড়াচড়া সনাক্তকরণ)
+        // -------------------------------------------------------------
+        let movingPixels = 0;
+        const currentGray = new Uint8ClampedArray(totalPixels);
+        const prevGray = prevFrameDataRef.current;
 
-              // Skin & face luminosity condition: robust to mobile screens, backlighting, shadows
-              const maxC = Math.max(r, g, b);
-              const minC = Math.min(r, g, b);
-              const isSkinOrFace = (
-                (r > 38 && g > 22 && b > 14 && (r >= g * 0.84) && (maxC - minC > 5)) ||
-                (r > 52 && g > 40 && b > 30 && Math.abs(r - g) < 45 && r >= b * 0.75)
-              );
-
-              if (isSkinOrFace) {
-                faceSkinCount++;
-                weightedFaceY += y;
-                weightedFaceX += x;
-                if (y < faceMinY) faceMinY = y;
-                if (y > faceMaxY) faceMaxY = y;
-                if (x < faceMinX) faceMinX = x;
-                if (x > faceMaxX) faceMaxX = x;
-              }
+        for (let i = 0; i < totalPixels; i++) {
+          const p = i * 4;
+          const lum = (data[p] * 299 + data[p + 1] * 587 + data[p + 2] * 114) >> 10;
+          currentGray[i] = lum;
+          if (prevGray) {
+            const diff = Math.abs(lum - prevGray[i]);
+            if (diff > 18) {
+              movingPixels++;
             }
           }
+        }
+        prevFrameDataRef.current = currentGray;
 
-          if (faceSkinCount > 25) {
-            hasCalibratedFaceRef.current = true;
-          }
+        const currentMotionPercent = prevGray ? (movingPixels / totalPixels) * 100 : 0;
+        setMotionPercent(Math.round(currentMotionPercent));
 
-          const now = Date.now();
-          const canTriggerViolation = now - lastViolationTimeRef.current > 1000;
+        const now = Date.now();
+        const canTriggerViolation = now - lastViolationTimeRef.current > 1800;
 
-          // Manual test simulation button
-          if (isSimulatingSuspicious) {
-            setGazeStatus('looking_down');
+        // Check for Excessive Movement
+        if (currentMotionPercent > 18.0) {
+          motionConsecutiveRef.current++;
+          if (motionConsecutiveRef.current >= 2) {
+            setMotionStatus('excessive');
             if (canTriggerViolation) {
               lastViolationTimeRef.current = now;
-              triggerSuspiciousFlag('দৃষ্টি নিচে নামিয়ে বই বা নোট পড়ার চেষ্টা সনাক্ত হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে উত্তর দিন।');
-            }
-            return;
-          }
-
-          // Case A: Face missing or student ducked completely out of frame
-          if (hasCalibratedFaceRef.current && faceSkinCount < 20) {
-            consecutiveAwayCountRef.current++;
-            setGazeStatus('looking_away');
-            if (consecutiveAwayCountRef.current >= 2 && canTriggerViolation) {
-              lastViolationTimeRef.current = now;
-              triggerSuspiciousFlag('স্ক্রিন থেকে চোখ ও মুখ সরানো হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে পরীক্ষা দিন।');
-            }
-            return;
-          }
-
-          if (faceSkinCount >= 20) {
-            const faceH = Math.max(faceMaxY - faceMinY, 15);
-            const faceW = Math.max(faceMaxX - faceMinX, 15);
-
-            // Step 2: Bilateral Eye Detection (Left Eye Zone vs Right Eye Zone)
-            // When facing the screen forward, BOTH eyes must be visible in the left and right upper face!
-            const eyeTop = Math.max(0, Math.floor(faceMinY + faceH * 0.16));
-            const eyeBottom = Math.min(74, Math.floor(faceMinY + faceH * 0.48));
-            
-            const leftEyeLeft = Math.max(0, Math.floor(faceMinX + faceW * 0.10));
-            const leftEyeRight = Math.min(99, Math.floor(faceMinX + faceW * 0.46));
-
-            const rightEyeLeft = Math.max(0, Math.floor(faceMinX + faceW * 0.54));
-            const rightEyeRight = Math.min(99, Math.floor(faceMinX + faceW * 0.90));
-
-            let leftDarkCount = 0;
-            let leftDarkY = 0;
-            let leftDarkX = 0;
-
-            let rightDarkCount = 0;
-            let rightDarkY = 0;
-            let rightDarkX = 0;
-
-            // Scan Left Eye Zone
-            for (let ey = eyeTop; ey <= eyeBottom; ey++) {
-              for (let ex = leftEyeLeft; ex <= leftEyeRight; ex++) {
-                const pIdx = (ey * 100 + ex) * 4;
-                const lum = 0.299 * data[pIdx] + 0.587 * data[pIdx + 1] + 0.114 * data[pIdx + 2];
-                if (lum < 82) {
-                  leftDarkCount++;
-                  leftDarkY += ey;
-                  leftDarkX += ex;
-                }
-              }
-            }
-
-            // Scan Right Eye Zone
-            for (let ey = eyeTop; ey <= eyeBottom; ey++) {
-              for (let ex = rightEyeLeft; ex <= rightEyeRight; ex++) {
-                const pIdx = (ey * 100 + ex) * 4;
-                const lum = 0.299 * data[pIdx] + 0.587 * data[pIdx + 1] + 0.114 * data[pIdx + 2];
-                if (lum < 82) {
-                  rightDarkCount++;
-                  rightDarkY += ey;
-                  rightDarkX += ex;
-                }
-              }
-            }
-
-            // A front-facing head ALWAYS sees both eye features
-            const leftEyeDetected = leftDarkCount >= 3;
-            const rightEyeDetected = rightDarkCount >= 3;
-
-            // Relative pupil positions inside each eye box
-            const leftPupilRelY = leftDarkCount > 0 ? (leftDarkY / leftDarkCount - eyeTop) / (eyeBottom - eyeTop) : 0.5;
-            const rightPupilRelY = rightDarkCount > 0 ? (rightDarkY / rightDarkCount - eyeTop) / (eyeBottom - eyeTop) : 0.5;
-            const avgPupilRelY = (leftPupilRelY + rightPupilRelY) / 2;
-
-            const leftPupilRelX = leftDarkCount > 0 ? (leftDarkX / leftDarkCount - leftEyeLeft) / Math.max(leftEyeRight - leftEyeLeft, 1) : 0.5;
-            const rightPupilRelX = rightDarkCount > 0 ? (rightDarkX / rightDarkCount - rightEyeLeft) / Math.max(rightEyeRight - rightEyeLeft, 1) : 0.5;
-            const avgPupilRelX = (leftPupilRelX + rightPupilRelX) / 2;
-
-            // Check 1: Head Turned Sideways in Profile (Exact case from user photo)
-            // In profile view: one eye is occluded, or eye asymmetry ratio is extreme (> 3.5x)
-            const isProfileHeadTurn = (!leftEyeDetected || !rightEyeDetected) || 
-              (leftDarkCount > 0 && rightDarkCount > 0 && (leftDarkCount / rightDarkCount > 3.5 || rightDarkCount / leftDarkCount > 3.5));
-
-            // Check 2: Eyes Glancing Left or Right (Pupils shifted horizontally)
-            const isLookingSideways = avgPupilRelX < 0.38 || avgPupilRelX > 0.62;
-
-            // Check 3: Eyes or Head Looking Down at Book/Notes
-            const isLookingDownAtBook = avgPupilRelY > 0.51 || (leftPupilRelY > 0.52 && rightPupilRelY > 0.52);
-
-            // Check 4: Head Pitched Downwards towards Desk/Lap
-            const currentFaceCentroidY = weightedFaceY / faceSkinCount;
-            const isHeadTiltedDown = currentFaceCentroidY > 36.0;
-
-            if (isProfileHeadTurn || isLookingSideways) {
-              consecutiveAwayCountRef.current++;
-              setGazeStatus('looking_away');
-              if (consecutiveAwayCountRef.current >= 2 && canTriggerViolation) {
-                lastViolationTimeRef.current = now;
-                triggerSuspiciousFlag('স্ক্রিন ছেড়ে অন্যদিকে তাকানোর চেষ্টা সনাক্ত হয়েছে! অনুগ্রহ করে স্ক্রিনের দিকে তাকিয়ে থাকুন।');
-              }
-            } else if (isLookingDownAtBook || isHeadTiltedDown) {
-              consecutiveAwayCountRef.current++;
-              setGazeStatus('looking_down');
-              if (consecutiveAwayCountRef.current >= 2 && canTriggerViolation) {
-                lastViolationTimeRef.current = now;
-                triggerSuspiciousFlag('দৃষ্টি নিচে নামিয়ে বই বা নোট পড়ার চেষ্টা সনাক্ত হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে উত্তর দিন।');
-              }
-            } else {
-              consecutiveAwayCountRef.current = 0;
-              setGazeStatus('normal');
+              triggerSuspiciousFlag('অতিরিক্ত নড়াচড়া সনাক্ত হয়েছে! অনুগ্রহ করে শান্ত হয়ে সোজা হয়ে বসুন।');
             }
           }
-        } catch {
-          // Canvas cross-origin or read error safe fallback
+        } else {
+          motionConsecutiveRef.current = 0;
+          setMotionStatus('normal');
         }
+
+        // -------------------------------------------------------------
+        // 2. FACE DETECTION & HEAD TURN / PROFILE ANALYSIS (মাথা ঘোরানো)
+        // -------------------------------------------------------------
+        let faceSkinCount = 0;
+        let weightedFaceY = 0;
+        let weightedFaceX = 0;
+        let faceMinY = 60, faceMaxY = 0;
+        let faceMinX = 80, faceMaxX = 0;
+        let upperDarkHairCount = 0;
+
+        for (let y = 0; y < 60; y++) {
+          for (let x = 0; x < 80; x++) {
+            const idx = (y * 80 + x) * 4;
+            const r = data[idx];
+            const g = data[idx + 1];
+            const b = data[idx + 2];
+
+            // Robust multi-tone lighting invariant skin check
+            const isSkin = (
+              (r > 36 && g > 20 && b > 14 && r >= g && g >= b * 0.72 && (r - g) >= 4) ||
+              (r > 52 && g > 38 && b > 28 && Math.abs(r - g) < 50 && (r - b) >= 6) ||
+              (r > 80 && g > 55 && b > 40 && r > b)
+            );
+
+            if (isSkin) {
+              faceSkinCount++;
+              weightedFaceY += y;
+              weightedFaceX += x;
+              if (y < faceMinY) faceMinY = y;
+              if (y > faceMaxY) faceMaxY = y;
+              if (x < faceMinX) faceMinX = x;
+              if (x > faceMaxX) faceMaxX = x;
+            } else if (y < 35 && r < 48 && g < 48 && b < 52) {
+              upperDarkHairCount++;
+            }
+          }
+        }
+
+        // Case A: Face completely missing from camera frame (ducked or left seat)
+        if (faceSkinCount < 16) {
+          faceMissingConsecutiveRef.current++;
+          if (faceMissingConsecutiveRef.current >= 3) {
+            setGazeStatus('face_missing');
+            setHeadStatus('turned');
+            if (canTriggerViolation) {
+              lastViolationTimeRef.current = now;
+              triggerSuspiciousFlag('ক্যামেরা ফ্রেমে কোনো মুখ দেখা যাচ্ছে না! সরাসরি ক্যামেরার সামনে বসুন।');
+            }
+          }
+          isAnalyzingRef.current = false;
+          return;
+        }
+
+        faceMissingConsecutiveRef.current = 0;
+
+        const centroidX = weightedFaceX / faceSkinCount;
+        const centroidY = weightedFaceY / faceSkinCount;
+        const faceW = Math.max(faceMaxX - faceMinX, 10);
+        const faceH = Math.max(faceMaxY - faceMinY, 10);
+
+        // Calibrate baseline when student sits calmly front-facing
+        if (calibrationSamplesCountRef.current < 15) {
+          if (centroidX > 28 && centroidX < 52 && centroidY > 16 && centroidY < 38) {
+            baselineFaceXRef.current = baselineFaceXRef.current === null ? centroidX : (baselineFaceXRef.current * 0.8 + centroidX * 0.2);
+            baselineFaceYRef.current = baselineFaceYRef.current === null ? centroidY : (baselineFaceYRef.current * 0.8 + centroidY * 0.2);
+            calibrationSamplesCountRef.current++;
+            hasCalibratedFaceRef.current = true;
+          }
+        }
+
+        const baseX = baselineFaceXRef.current ?? 40;
+        const baseY = baselineFaceYRef.current ?? 26;
+
+        // Condition 1: Head Turned Sideways or Backwards (মাথা সম্পূর্ণ ঘুরানো)
+        // Profile view narrows face aspect ratio (faceW/faceH < 0.52), or shifts centroid far from center
+        const isTurnedSideways = (faceW / faceH < 0.52) || (Math.abs(centroidX - baseX) > 13.5);
+        // Head turned backwards shows dark hair dominating upper frame with little/no face
+        const isTurnedBackwards = upperDarkHairCount > 130 && faceSkinCount < 45;
+        const isHeadTurned = isTurnedSideways || isTurnedBackwards;
+
+        // Condition 2: Head Pitched Downwards toward desk/lap to read books or notes
+        const isHeadDownAtDesk = (centroidY > baseY + 8.5) || (faceMinY > 26.0);
+
+        if (isHeadTurned) {
+          headTurnConsecutiveRef.current++;
+          lookDownConsecutiveRef.current = 0;
+          setHeadStatus('turned');
+          setGazeStatus('looking_away');
+
+          if (headTurnConsecutiveRef.current >= 2 && canTriggerViolation) {
+            lastViolationTimeRef.current = now;
+            triggerSuspiciousFlag('মাথা অন্যদিকে ঘোরানো সনাক্ত হয়েছে! সরাসরি ক্যামেরার দিকে তাকিয়ে পরীক্ষা দিন।');
+          }
+        } else if (isHeadDownAtDesk) {
+          lookDownConsecutiveRef.current++;
+          headTurnConsecutiveRef.current = 0;
+          setHeadStatus('forward');
+          setGazeStatus('looking_down');
+
+          if (lookDownConsecutiveRef.current >= 2 && canTriggerViolation) {
+            lastViolationTimeRef.current = now;
+            triggerSuspiciousFlag('দৃষ্টি নিচে নামিয়ে বই বা নোট পড়ার চেষ্টা সনাক্ত হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে উত্তর দিন।');
+          }
+        } else {
+          headTurnConsecutiveRef.current = 0;
+          lookDownConsecutiveRef.current = 0;
+          setHeadStatus('forward');
+          setGazeStatus('normal');
+        }
+
+      } catch (err) {
+        // Frame analysis error safe fallback
+      } finally {
+        isAnalyzingRef.current = false;
       }
-    }, 220);
+    }, 140);
 
     return () => clearInterval(interval);
-  }, [isReviewOnly, isSubmitted, cameraActive, isSimulatingSuspicious]);
+  }, [isReviewOnly, isSubmitted, cameraActive]);
 
   // Trigger Warning, Sound Alarm & Log Incident
   const triggerSuspiciousFlag = (reason: string) => {
@@ -631,17 +664,6 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     setTimeout(() => {
       setLastWarning(null);
     }, 4000);
-  };
-
-  // Interactive Test Simulation for User/Examiner to simulate looking down at notes
-  const simulateLookingAtNotes = () => {
-    setIsSimulatingSuspicious(true);
-    setGazeStatus('looking_down');
-    triggerSuspiciousFlag('দৃষ্টি নিচে নামিয়ে বই বা নোট পড়ার চেষ্টা সনাক্ত হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে উত্তর দিন।');
-    setTimeout(() => {
-      setIsSimulatingSuspicious(false);
-      setGazeStatus('normal');
-    }, 3500);
   };
 
   // Timer countdown & Auto-submit
@@ -891,25 +913,33 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 </div>
               )}
 
-              {/* Live AI Proctor Bounding Box & Gaze Tracking HUD */}
-              <div className={`absolute inset-1.5 rounded-lg border-2 pointer-events-none transition-colors duration-300 flex flex-col justify-between p-1.5 ${
-                gazeStatus === 'looking_down'
+              {/* Live AI Proctor Bounding Box & Motion/Gaze Tracking HUD */}
+              <div className={`absolute inset-1.5 rounded-lg border-2 pointer-events-none transition-colors duration-200 flex flex-col justify-between p-1.5 ${
+                headStatus === 'turned' || gazeStatus === 'looking_away' || gazeStatus === 'looking_down' || motionStatus === 'excessive' || gazeStatus === 'face_missing'
                   ? 'border-rose-500 bg-rose-500/15 animate-pulse'
-                  : gazeStatus === 'looking_away'
-                  ? 'border-amber-500 bg-amber-500/15 animate-pulse'
                   : 'border-emerald-400/80'
               }`}>
                 <div className="flex items-center justify-between">
-                  <span className={`text-[8px] sm:text-[8.5px] font-black px-1 sm:px-1.5 py-0.5 rounded shadow-sm ${
-                    gazeStatus === 'normal' 
-                      ? 'bg-emerald-950/85 text-emerald-300 border border-emerald-500/40' 
-                      : 'bg-rose-950/90 text-rose-200 border border-rose-500 animate-bounce'
+                  <span className={`text-[8px] sm:text-[8.5px] font-black px-1 sm:px-1.5 py-0.5 rounded shadow-sm transition-all ${
+                    headStatus === 'turned' || gazeStatus === 'looking_away'
+                      ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
+                      : motionStatus === 'excessive'
+                      ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
+                      : gazeStatus === 'looking_down'
+                      ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
+                      : gazeStatus === 'face_missing'
+                      ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
+                      : 'bg-emerald-950/85 text-emerald-300 border border-emerald-500/40'
                   }`}>
-                    {gazeStatus === 'looking_down'
+                    {headStatus === 'turned' || gazeStatus === 'looking_away'
+                      ? '⚠️ মাথা অন্যদিকে ঘুরানো!'
+                      : motionStatus === 'excessive'
+                      ? '⚠️ অতিরিক্ত নড়াচড়া!'
+                      : gazeStatus === 'looking_down'
                       ? '⚠️ দৃষ্টি বই/নোটে!'
-                      : gazeStatus === 'looking_away'
-                      ? '⚠️ দৃষ্টি অন্যদিকে!'
-                      : 'দৃষ্টি স্ক্রিনে ✓'}
+                      : gazeStatus === 'face_missing'
+                      ? '⚠️ মুখ অনুপস্থিত!'
+                      : 'দৃষ্টি ও মুখ স্ক্রিনে ✓'}
                   </span>
                   <div className="flex items-center gap-1 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded-full text-[8px] sm:text-[9px] text-emerald-400 font-mono font-bold">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
@@ -918,22 +948,55 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-mono text-white/90 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded">
-                  <span>নকল প্রতিরোধ</span>
-                  <span>সতর্কতা: {violationCount}/৫</span>
+                  <span>স্বয়ংক্রিয় এআই প্রক্টরিং</span>
+                  <span className={violationCount > 0 ? "text-rose-400 font-bold" : "text-emerald-400"}>
+                    সতর্কতা: {violationCount}/৫
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* PIP Info & Interactive Book/Notes Test Button */}
+            {/* Realtime Continuous Proctor Sensors HUD (Always Automatic - No button click needed) */}
             <div className="w-full px-0.5 pt-1.5 flex flex-col gap-1 text-center">
-              <button
-                type="button"
-                onClick={simulateLookingAtNotes}
-                className="w-full py-1 px-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-950 border border-slate-700 text-[8.5px] sm:text-[9px] text-amber-300 font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
-                title="ক্লিক করে বই/নোট পড়ার সতর্কতা পরীক্ষা করুন"
-              >
-                <span>📖 বই/নোট পড়ার টেস্ট</span>
-              </button>
+              <div className="grid grid-cols-3 gap-1 text-[7.5px] sm:text-[8px] font-mono">
+                <div className={`py-1 px-0.5 rounded transition-colors ${
+                  headStatus === 'turned' 
+                    ? 'bg-rose-950 text-rose-300 border border-rose-600 font-bold animate-pulse' 
+                    : 'bg-slate-800 text-slate-300 border border-slate-700/60'
+                }`}>
+                  <span className="block text-[6.5px] sm:text-[7px] text-slate-400">মাথা</span>
+                  <span>{headStatus === 'turned' ? 'ঘুরানো ⚠️' : 'সোজা ✓'}</span>
+                </div>
+
+                <div className={`py-1 px-0.5 rounded transition-colors ${
+                  gazeStatus !== 'normal' 
+                    ? 'bg-rose-950 text-rose-300 border border-rose-600 font-bold animate-pulse' 
+                    : 'bg-slate-800 text-slate-300 border border-slate-700/60'
+                }`}>
+                  <span className="block text-[6.5px] sm:text-[7px] text-slate-400">দৃষ্টি</span>
+                  <span>{gazeStatus === 'looking_down' ? 'বই/নোটে ⚠️' : gazeStatus === 'looking_away' ? 'অন্যত্র ⚠️' : gazeStatus === 'face_missing' ? 'নাই ⚠️' : 'স্ক্রিনে ✓'}</span>
+                </div>
+
+                <div className={`py-1 px-0.5 rounded transition-colors ${
+                  motionStatus === 'excessive' 
+                    ? 'bg-rose-950 text-rose-300 border border-rose-600 font-bold animate-pulse' 
+                    : 'bg-slate-800 text-slate-300 border border-slate-700/60'
+                }`}>
+                  <span className="block text-[6.5px] sm:text-[7px] text-slate-400">নড়াচড়া</span>
+                  <span>{motionStatus === 'excessive' ? `অস্থির ⚠️` : `স্বাভাবিক ✓`}</span>
+                </div>
+              </div>
+
+              {!cameraActive && (
+                <button
+                  type="button"
+                  onClick={requestWebcamAccess}
+                  className="w-full py-1 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-[8px] sm:text-[8.5px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-xs mt-0.5"
+                >
+                  <Camera className="w-2.5 h-2.5" />
+                  <span>ক্যামেরা অন করুন</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

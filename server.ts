@@ -23,7 +23,7 @@ function resolvePort(): number {
     const val = parseInt(process.env.APP_PORT, 10);
     if (!isNaN(val)) return val;
   }
-  if (process.env.PORT && process.env.PORT !== '8080') {
+  if (process.env.PORT) {
     const val = parseInt(process.env.PORT, 10);
     if (!isNaN(val)) return val;
   }
@@ -690,17 +690,18 @@ async function startServer() {
       console.log(`Dapathshala Full-Stack server running on port ${PORT}`);
     });
 
-    currentServer.on('error', (err: any) => {
+    currentServer.once('error', (err: any) => {
       if (err?.code === 'EADDRINUSE') {
         if (retryCount < maxRetries) {
           retryCount++;
           console.warn(`[Port Conflict] Port ${PORT} in use, waiting for release (retry ${retryCount}/${maxRetries})...`);
           try {
-            currentServer?.close();
+            currentServer?.removeAllListeners();
+            currentServer?.close?.();
           } catch {}
           setTimeout(() => {
             bindServer();
-          }, 1200);
+          }, 1000);
           return;
         }
         console.warn(`[Port Conflict] Port ${PORT} remained busy after ${maxRetries} attempts. Exiting cleanly for fresh restart.`);
