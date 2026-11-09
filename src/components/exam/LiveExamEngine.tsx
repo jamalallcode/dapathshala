@@ -786,9 +786,6 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
         const isHeadTurned = isStrongFeatureTurn || isCombinedTurn || isExtremeAsymmetryTurn || isTurnedByProfileRatio || isTurnedByCentroidShift || isTurnedBackwards;
 
-        // 5. Head Pitched Downwards toward desk or lap (বই বা নোট দেখার চেষ্টা)
-        const isHeadDownAtDesk = (centroidY > baseY + proctorConfig.pitchDownThreshold) || (faceMinY > 28 && faceH < 28);
-
         if (isHeadTurned) {
           headTurnConsecutiveRef.current++;
           sideGlanceConsecutiveRef.current = 0;
@@ -815,20 +812,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             isViolatingRef.current = true;
             handleGazeAway('আড় চোখে এদিক-সেদিক তাকানো সনাক্ত হয়েছে');
           }
-        } else if (isHeadDownAtDesk) {
-          lookDownConsecutiveRef.current++;
-          sideGlanceConsecutiveRef.current = 0;
-          headTurnConsecutiveRef.current = 0;
-          setHeadStatus('forward');
-          setGazeStatus('looking_down');
-
-          const isNewTurn = !isViolatingRef.current;
-          if (lookDownConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 7000)) {
-            lastViolationTimeRef.current = now;
-            isViolatingRef.current = true;
-            handleGazeAway('দৃষ্টি নিচে নামিয়ে বই বা নোট দেখার চেষ্টা সনাক্ত হয়েছে');
-          }
         } else {
+          // Normal screen gaze / reading questions (স্ক্রিনের নিচের দিকে প্রশ্ন পড়ার জন্য দৃষ্টি নামানো স্বাভাবিক, তাই সতর্ক করা হবে না)
           headTurnConsecutiveRef.current = 0;
           sideGlanceConsecutiveRef.current = 0;
           lookDownConsecutiveRef.current = 0;
@@ -837,8 +822,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           setGazeStatus('normal');
 
           // International Standard: Continuous smooth adaptive baseline
-          // Absorbs natural sitting posture micro-drifts so a relaxed examinee never gets false alarms
-          if (hasCalibratedFaceRef.current && centroidX > 22 && centroidX < 58 && centroidY > 12 && centroidY < 42) {
+          // Absorbs natural sitting posture micro-drifts and natural downward reading posture
+          if (hasCalibratedFaceRef.current && centroidX > 22 && centroidX < 58 && centroidY > 12 && centroidY < 50) {
             baselineFaceXRef.current = (baselineFaceXRef.current! * 0.985) + (centroidX * 0.015);
             baselineFaceYRef.current = (baselineFaceYRef.current! * 0.985) + (centroidY * 0.015);
           }
@@ -1168,7 +1153,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
               {/* Live AI Proctor Bounding Box & Motion/Gaze Tracking HUD */}
               <div className={`absolute inset-1.5 rounded-lg border-2 pointer-events-none transition-colors duration-200 flex flex-col justify-between p-1.5 ${
-                headStatus === 'turned' || gazeStatus === 'looking_away' || gazeStatus === 'side_glance' || gazeStatus === 'looking_down' || motionStatus === 'excessive' || gazeStatus === 'face_missing'
+                headStatus === 'turned' || gazeStatus === 'looking_away' || gazeStatus === 'side_glance' || motionStatus === 'excessive' || gazeStatus === 'face_missing'
                   ? 'border-rose-500 bg-rose-500/15 animate-pulse'
                   : 'border-emerald-400/80'
               }`}>
@@ -1178,8 +1163,6 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                       ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
                       : headStatus === 'turned' || gazeStatus === 'looking_away'
                       ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
-                      : gazeStatus === 'looking_down'
-                      ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
                       : gazeStatus === 'face_missing'
                       ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
                       : 'bg-emerald-950/85 text-emerald-300 border border-emerald-500/40'
@@ -1188,8 +1171,6 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                       ? '⚠️ আড় চোখে তাকানো!'
                       : headStatus === 'turned' || gazeStatus === 'looking_away'
                       ? '⚠️ দৃষ্টি অন্যদিকে!'
-                      : gazeStatus === 'looking_down'
-                      ? '⚠️ দৃষ্টি নিচে নামানো!'
                       : gazeStatus === 'face_missing'
                       ? '⚠️ মুখ অনুপস্থিত!'
                       : 'দৃষ্টি স্ক্রিনে ✓'}
@@ -1213,7 +1194,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             <div className="w-full px-0.5 pt-1.5 flex flex-col gap-1 text-center">
               <div className="grid grid-cols-2 gap-1 text-[7.5px] sm:text-[8px] font-mono">
                 <div className={`py-1 px-0.5 rounded transition-colors ${
-                  gazeStatus !== 'normal' 
+                  gazeStatus === 'side_glance' || gazeStatus === 'looking_away' || gazeStatus === 'face_missing' || headStatus === 'turned'
                     ? 'bg-rose-950 text-rose-300 border border-rose-600 font-bold animate-pulse' 
                     : 'bg-slate-800 text-slate-300 border border-slate-700/60'
                 }`}>
@@ -1221,10 +1202,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                   <span className="truncate block">
                     {gazeStatus === 'side_glance'
                       ? 'আড় চোখ ⚠️'
-                      : gazeStatus === 'looking_away'
+                      : gazeStatus === 'looking_away' || headStatus === 'turned'
                       ? 'স্ক্রিনের বাইরে ⚠️'
-                      : gazeStatus === 'looking_down'
-                      ? 'দৃষ্টি নিচে ⚠️'
                       : gazeStatus === 'face_missing'
                       ? 'অনুপস্থিত ⚠️'
                       : 'স্ক্রিনে নিবদ্ধ ✓'}
