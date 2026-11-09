@@ -412,7 +412,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     };
   }, [isReviewOnly, isSubmitted, violationCount]);
 
-  // Real-time AI Gaze & Note/Book Reading Detector (running every 900ms)
+  // Real-time AI Gaze & Note/Book Reading Detector (Ultra-strict proctoring running every 350ms)
   useEffect(() => {
     if (isReviewOnly || isSubmitted || !cameraActive) return;
 
@@ -457,12 +457,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             }
           }
 
-          if (totalWeight > 40) {
+          if (totalWeight > 35) {
             hasCalibratedFaceRef.current = true;
           }
 
           const now = Date.now();
-          const canTriggerViolation = now - lastViolationTimeRef.current > 2600;
+          const canTriggerViolation = now - lastViolationTimeRef.current > 1400;
 
           // Manual test simulation button
           if (isSimulatingSuspicious) {
@@ -474,44 +474,38 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             return;
           }
 
-          // If face was previously detected but now absent (student looked down into lap/book, face obscured, or turned away)
-          if (hasCalibratedFaceRef.current && totalWeight < 25) {
-            consecutiveAwayCountRef.current += 1;
-            if (consecutiveAwayCountRef.current >= 2) {
-              setGazeStatus('looking_away');
-              if (canTriggerViolation) {
-                lastViolationTimeRef.current = now;
-                triggerSuspiciousFlag('স্ক্রিন থেকে চোখ ও মুখ সরানো হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে পরীক্ষা দিন।');
-              }
+          // Strict Case 1: If face was previously seen but now absent / obscured (e.g. bowed head into lap/book, face covered)
+          if (hasCalibratedFaceRef.current && totalWeight < 28) {
+            setGazeStatus('looking_away');
+            if (canTriggerViolation) {
+              lastViolationTimeRef.current = now;
+              triggerSuspiciousFlag('স্ক্রিন থেকে চোখ ও মুখ সরানো হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে পরীক্ষা দিন।');
             }
             return;
           }
 
-          if (totalWeight >= 25) {
-            const centroidY = weightedY / totalWeight; // 0 to 60 (normal upright eye/face level is 18-29)
-            const centroidX = weightedX / totalWeight; // 0 to 80 (normal horizontal center is 28-52)
+          if (totalWeight >= 28) {
+            const centroidY = weightedY / totalWeight; // 0 to 60 (normal eye/screen center is 19-26)
+            const centroidX = weightedX / totalWeight; // 0 to 80 (normal horizontal center is 33-47)
 
-            // Detected Looking Down: Head or gaze pitched downward towards notebook/desk
-            if (centroidY > 31) {
-              consecutiveAwayCountRef.current += 1;
+            // Strict Case 2: Detected Looking Down at desk, notebook or book (Y >= 27.2)
+            if (centroidY >= 27.2) {
               setGazeStatus('looking_down');
               if (canTriggerViolation) {
                 lastViolationTimeRef.current = now;
                 triggerSuspiciousFlag('দৃষ্টি নিচে নামিয়ে বই বা নোট পড়ার চেষ্টা সনাক্ত হয়েছে! সরাসরি স্ক্রিনের দিকে তাকিয়ে উত্তর দিন।');
               }
             }
-            // Detected Looking Away: Head or gaze shifted left or right
-            else if (centroidX < 24 || centroidX > 56) {
-              consecutiveAwayCountRef.current += 1;
+            // Strict Case 3: Detected Looking Left or Right away from screen (X < 32 or X > 48)
+            else if (centroidX < 32 || centroidX > 48) {
               setGazeStatus('looking_away');
               if (canTriggerViolation) {
                 lastViolationTimeRef.current = now;
                 triggerSuspiciousFlag('স্ক্রিন ছেড়ে অন্যদিকে তাকানোর চেষ্টা সনাক্ত হয়েছে! অনুগ্রহ করে স্ক্রিনের দিকে তাকিয়ে থাকুন।');
               }
             }
-            // Normal: Looking directly at exam screen
+            // Normal: Upright & looking directly at exam screen
             else {
-              consecutiveAwayCountRef.current = 0;
               setGazeStatus('normal');
             }
           }
@@ -519,7 +513,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           // Canvas cross-origin or read error safe fallback
         }
       }
-    }, 900);
+    }, 350);
 
     return () => clearInterval(interval);
   }, [isReviewOnly, isSubmitted, cameraActive, isSimulatingSuspicious]);
@@ -528,18 +522,16 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const triggerSuspiciousFlag = (reason: string) => {
     playWarningBeep();
     const nowTime = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const logEntry = `[${nowTime}] ${reason}`;
-
-    setProctorLogs(prev => {
-      if (prev.includes(logEntry)) return prev;
-      return [...prev, logEntry];
-    });
 
     setViolationCount(prev => {
       const next = prev + 1;
-      setLastWarning(`⚠️ সতর্কতা (${next}/৩): ${reason}`);
-      if (next >= 3) {
-        // Auto-submit exam immediately on 3 persistent violations
+      const logEntry = `[${nowTime}] ${reason} (সতর্কতা #${next})`;
+      
+      setProctorLogs(logs => [...logs, logEntry]);
+      setLastWarning(`⚠️ সতর্কতা (${next}/৫): ${reason}`);
+      
+      if (next >= 5) {
+        // Auto-submit exam immediately on 5 persistent violations
         setTimeout(() => {
           handleSubmitExam(true);
         }, 1200);
@@ -549,7 +541,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
     setTimeout(() => {
       setLastWarning(null);
-    }, 4500);
+    }, 4000);
   };
 
   // Interactive Test Simulation for User/Examiner to simulate looking down at notes
@@ -631,7 +623,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     const calculatedScore = questionsList.length > 0 ? Math.round((correctCount / questionsList.length) * 100) : 0;
     
     const finalFlags = isForcedByProctor 
-      ? ['৩ বার অসদুপায় / বই-নোট পড়ার চেষ্টার কারণে পরীক্ষা নির্ধারিত সময়ের পূর্বে স্বয়ংক্রিয়ভাবে জমা হয়েছে', ...proctorLogs]
+      ? ['৫ বার অসদুপায় / বই-নোট পড়ার চেষ্টার কারণে পরীক্ষা নির্ধারিত সময়ের পূর্বে স্বয়ংক্রিয়ভাবে জমা হয়েছে', ...proctorLogs]
       : proctorLogs.length > 0
       ? proctorLogs
       : violationCount > 0 
@@ -834,7 +826,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
                   <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-mono text-white/90 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded">
                     <span>নকল প্রতিরোধ</span>
-                    <span>সতর্কতা: {violationCount}/৩</span>
+                    <span>সতর্কতা: {violationCount}/৫</span>
                   </div>
                 </div>
               </div>
