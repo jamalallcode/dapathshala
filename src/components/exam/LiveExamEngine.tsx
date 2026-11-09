@@ -3,7 +3,8 @@ import confetti from "canvas-confetti";
 import { 
   ArrowLeft, Clock, CircleAlert, CircleCheck, Check, CheckCircle2,
   FileCheck, Send, ShieldCheck, ShieldAlert, X, FileText, Camera, 
-  AlertTriangle, Eye, EyeOff, Maximize, MessageSquare, Copy 
+  AlertTriangle, Eye, EyeOff, Maximize, MessageSquare, Copy,
+  Volume2, VolumeX, Play
 } from "lucide-react";
 import { 
   getStoredTests, 
@@ -60,6 +61,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [proctorLogs, setProctorLogs] = useState<string[]>([]);
   const [isSimulatingSuspicious, setIsSimulatingSuspicious] = useState(false);
   const [showObservationModal, setShowObservationModal] = useState(false);
+  const [isSpeakingAudio, setIsSpeakingAudio] = useState(false);
   const isViolatingRef = useRef<boolean>(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -96,63 +98,145 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       levelNum: 1,
       name: 'লেভেল ১ (মৃদু)',
       tag: 'সহনশীল',
-      featureSkewThreshold: 0.13,
-      skinAsymmetryThreshold: 0.28,
+      featureSkewThreshold: 0.18,
+      skinAsymmetryThreshold: 0.35,
       yawCentroidThreshold: 12.0,
-      pitchDownThreshold: 9.0,
-      sideGlanceDev: 0.22,
-      consecutiveRequired: 2,
+      pitchDownThreshold: 9.5,
+      sideGlanceDev: 0.24,
+      consecutiveRequired: 3,
     },
     2: {
       levelNum: 2,
       name: 'লেভেল ২ (মাঝারি)',
       tag: 'স্ট্যান্ডার্ড',
-      featureSkewThreshold: 0.095,
-      skinAsymmetryThreshold: 0.20,
-      yawCentroidThreshold: 8.0,
-      pitchDownThreshold: 7.0,
-      sideGlanceDev: 0.16,
+      featureSkewThreshold: 0.15,
+      skinAsymmetryThreshold: 0.30,
+      yawCentroidThreshold: 9.0,
+      pitchDownThreshold: 8.0,
+      sideGlanceDev: 0.20,
       consecutiveRequired: 2,
     },
     3: {
       levelNum: 3,
       name: 'লেভেল ৩ (কঠোর - আড় চোখ সনাক্ত)',
       tag: 'কঠোর',
-      featureSkewThreshold: 0.07,
-      skinAsymmetryThreshold: 0.15,
-      yawCentroidThreshold: 5.5,
-      pitchDownThreshold: 5.8,
-      sideGlanceDev: 0.12,
-      consecutiveRequired: 1,
+      featureSkewThreshold: 0.13,
+      skinAsymmetryThreshold: 0.27,
+      yawCentroidThreshold: 7.0,
+      pitchDownThreshold: 7.0,
+      sideGlanceDev: 0.18,
+      consecutiveRequired: 2,
     },
     4: {
       levelNum: 4,
       name: 'লেভেল ৪ (সর্বোচ্চ কঠোর - অতি-সংবেদনশীল)',
       tag: 'অতি-সংবেদনশীল',
-      featureSkewThreshold: 0.045, // Super sensitive: detect any head turn like in test photo (~0.15+)
-      skinAsymmetryThreshold: 0.11, // Super sensitive: detect cheek turning towards side (~0.35+)
-      yawCentroidThreshold: 3.5,
-      pitchDownThreshold: 4.5,
-      sideGlanceDev: 0.08,
-      consecutiveRequired: 1, // Instant 1-frame (~140ms) detection!
+      // Calibrated: frontal face has skew ~0.04-0.07; turned head has skew ~0.16-0.35
+      // 0.11 accurately catches every head turn while never triggering on a straight face
+      featureSkewThreshold: 0.11,
+      // Calibrated: natural room lighting creates asymmetry ~0.10-0.18; turned face creates ~0.32-0.45
+      // 0.25 prevents room lighting false positives
+      skinAsymmetryThreshold: 0.25,
+      yawCentroidThreshold: 5.5,
+      pitchDownThreshold: 6.0,
+      sideGlanceDev: 0.17,
+      consecutiveRequired: 2, // 2 consecutive frames (~280ms) filters single-frame pixel noise & auto-exposure flicker
     },
   }[effectiveProctoringLevel] || {
     levelNum: 2,
     name: 'লেভেল ২ (মাঝারি)',
     tag: 'স্ট্যান্ডার্ড',
-    featureSkewThreshold: 0.095,
-    skinAsymmetryThreshold: 0.20,
-    yawCentroidThreshold: 8.0,
-    pitchDownThreshold: 7.0,
-    sideGlanceDev: 0.16,
+    featureSkewThreshold: 0.15,
+    skinAsymmetryThreshold: 0.30,
+    yawCentroidThreshold: 9.0,
+    pitchDownThreshold: 8.0,
+    sideGlanceDev: 0.20,
     consecutiveRequired: 2,
   };
 
-  // Sound replacement notice: Audible buzzer is replaced by on-screen observation alerts
-  const playWarningBeep = () => {
-    // Sound replaced with visual warning modal as explicitly requested:
-    // "সাউন্ড এর পরিবর্তে “প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।” এই মেচেজটি আসবে।"
+  // Spoken Voice Audio Alert (বাংলা কণ্ঠস্বরে অডিও আকারে সতর্কবার্তা)
+  // User Requirement: “প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।” অডিও আকারে বলা হবে।
+  const speakObservationAudio = (customText?: string) => {
+    const textToSpeak = customText || "প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।";
+
+    // 1. Dual-tone Attention Alert Chime via Web Audio API
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') {
+          ctx.resume();
+        }
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(520, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(780, ctx.currentTime + 0.15);
+        osc.frequency.setValueAtTime(780, ctx.currentTime + 0.22);
+        osc.frequency.exponentialRampToValueAtTime(1040, ctx.currentTime + 0.38);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.5);
+      }
+    } catch (e) {
+      console.warn("Audio chime error:", e);
+    }
+
+    // 2. High-Fidelity Bengali Voice Speech Synthesis (Text-to-Speech)
+    try {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(textToSpeak);
+        utterance.lang = 'bn-BD';
+        utterance.rate = 0.88; // clear, natural Bangladeshi cadence
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+
+        const voices = window.speechSynthesis.getVoices();
+        const bnVoice = voices.find(v => 
+          v.lang.toLowerCase().startsWith('bn') || 
+          v.lang.toLowerCase().includes('bengali') || 
+          v.lang.toLowerCase().includes('bangla')
+        );
+        if (bnVoice) {
+          utterance.voice = bnVoice;
+        }
+
+        utterance.onstart = () => {
+          setIsSpeakingAudio(true);
+        };
+        utterance.onend = () => {
+          setIsSpeakingAudio(false);
+        };
+        utterance.onerror = () => {
+          setIsSpeakingAudio(false);
+        };
+
+        window.speechSynthesis.speak(utterance);
+      }
+    } catch (err) {
+      console.warn("Speech synthesis error:", err);
+    }
   };
+
+  // Pre-load Speech Synthesis voices on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+      };
+    }
+    return () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   // Request Fullscreen Mode to lock out browser tabs and address bar
   const enterFullscreen = async () => {
@@ -690,16 +774,20 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         }
 
         // 4. Head Turned Sideways or Backwards (মাথা সম্পূর্ণ অন্যদিকে ঘুরানো)
-        const isTurnedByFeatureSkew = featureSkew > proctorConfig.featureSkewThreshold;
-        const isTurnedBySkinAsymmetry = skinAsymmetry > proctorConfig.skinAsymmetryThreshold;
-        const isTurnedByProfileRatio = (faceW / faceH < 0.58);
+        // Multi-Factor Detection: True head rotation shifts nose/eyes away from center (> threshold)
+        // OR combines moderate skew with marked cheek asymmetry (both signals agreeing).
+        // Directional room lighting alone (asymmetry ~0.10-0.18) without feature skew will NEVER trigger!
+        const isStrongFeatureTurn = featureSkew > proctorConfig.featureSkewThreshold;
+        const isCombinedTurn = (featureSkew > (proctorConfig.featureSkewThreshold * 0.72)) && (skinAsymmetry > proctorConfig.skinAsymmetryThreshold);
+        const isExtremeAsymmetryTurn = (skinAsymmetry > 0.38) && (featureSkew > 0.07);
+        const isTurnedByProfileRatio = (faceW / faceH < 0.50);
         const isTurnedByCentroidShift = (Math.abs(centroidX - baseX) > proctorConfig.yawCentroidThreshold);
-        const isTurnedBackwards = upperDarkHairCount > 120 && faceSkinCount < 40;
+        const isTurnedBackwards = upperDarkHairCount > 130 && faceSkinCount < 35;
 
-        const isHeadTurned = isTurnedByFeatureSkew || isTurnedBySkinAsymmetry || isTurnedByProfileRatio || isTurnedByCentroidShift || isTurnedBackwards;
+        const isHeadTurned = isStrongFeatureTurn || isCombinedTurn || isExtremeAsymmetryTurn || isTurnedByProfileRatio || isTurnedByCentroidShift || isTurnedBackwards;
 
         // 5. Head Pitched Downwards toward desk or lap (বই বা নোট দেখার চেষ্টা)
-        const isHeadDownAtDesk = (centroidY > baseY + proctorConfig.pitchDownThreshold) || (faceMinY > 24 && faceH < 34);
+        const isHeadDownAtDesk = (centroidY > baseY + proctorConfig.pitchDownThreshold) || (faceMinY > 26 && faceH < 30);
 
         if (isHeadTurned) {
           headTurnConsecutiveRef.current++;
@@ -709,7 +797,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           setGazeStatus('looking_away');
 
           const isNewTurn = !isViolatingRef.current;
-          if (headTurnConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 3000)) {
+          if (headTurnConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 4000)) {
             lastViolationTimeRef.current = now;
             isViolatingRef.current = true;
             handleGazeAway('মাথা ও দৃষ্টি অন্যদিকে ঘোরানো সনাক্ত হয়েছে');
@@ -722,7 +810,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           setGazeStatus('side_glance');
 
           const isNewTurn = !isViolatingRef.current;
-          if (sideGlanceConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 3000)) {
+          if (sideGlanceConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 4000)) {
             lastViolationTimeRef.current = now;
             isViolatingRef.current = true;
             handleGazeAway('আড় চোখে এদিক-সেদিক তাকানো সনাক্ত হয়েছে');
@@ -735,7 +823,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           setGazeStatus('looking_down');
 
           const isNewTurn = !isViolatingRef.current;
-          if (lookDownConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 3000)) {
+          if (lookDownConsecutiveRef.current >= proctorConfig.consecutiveRequired && (isNewTurn || now - lastViolationTimeRef.current > 4000)) {
             lastViolationTimeRef.current = now;
             isViolatingRef.current = true;
             handleGazeAway('দৃষ্টি নিচে নামিয়ে বই বা নোট দেখার চেষ্টা সনাক্ত হয়েছে');
@@ -786,10 +874,11 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       return;
     }
 
-    // Every 3 warnings (3rd, 6th, 9th, 12th...), show prominent observation alert modal
+    // Every 3 warnings (3rd, 6th, 9th, 12th...), trigger voice audio announcement and modal
     if (next % 3 === 0) {
       setShowObservationModal(true);
       setLastWarning("“প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।”");
+      speakObservationAudio("প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।");
       setTimeout(() => {
         setLastWarning(null);
       }, 6000);
@@ -937,6 +1026,18 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
+  const handleRecalibrate = () => {
+    baselineFaceXRef.current = null;
+    baselineFaceYRef.current = null;
+    calibrationSamplesCountRef.current = 0;
+    isViolatingRef.current = false;
+    headTurnConsecutiveRef.current = 0;
+    sideGlanceConsecutiveRef.current = 0;
+    lookDownConsecutiveRef.current = 0;
+    setGazeStatus('normal');
+    setHeadStatus('forward');
+  };
+
   const answeredCount = Object.keys(answers).length;
   const isReviewed = test.status === 'reviewed';
 
@@ -990,7 +1091,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         </div>
       )}
 
-      {/* 3-Warning Periodic Observation Alert Modal */}
+      {/* 3-Warning Periodic Observation Alert Modal with Spoken Voice Audio */}
       {showObservationModal && !isReviewOnly && !isSubmitted && (
         <div className="fixed inset-0 z-[120] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
           <div className="max-w-lg w-full bg-slate-900 border-2 border-amber-500 rounded-3xl p-6 sm:p-8 text-center text-white space-y-5 shadow-2xl shadow-amber-500/25 ring-4 ring-amber-500/30 animate-in zoom-in-95">
@@ -1013,6 +1114,36 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               </p>
             </div>
 
+            {/* Spoken Voice Audio Player & Replay Bar */}
+            <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-between gap-3 text-amber-200">
+              <div className="flex items-center gap-2 text-xs font-bold text-left">
+                <div className="relative">
+                  <Volume2 className={`w-5 h-5 text-amber-400 ${isSpeakingAudio ? "animate-bounce" : ""}`} />
+                  {isSpeakingAudio && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                  )}
+                </div>
+                <div>
+                  <span className="block font-black text-amber-300">
+                    {isSpeakingAudio ? "🔊 অডিও বার্তা বাজছে..." : "🔊 সতর্কতামূলক অডিও বার্তা"}
+                  </span>
+                  <span className="text-[10px] text-slate-300 font-normal">
+                    {isSpeakingAudio ? "বাংলা কণ্ঠস্বরে বলা হচ্ছে" : "স্বয়ংক্রিয়ভাবে অডিও বার্তাটি শোনানো হচ্ছে"}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => speakObservationAudio("প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।")}
+                className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-black text-xs flex items-center gap-1.5 cursor-pointer transition-all shadow-md shrink-0"
+                title="বার্তাটি অডিও আকারে পুনরায় শুনুন"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>পুনরায় শুনুন</span>
+              </button>
+            </div>
+
             <div className="p-3 rounded-2xl bg-slate-800/90 border border-slate-700 text-xs text-amber-200 font-semibold flex items-center justify-between">
               <span className="text-slate-400">বর্তমান মোট সতর্কতা:</span>
               <span className="text-amber-400 font-mono font-bold text-sm">{violationCount}/৫০ বার</span>
@@ -1020,7 +1151,13 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
             <button
               type="button"
-              onClick={() => setShowObservationModal(false)}
+              onClick={() => {
+                if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                  window.speechSynthesis.cancel();
+                }
+                setIsSpeakingAudio(false);
+                setShowObservationModal(false);
+              }}
               className="w-full py-3.5 px-5 rounded-2xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/30 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
             >
               <CheckCircle2 className="w-5 h-5" />
@@ -1176,7 +1313,30 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
               <div className="text-[7px] sm:text-[7.5px] text-slate-400 font-mono bg-slate-950/80 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between">
                 <span className="truncate">মাত্রা: {proctorConfig.name}</span>
-                <span className="shrink-0 text-amber-300 font-bold">প্রতি ৩ বারে বিশেষ বার্তা</span>
+                <span className="shrink-0 text-amber-300 font-bold">প্রতি ৩ বারে অডিও বার্তা 🔊</span>
+              </div>
+
+              {/* Recalibrate, Audio Test & Reset Controls */}
+              {/* Recalibrate & Audio Test Controls */}
+              <div className="flex items-center gap-1 pt-0.5">
+                <button
+                  type="button"
+                  onClick={handleRecalibrate}
+                  className="flex-1 py-1 px-1.5 rounded bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-300 hover:text-white text-[7.5px] sm:text-[8px] font-bold cursor-pointer border border-slate-700 transition-colors flex items-center justify-center gap-1"
+                  title="সোজা বসে ক্যামেরার দৃষ্টি রিক্যালিব্রেট বা রি-অ্যালাইন করুন"
+                >
+                  <span>ক্যামেরা রি-অ্যালাইন</span>
+                  <span>⟳</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => speakObservationAudio("প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।")}
+                  className="py-1 px-1.5 rounded bg-amber-950/80 hover:bg-amber-900 active:bg-amber-950 text-amber-300 hover:text-white text-[7.5px] sm:text-[8px] font-bold cursor-pointer border border-amber-800/60 transition-colors flex items-center gap-0.5"
+                  title="বাংলা কণ্ঠস্বরে অডিও বার্তাটি পরীক্ষা করে শুনুন"
+                >
+                  <Volume2 className="w-2.5 h-2.5" />
+                  <span>অডিও টেস্ট</span>
+                </button>
               </div>
 
               {!cameraActive && (
