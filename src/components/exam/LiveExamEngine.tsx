@@ -4,7 +4,7 @@ import {
   ArrowLeft, Clock, CircleAlert, CircleCheck, Check, CheckCircle2,
   FileCheck, Send, ShieldCheck, ShieldAlert, X, FileText, Camera, 
   AlertTriangle, Eye, EyeOff, Maximize, MessageSquare, Copy,
-  Volume2, VolumeX, Play
+  Volume2, VolumeX, Play, Mic, MicOff, Smartphone, BookOpen, Shuffle, Lock, Timer
 } from "lucide-react";
 import { 
   getStoredTests, 
@@ -15,7 +15,9 @@ import {
   syncSubmissionToServer,
   syncTestToServer
 } from "../../lib/storage";
-import { AssignedTest } from "../../types";
+import { AssignedTest, ViolationSnapshot, ExamQuestion } from "../../types";
+import { startAudioMonitoring, AudioProctoringController } from "../../lib/audioProctoringService";
+import { startObjectDetection, ObjectDetectionController, DetectedObjectResult } from "../../lib/objectDetectionService";
 
 interface LiveExamEngineProps {
   test: AssignedTest;
@@ -28,9 +30,43 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   onExit,
   isReviewOnly = false
 }) => {
+  // Feature 2: Anti-Cheating Question & Option Shuffling per Examinee Attempt
+  const [activeQuestions] = useState<ExamQuestion[]>(() => {
+    const rawList = test.questions || [];
+    // If reviewing or already submitted, maintain submitted order
+    if (isReviewOnly || test.status === 'submitted' || test.status === 'reviewed') {
+      return rawList;
+    }
+
+    // Deep clone and shuffle options per question using Fisher-Yates algorithm
+    const randomized = rawList.map((q) => {
+      const opts = [...(q.options || [])];
+      for (let i = opts.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [opts[i], opts[j]] = [opts[j], opts[i]];
+      }
+
+      const newCorrectIndex = opts.findIndex((opt) => opt === q.correctAnswer);
+
+      return {
+        ...q,
+        options: opts,
+        correctAnswerIndex: newCorrectIndex !== -1 ? newCorrectIndex : q.correctAnswerIndex
+      };
+    });
+
+    // Shuffle questions sequence using Fisher-Yates algorithm
+    for (let i = randomized.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [randomized[i], randomized[j]] = [randomized[j], randomized[i]];
+    }
+
+    return randomized;
+  });
+
   const [answers, setAnswers] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
-    (test.questions || []).forEach((q) => {
+    (activeQuestions || []).forEach((q) => {
       if (q && q.studentAnswer) {
         initial[q.id] = q.studentAnswer;
       }
@@ -58,10 +94,32 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [gazeAwayCount, setGazeAwayCount] = useState<number>(0);
   const gazeAwayCountRef = useRef<number>(0);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  
+  // Feature 3: Per-Question Dedicated Time Limit & Backtrack Lock
+  const perQuestionDuration = Math.max(30, Math.floor((test.durationMinutes * 60) / Math.max(1, activeQuestions.length)));
+  const [questionTimeLeft, setQuestionTimeLeft] = useState<number>(perQuestionDuration);
+  const [lockedQuestionIndices, setLockedQuestionIndices] = useState<Set<number>>(() => {
+    const initial = new Set<number>();
+    if (!isReviewOnly && test.status !== 'submitted' && test.status !== 'reviewed') {
+      activeQuestions.forEach((q, idx) => {
+        if (q.studentAnswer) initial.add(idx);
+      });
+    }
+    return initial;
+  });
+
   const [proctorLogs, setProctorLogs] = useState<string[]>([]);
   const [isSimulatingSuspicious, setIsSimulatingSuspicious] = useState(false);
   const [isSpeakingAudio, setIsSpeakingAudio] = useState(false);
   const isViolatingRef = useRef<boolean>(false);
+
+  // Live Audio & Object Detection States
+  const [audioStatus, setAudioStatus] = useState<'calibrating' | 'quiet' | 'speech_detected' | 'noise'>('quiet');
+  const [audioVolume, setAudioVolume] = useState<number>(0);
+  const [detectedObject, setDetectedObject] = useState<string | null>(null);
+
+  const audioControllerRef = useRef<AudioProctoringController | null>(null);
+  const objectControllerRef = useRef<ObjectDetectionController | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -84,6 +142,61 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const baselineFaceYRef = useRef<number | null>(null);
   const baselineFaceXRef = useRef<number | null>(null);
   const calibrationSamplesCountRef = useRef<number>(0);
+
+  // Feature 1: Automated Photographic Violation Snapshot Proofs
+  const [violationSnapshots, setViolationSnapshots] = useState<ViolationSnapshot[]>(() => test.violationSnapshots || []);
+  const violationSnapshotsRef = useRef<ViolationSnapshot[]>(test.violationSnapshots || []);
+  const snapshotCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const captureViolationSnapshot = (reason: string, strike: number): ViolationSnapshot | null => {
+    try {
+      const video = videoRef.current;
+      if (!video) return null;
+      if (!snapshotCanvasRef.current) {
+        snapshotCanvasRef.current = document.createElement('canvas');
+        snapshotCanvasRef.current.width = 320;
+        snapshotCanvasRef.current.height = 240;
+      }
+      const canvas = snapshotCanvasRef.current;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+
+      // Draw the active video stream frame
+      ctx.drawImage(video, 0, 0, 320, 240);
+
+      // Watermark bar at bottom
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+      ctx.fillRect(0, 192, 320, 48);
+
+      // Red warning accent line
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(0, 190, 320, 2);
+
+      // Warning text with strike & reason
+      ctx.fillStyle = '#fca5a5';
+      ctx.font = 'bold 11px sans-serif';
+      const cleanReason = reason.length > 34 ? reason.slice(0, 34) + '...' : reason;
+      ctx.fillText(`⚠️ সতর্কতা #${strike}: ${cleanReason}`, 8, 208);
+
+      // Timestamp & verification tag
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '9.5px sans-serif';
+      const nowTime = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      ctx.fillText(`সময়: ${nowTime} • দাপাঠশালা স্বয়ংক্রিয় ডিজিটাল প্রমাণ`, 8, 226);
+
+      const photo = canvas.toDataURL('image/jpeg', 0.65);
+      return {
+        id: `snap-${Date.now()}-${strike}-${Math.random().toString(36).substr(2, 4)}`,
+        timestamp: nowTime,
+        reason,
+        strike,
+        photo
+      };
+    } catch (err) {
+      console.warn("Failed to capture violation snapshot:", err);
+      return null;
+    }
+  };
 
   // 4 Proctoring Strictness Levels (অভিভাবক কর্তৃক নির্বাচিত ৪টি মাত্রা)
   const effectiveProctoringLevel: 1 | 2 | 3 | 4 = (
@@ -469,18 +582,42 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     async function initCamera() {
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { 
-              facingMode: 'user', 
-              width: { ideal: 480 }, 
-              height: { ideal: 360 } 
-            },
-            audio: false
-          });
+          let stream: MediaStream;
+          try {
+            // Request both video and microphone for full anti-cheating proctoring
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { 
+                facingMode: 'user', 
+                width: { ideal: 480 }, 
+                height: { ideal: 360 } 
+              },
+              audio: true
+            });
+          } catch (micErr) {
+            console.warn("Microphone access unavailable or denied, falling back to video only:", micErr);
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { 
+                facingMode: 'user', 
+                width: { ideal: 480 }, 
+                height: { ideal: 360 } 
+              },
+              audio: false
+            });
+          }
+
           if (isMounted) {
             mediaStreamRef.current = stream;
             setCameraActive(true);
             attachStream(stream);
+
+            // Start Audio Proctoring if microphone track is active
+            if (stream.getAudioTracks().length > 0) {
+              audioControllerRef.current = startAudioMonitoring(stream, (reason) => {
+                setAudioStatus('speech_detected');
+                handleGazeAway(reason);
+              });
+            }
+
             return;
           }
         }
@@ -505,6 +642,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
     return () => {
       isMounted = false;
+      audioControllerRef.current?.stop();
+      objectControllerRef.current?.stop();
       if (fallbackAnimationRef.current) {
         cancelAnimationFrame(fallbackAnimationRef.current);
       }
@@ -520,6 +659,49 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       attachStream(mediaStreamRef.current);
     }
   }, [cameraActive]);
+
+  // Live Object Detection Loop (Smartphone, Books/Notes, Second Person in Frame)
+  useEffect(() => {
+    if (isReviewOnly || isSubmitted || !cameraActive || !videoRef.current) return;
+
+    const controller = startObjectDetection(videoRef.current, (result: DetectedObjectResult) => {
+      setDetectedObject(result.label);
+      const reason = result.type === 'cell_phone'
+        ? 'ফ্রেমে মোবাইল ফোন বা ডিজিটাল ডিভাইস সনাক্ত হয়েছে'
+        : result.type === 'book'
+        ? 'ফ্রেমে বই, খাতা বা নোট পেপার সনাক্ত হয়েছে'
+        : result.type === 'second_person'
+        ? 'ফ্রেমে অতিরিক্ত মানুষের উপস্থিতি সনাক্ত হয়েছে'
+        : `ফ্রেমে অননুমোদিত বস্তু (${result.label}) সনাক্ত হয়েছে`;
+      
+      handleGazeAway(reason);
+
+      setTimeout(() => {
+        setDetectedObject(null);
+      }, 4500);
+    });
+
+    objectControllerRef.current = controller;
+
+    return () => {
+      controller.stop();
+      objectControllerRef.current = null;
+    };
+  }, [cameraActive, isReviewOnly, isSubmitted]);
+
+  // Audio volume and status live poller for UI
+  useEffect(() => {
+    if (isReviewOnly || isSubmitted || !cameraActive) return;
+
+    const interval = setInterval(() => {
+      if (audioControllerRef.current) {
+        setAudioVolume(audioControllerRef.current.getVolume());
+        setAudioStatus(audioControllerRef.current.getStatus());
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [cameraActive, isReviewOnly, isSubmitted]);
 
   // Anti-Cheating Listeners: Tab Switch & Window Blur Detection
   useEffect(() => {
@@ -556,21 +738,43 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const requestWebcamAccess = async () => {
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { 
-            facingMode: 'user', 
-            width: { ideal: 480 }, 
-            height: { ideal: 360 } 
-          },
-          audio: false
-        });
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { 
+              facingMode: 'user', 
+              width: { ideal: 480 }, 
+              height: { ideal: 360 } 
+            },
+            audio: true
+          });
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { 
+              facingMode: 'user', 
+              width: { ideal: 480 }, 
+              height: { ideal: 360 } 
+            },
+            audio: false
+          });
+        }
+
         if (mediaStreamRef.current) {
           mediaStreamRef.current.getTracks().forEach(track => track.stop());
         }
+        audioControllerRef.current?.stop();
+
         mediaStreamRef.current = stream;
         setCameraActive(true);
         setCameraError(false);
         attachStream(stream);
+
+        if (stream.getAudioTracks().length > 0) {
+          audioControllerRef.current = startAudioMonitoring(stream, (reason) => {
+            setAudioStatus('speech_detected');
+            handleGazeAway(reason);
+          });
+        }
       }
     } catch (err) {
       console.warn("User webcam request error:", err);
@@ -908,6 +1112,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     proctorLogsRef.current = [...proctorLogsRef.current, logEntry];
     setProctorLogs([...proctorLogsRef.current]);
 
+    // Feature 1: Capture photographic snapshot proof of the violation
+    const snap = captureViolationSnapshot(reason, next);
+    if (snap) {
+      const updatedSnaps = [...violationSnapshotsRef.current, snap].slice(-25);
+      violationSnapshotsRef.current = updatedSnaps;
+      setViolationSnapshots(updatedSnaps);
+    }
+
     // Auto-termination STRICTLY occurs ONLY after minimum 50 warnings! Before 50, test continues.
     if (next >= 50) {
       setLastWarning(`⛔ সর্বোচ্চ ৫০ বার সতর্কতার মাত্রা লঙ্ঘিত হয়েছে! পরীক্ষাটি স্বয়ংক্রিয়ভাবে সমাপ্ত ও জমা নেওয়া হচ্ছে...`);
@@ -953,23 +1165,72 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     return () => clearInterval(interval);
   }, [timeLeft, isReviewOnly, isSubmitted]);
 
-  // Handle Option Select with Auto-advance to Next Question
+  // Feature 3: Per-Question Expiration Handler
+  const handleQuestionTimeExpired = (index: number) => {
+    setLockedQuestionIndices((prev) => new Set([...prev, index]));
+
+    if (index + 1 < activeQuestions.length) {
+      const nextIndex = index + 1;
+      setActiveQuestionIndex(nextIndex);
+      setQuestionTimeLeft(perQuestionDuration);
+      questionRefs.current[nextIndex]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+      setLastWarning(`⏱️ ${index + 1} নং প্রশ্নের নির্ধারিত সময় শেষ হয়েছে! স্বয়ংক্রিয়ভাবে ${nextIndex + 1} নং প্রশ্নে নিয়ে যাওয়া হয়েছে।`);
+      setTimeout(() => setLastWarning(null), 3500);
+    } else {
+      // Last question time expired, auto-submit
+      handleSubmitExam(false);
+    }
+  };
+
+  // Feature 3: Dedicated Per-Question Countdown Timer Loop
+  useEffect(() => {
+    if (isReviewOnly || isSubmitted) return;
+
+    const interval = setInterval(() => {
+      setQuestionTimeLeft((prev) => {
+        if (prev <= 1) {
+          handleQuestionTimeExpired(activeQuestionIndex);
+          return perQuestionDuration;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeQuestionIndex, isReviewOnly, isSubmitted, perQuestionDuration, activeQuestions.length]);
+
+  // Handle Option Select with Auto-advance to Next Question & Backtrack Locking
   const handleSelectOption = (questionId: string, option: string, index: number) => {
     if (isReviewOnly || isSubmitted) return;
+
+    // Feature 3: Backtrack Lock - prevent altering locked/passed questions
+    if (lockedQuestionIndices.has(index)) {
+      setLastWarning("🔒 এই প্রশ্নের উত্তর ইতিমধ্যে জমা ও লক করা হয়েছে (নিরাপত্তার স্বার্থে ব্যাক-ট্র্যাক বন্ধ)");
+      setTimeout(() => setLastWarning(null), 3000);
+      return;
+    }
 
     setAnswers((prev) => ({
       ...prev,
       [questionId]: option
     }));
 
-    // Auto-advance to the next question smoothly
+    // Auto-advance to the next question and lock current question
     setTimeout(() => {
-      if (index + 1 < test.questions.length) {
-        questionRefs.current[index + 1]?.scrollIntoView({
+      // Lock the answered question
+      setLockedQuestionIndices((prev) => new Set([...prev, index]));
+
+      if (index + 1 < activeQuestions.length) {
+        const nextIndex = index + 1;
+        setActiveQuestionIndex(nextIndex);
+        setQuestionTimeLeft(perQuestionDuration);
+        questionRefs.current[nextIndex]?.scrollIntoView({
           behavior: "smooth",
           block: "center"
         });
-        setActiveQuestionIndex(index + 1);
       } else {
         // If final question answered, smoothly scroll to submit button
         submitSectionRef.current?.scrollIntoView({
@@ -990,7 +1251,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }
 
     let correctCount = 0;
-    const questionsList = test.questions || [];
+    const questionsList = activeQuestions || [];
     const updatedQuestions = questionsList.map((q) => {
       const chosen = answers[q.id] || "";
       const isCorrect = chosen === q.correctAnswer;
@@ -1020,6 +1281,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       score: calculatedScore,
       questions: updatedQuestions,
       proctoringFlags: finalFlags,
+      violationSnapshots: violationSnapshotsRef.current,
       submittedAt: test.submittedAt || nowIso
     };
 
@@ -1232,6 +1494,13 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                   </div>
                 </div>
 
+                {detectedObject && (
+                  <div className="absolute top-7 left-1.5 right-1.5 bg-rose-600 text-white text-[7.5px] sm:text-[8px] font-black py-0.5 px-1 rounded shadow-md border border-rose-300 animate-bounce flex items-center justify-center gap-1 z-10">
+                    <Smartphone className="w-2.5 h-2.5" />
+                    <span>⚠️ ফ্রেমে {detectedObject} সনাক্ত!</span>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-mono text-white/90 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded">
                   <span>সতর্কতা (সর্বনিম্ন ৫০):</span>
                   <span className={violationCount > 0 ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
@@ -1274,6 +1543,42 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                   </span>
                 </div>
               </div>
+
+              {/* Live Microphone Voice & Mobile/Book Scanner Row */}
+              <div className="grid grid-cols-2 gap-1 text-[7px] sm:text-[7.5px] font-mono">
+                <div className={`py-1 px-1 rounded transition-colors flex items-center justify-between border ${
+                  audioStatus === 'speech_detected'
+                    ? 'bg-rose-950 text-rose-300 border-rose-500 font-bold animate-pulse'
+                    : audioStatus === 'noise'
+                    ? 'bg-amber-950 text-amber-300 border-amber-600 font-bold'
+                    : 'bg-slate-800 text-slate-300 border-slate-700/60'
+                }`} title="কক্ষে মানুষের কণ্ঠস্বর ও ফিসফিসানি ট্র্যাকিং">
+                  <div className="flex items-center gap-0.5 truncate">
+                    <Mic className={`w-2.5 h-2.5 shrink-0 ${audioStatus === 'speech_detected' ? 'text-rose-400 animate-ping' : 'text-emerald-400'}`} />
+                    <span className="truncate">{audioStatus === 'speech_detected' ? 'কণ্ঠস্বর ⚠️' : audioStatus === 'noise' ? 'শব্দ ⚠️' : 'মাইক: শান্ত ✓'}</span>
+                  </div>
+                  <span className="text-[6.5px] font-bold text-slate-400 shrink-0">{audioVolume}%</span>
+                </div>
+
+                <div className={`py-1 px-1 rounded transition-colors flex items-center justify-between border ${
+                  detectedObject
+                    ? 'bg-rose-950 text-rose-300 border-rose-500 font-bold animate-pulse'
+                    : 'bg-slate-800 text-slate-300 border-slate-700/60'
+                }`} title="মোবাইল ফোন ও বই সনাক্তকারী এআই স্ক্যানার">
+                  <div className="flex items-center gap-0.5 truncate">
+                    <Smartphone className={`w-2.5 h-2.5 shrink-0 ${detectedObject ? 'text-rose-400 animate-pulse' : 'text-emerald-400'}`} />
+                    <span className="truncate">{detectedObject ? `${detectedObject} ⚠️` : 'ডিভাইস/বই: মুক্ত ✓'}</span>
+                  </div>
+                  <span className="text-[6.5px] font-bold text-emerald-400 shrink-0">AI</span>
+                </div>
+              </div>
+
+              {violationSnapshots.length > 0 && (
+                <div className="text-[7px] sm:text-[7.5px] text-rose-300 font-mono bg-rose-950/70 px-1.5 py-0.5 rounded border border-rose-800/80 flex items-center justify-between">
+                  <span>📸 প্রমাণ ছবি রেকর্ড:</span>
+                  <span className="font-bold text-rose-200">{violationSnapshots.length}টি সংরক্ষিত</span>
+                </div>
+              )}
 
               <div className="text-[7px] sm:text-[7.5px] text-slate-400 font-mono bg-slate-950/80 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between">
                 <span className="truncate">মাত্রা: {proctorConfig.name}</span>
@@ -1434,7 +1739,15 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping"></span>
                 সার্বক্ষণিক অ্যান্টি-চিটিং নজরদারি
               </span>
-              <span className="text-[10px] text-slate-500 font-semibold hidden md:inline">
+              <span className="text-[10px] sm:text-[11px] font-bold text-indigo-950 bg-indigo-100/90 px-2 py-0.5 rounded-md border border-indigo-200 flex items-center gap-1">
+                <Shuffle className="w-3 h-3 text-indigo-600" />
+                <span>প্রশ্ন ও অপশন ওলট-পালট সক্রিয়</span>
+              </span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-emerald-950 bg-emerald-100/90 px-2 py-0.5 rounded-md border border-emerald-300 flex items-center gap-1">
+                <Lock className="w-3 h-3 text-emerald-600" />
+                <span>প্রতি প্রশ্নে সময় ও ব্যাক-ট্র্যাক লক সক্রিয়</span>
+              </span>
+              <span className="text-[10px] text-slate-500 font-semibold hidden lg:inline">
                 • ওয়েবক্যাম ও সিস্টেম অ্যাক্টিভিটি স্বয়ংক্রিয়ভাবে রেকর্ড হচ্ছে
               </span>
             </div>
@@ -1501,11 +1814,13 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       {/* Questions Answering Sheet - hidden for student right after submission until reviewed */}
       {(!isSubmitted || isReviewOnly || isReviewed) && (
       <div className="space-y-4">
-        {(test.questions || []).map((q, idx) => {
+        {(activeQuestions || []).map((q, idx) => {
           const chosenAnswer = answers[q.id];
           const isCorrect = chosenAnswer === q.correctAnswer;
           const showGrading = isReviewOnly || isSubmitted;
           const isCurrentActive = activeQuestionIndex === idx && !showGrading;
+          const isLocked = lockedQuestionIndices.has(idx) && !showGrading;
+          const isFuture = idx > activeQuestionIndex && !showGrading;
 
           return (
             <div
@@ -1522,30 +1837,34 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                     : chosenAnswer
                     ? "border-rose-200 bg-rose-50/10"
                     : "border-slate-200"
+                  : isLocked
+                  ? "border-slate-200 bg-slate-50/60"
                   : chosenAnswer
                   ? "border-blue-400 shadow-xs"
                   : "border-slate-200"
               }`}
             >
-              {/* Question Text */}
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="flex items-start gap-2.5">
+              {/* Question Text & Status Header */}
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex items-start gap-2.5 flex-1 min-w-0">
                   <span className={`w-6 h-6 rounded-lg font-bold text-xs flex items-center justify-center shrink-0 mt-0.5 ${
-                    isCurrentActive ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-700"
+                    isCurrentActive ? "bg-blue-600 text-white" : isLocked ? "bg-slate-200 text-slate-700" : "bg-slate-100 text-slate-700"
                   }`}>
                     {idx + 1}
                   </span>
-                  <div className="space-y-1">
+                  <div className="space-y-1 flex-1">
                     <h4 className="text-sm sm:text-base font-bold text-slate-900 leading-snug">
                       {q.question}
                     </h4>
-                    {isCurrentActive && (
-                      <span className="inline-block text-[10px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full">
-                        চলমান প্রশ্ন • উত্তর দিলে স্বয়ংক্রিয়ভাবে পরের প্রশ্নে যাবে
-                      </span>
-                    )}
                   </div>
                 </div>
+
+                {isLocked && !showGrading && (
+                  <span className="text-[10px] sm:text-[10.5px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-300 flex items-center gap-1 shrink-0">
+                    <Lock className="w-3 h-3 text-slate-500" />
+                    <span>লক করা (ব্যাক-ট্র্যাক বন্ধ)</span>
+                  </span>
+                )}
 
                 {showGrading && (
                   <span
@@ -1559,8 +1878,36 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 )}
               </div>
 
+              {/* Feature 3: Dedicated Per-Question Timer Progress Bar (Active Question Only) */}
+              {isCurrentActive && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-blue-50/90 border border-blue-200 mt-2 mb-3">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
+                    <Timer className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                    <span>এই প্রশ্নের সময়সীমা:</span>
+                    <span className={`font-mono text-xs px-2 py-0.5 rounded-md font-black ${
+                      questionTimeLeft < 15 ? "bg-rose-100 text-rose-700 animate-pulse border border-rose-300" : "bg-white text-blue-800 border border-blue-200"
+                    }`}>
+                      {formatTime(questionTimeLeft)}
+                    </span>
+                  </div>
+
+                  <div className="flex-1 max-w-xs h-2 bg-blue-200/80 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-1000 ${
+                        questionTimeLeft < 15 ? "bg-rose-500" : "bg-blue-600"
+                      }`}
+                      style={{ width: `${Math.max(0, Math.min(100, (questionTimeLeft / perQuestionDuration) * 100))}%` }}
+                    />
+                  </div>
+
+                  <span className="text-[10px] text-blue-600 font-semibold hidden md:inline">
+                    উত্তর দিলে বা সময় ফুরালে স্বয়ংক্রিয় লক
+                  </span>
+                </div>
+              )}
+
               {/* Options */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2">
                 {(q.options || []).map((opt, oIdx) => {
                   const isSelected = chosenAnswer === opt;
                   const isRightAnswer = q.correctAnswer === opt;
@@ -1575,18 +1922,28 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                     } else {
                       optClass = "border-slate-200 bg-slate-50/30 text-slate-400";
                     }
+                  } else if (isLocked) {
+                    if (isSelected) {
+                      optClass = "border-slate-300 bg-slate-100/90 text-slate-800 font-bold shadow-xs cursor-not-allowed";
+                    } else {
+                      optClass = "border-slate-200 bg-slate-50/40 text-slate-400 opacity-60 cursor-not-allowed";
+                    }
+                  } else if (isFuture) {
+                    optClass = "border-slate-200 bg-slate-50/40 text-slate-400 opacity-70 cursor-not-allowed";
                   } else if (isSelected) {
                     optClass = "border-blue-600 bg-blue-50 text-blue-900 font-bold shadow-xs ring-1 ring-blue-500";
                   }
+
+                  const isDisabled = isReviewOnly || isSubmitted || isLocked || isFuture;
 
                   return (
                     <button
                       key={oIdx}
                       type="button"
-                      disabled={isReviewOnly || isSubmitted}
+                      disabled={isDisabled}
                       onClick={() => handleSelectOption(q.id, opt, idx)}
                       className={`p-3.5 rounded-xl border text-left text-xs sm:text-sm transition-all flex items-center justify-between ${optClass} ${
-                        !isReviewOnly && !isSubmitted ? "cursor-pointer active:scale-[0.99]" : ""
+                        !isDisabled ? "cursor-pointer active:scale-[0.99]" : ""
                       }`}
                     >
                       <span>{opt}</span>
@@ -1595,6 +1952,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                       )}
                       {showGrading && isSelected && !isRightAnswer && (
                         <X className="w-4 h-4 text-rose-500 shrink-0" />
+                      )}
+                      {isLocked && isSelected && !showGrading && (
+                        <span className="flex items-center gap-1 text-[10px] text-slate-600 font-bold bg-white px-2 py-0.5 rounded border border-slate-300">
+                          <Lock className="w-2.5 h-2.5 text-slate-500" />
+                          <span>লক</span>
+                        </span>
                       )}
                     </button>
                   );
@@ -1621,7 +1984,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           className="sticky bottom-3 z-50 bg-white/98 backdrop-blur-md rounded-2xl p-3.5 sm:p-4 border border-slate-200 shadow-2xl flex items-center justify-between gap-3 mt-4"
         >
           <div className="text-xs sm:text-sm text-slate-700 font-bold">
-            উত্তর সম্পন্ন: <span className="text-blue-600 font-black">{answeredCount}</span> / {test.questions.length}টি
+            উত্তর সম্পন্ন: <span className="text-blue-600 font-black">{answeredCount}</span> / {activeQuestions.length}টি
           </div>
 
           <button

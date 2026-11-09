@@ -12,6 +12,14 @@ export interface ExamQuestion {
   isCorrect?: boolean;
 }
 
+export interface ViolationSnapshot {
+  id: string;
+  timestamp: string;
+  reason: string;
+  strike: number;
+  photo: string;
+}
+
 export interface AssignedTest {
   id: string;
   title: string;
@@ -30,6 +38,7 @@ export interface AssignedTest {
   proctoringLevel?: 1 | 2 | 3 | 4;
   aiGradingEnabled: boolean;
   proctoringFlags?: string[];
+  violationSnapshots?: ViolationSnapshot[];
   parentComment?: string;
   questions: ExamQuestion[];
   submittedAt?: string;
@@ -45,6 +54,7 @@ export interface StudentSubmission {
   score: number;
   totalQuestions: number;
   proctoringFlags: string[];
+  violationSnapshots?: ViolationSnapshot[];
   status: 'submitted' | 'reviewed';
   isPublished: boolean;
   parentComment?: string;

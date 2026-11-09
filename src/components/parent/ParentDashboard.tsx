@@ -8,7 +8,7 @@ import {
   Brain, Trophy, Target, Zap, Landmark, School, Lock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { AssignedTest, StudentSubmission, ExamQuestion } from '../../types';
+import { AssignedTest, StudentSubmission, ExamQuestion, ViolationSnapshot } from '../../types';
 import { 
   getStoredTests, 
   saveStoredTests, 
@@ -77,6 +77,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [filterMode, setFilterMode] = useState<'all' | 'unreviewed'>('all');
   const [copiedPin, setCopiedPin] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [selectedSnapshot, setSelectedSnapshot] = useState<ViolationSnapshot | null>(null);
 
   // Configuration for AI Question Builder
   const [selectedClass, setSelectedClass] = useState('৮ম শ্রেণি');
@@ -2983,6 +2984,50 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                   </ul>
                 </div>
               )}
+
+              {/* Feature 1: Photographic Violation Snapshot Proofs Gallery */}
+              {reviewTest.violationSnapshots && reviewTest.violationSnapshots.length > 0 && (
+                <div className="p-3.5 rounded-2xl bg-rose-50/90 border border-rose-200 text-xs space-y-2.5 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold text-rose-950 flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>সন্দেহজনক মুহূর্তের স্বয়ংক্রিয় ফটো স্ন্যাপশট প্রমাণ ({toBn(reviewTest.violationSnapshots.length)}টি সংরক্ষিত):</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-300">
+                      ক্লিক করে বড় ছবি দেখুন ⤢
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 max-h-48 overflow-y-auto pr-1">
+                    {reviewTest.violationSnapshots.map((snap, sIdx) => (
+                      <div
+                        key={snap.id || sIdx}
+                        onClick={() => setSelectedSnapshot(snap)}
+                        className="group relative rounded-xl overflow-hidden border border-rose-300 bg-black cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all"
+                      >
+                        <img
+                          src={snap.photo}
+                          alt={`সতর্কতা #${snap.strike}`}
+                          className="w-full h-24 object-cover group-hover:opacity-90"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent flex flex-col justify-between p-1.5 pointer-events-none">
+                          <span className="self-start text-[9px] font-black bg-rose-600 text-white px-1.5 py-0.2 rounded shadow-xs">
+                            #{toBn(snap.strike)}
+                          </span>
+                          <div className="text-white">
+                            <span className="block text-[8.5px] font-bold truncate text-rose-200" title={snap.reason}>
+                              {snap.reason}
+                            </span>
+                            <span className="block text-[8px] text-slate-300 font-mono">
+                              {snap.timestamp}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Questions breakdown */}
@@ -3503,6 +3548,71 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           }
         }}
       />
+
+      {/* Feature 1: Zoom Modal for Violation Snapshot Photo Proof */}
+      {selectedSnapshot && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in">
+          <div className="bg-slate-900 border-2 border-rose-500 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl text-white">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/40">
+                  <ShieldAlert className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-rose-200">
+                    নকল সতর্কতার সচিত্র প্রমাণ (সতর্কতা #{toBn(selectedSnapshot.strike)})
+                  </h4>
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    রেকর্ড সময়: {selectedSnapshot.timestamp}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedSnapshot(null)}
+                className="w-8 h-8 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white cursor-pointer"
+                title="বন্ধ করুন"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-4 flex flex-col items-center">
+              <div className="w-full rounded-2xl overflow-hidden border-2 border-slate-700 bg-black shadow-inner">
+                <img
+                  src={selectedSnapshot.photo}
+                  alt={selectedSnapshot.reason}
+                  className="w-full h-auto object-contain max-h-[380px]"
+                />
+              </div>
+
+              <div className="w-full mt-3.5 p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">সনাক্তকৃত কারণ:</span>
+                  <span className="font-bold text-rose-300">{selectedSnapshot.reason}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">প্রমাণ আইডি:</span>
+                  <span className="font-mono text-[10px] text-slate-400">{selectedSnapshot.id}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3.5 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">
+                ফ্রন্ট ক্যামেরা থেকে স্বয়ংক্রিয়ভাবে ধারণকৃত প্রমাণ
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelectedSnapshot(null)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors cursor-pointer border border-slate-700"
+              >
+                বন্ধ করুন
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
