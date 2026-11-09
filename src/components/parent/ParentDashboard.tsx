@@ -1143,21 +1143,6 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           </button>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            {/* প্রক্টরিং কঠোরতার মাত্রা (৪টি লেভেল) সরাসরি বাটন */}
-            <button
-              type="button"
-              onClick={() => {
-                setSettingsInitialTab('preferences');
-                setIsSettingsOpen(true);
-              }}
-              className="flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 active:bg-purple-200 border border-purple-200 text-purple-900 text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs active:scale-98"
-              title="প্রক্টরিং কঠোরতার ৪টি লেভেল নির্ধারণ করুন"
-            >
-              <ShieldAlert className="w-4 h-4 text-purple-600 shrink-0" />
-              <span>প্রক্টরিং: লেভেল {proctoringLevel === 1 ? '১ (মৃদু)' : proctoringLevel === 2 ? '২ (মাঝারি)' : proctoringLevel === 3 ? '৩ (কঠোর)' : '৪ (সর্বোচ্চ)'}</span>
-              <Settings className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-            </button>
-
             {/* নতুন প্রশ্ন তৈরি করুন (স্থানান্তরিত: উপরে ব্যানার কার্ডে) */}
             <button
               type="button"
