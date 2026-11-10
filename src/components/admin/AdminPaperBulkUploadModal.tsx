@@ -65,6 +65,7 @@ export const AdminPaperBulkUploadModal: React.FC<AdminPaperBulkUploadModalProps>
 
   // Database list
   const [papersList, setPapersList] = useState<InstitutionPaper[]>([]);
+  const [deletingPaperId, setDeletingPaperId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -635,20 +636,49 @@ export const AdminPaperBulkUploadModal: React.FC<AdminPaperBulkUploadModalProps>
                           </p>
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (window.confirm(`আপনি কি "${paper.institutionName}" এর প্রশ্নপত্রটি ডাটাবেজ থেকে মুছে ফেলতে চান?`)) {
-                              deleteInstitutionPaper(paper.id);
-                              setPapersList(prev => prev.filter(p => p.id !== paper.id));
-                              fetch(`/api/institution-papers/${paper.id}`, { method: 'DELETE' }).catch(() => {});
-                            }
-                          }}
-                          className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer shrink-0"
-                          title="ডাটাবেজ থেকে মুছুন"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex flex-col items-end shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setDeletingPaperId(deletingPaperId === paper.id ? null : paper.id)}
+                            className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                              deletingPaperId === paper.id
+                                ? 'bg-rose-600 text-white ring-2 ring-rose-500/50'
+                                : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                            }`}
+                            title={deletingPaperId === paper.id ? 'বাতিল' : 'ডাটাবেজ থেকে মুছুন'}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+
+                          {deletingPaperId === paper.id && (
+                            <div className="mt-1.5 p-2 bg-rose-50 border border-rose-200 rounded-lg text-left shadow-md min-w-[170px] z-20">
+                              <p className="text-[11px] font-bold text-rose-800 mb-1 leading-tight">
+                                ⚠️ মুছে ফেলতে চান?
+                              </p>
+                              <div className="flex items-center justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setDeletingPaperId(null)}
+                                  className="px-2 py-0.5 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-medium transition-colors cursor-pointer"
+                                >
+                                  বাতিল
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    deleteInstitutionPaper(paper.id);
+                                    setPapersList(prev => prev.filter(p => p.id !== paper.id));
+                                    setDeletingPaperId(null);
+                                    fetch(`/api/institution-papers/${paper.id}`, { method: 'DELETE' }).catch(() => {});
+                                  }}
+                                  className="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-bold transition-colors cursor-pointer shadow-xs"
+                                >
+                                  হ্যাঁ, মুছুন
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

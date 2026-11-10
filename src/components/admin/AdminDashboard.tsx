@@ -118,6 +118,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [selectedExamForInspect, setSelectedExamForInspect] = useState<AssignedTest | null>(null);
   const [inspectMode, setInspectMode] = useState<'questions' | 'submission'>('questions');
   
+  // Inline Delete Confirmation States (No browser popups, asks right below the delete button without covering any options)
+  const [deletingPaperId, setDeletingPaperId] = useState<string | null>(null);
+  const [deletingExamPin, setDeletingExamPin] = useState<string | null>(null);
+  const [deletingParentPhone, setDeletingParentPhone] = useState<string | null>(null);
+  
   // Password Reset Modal for Parent
   const [parentToResetPass, setParentToResetPass] = useState<ParentAccountSummary | null>(null);
   const [newPasswordInput, setNewPasswordInput] = useState('');
@@ -247,9 +252,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Delete an Exam (Super-Admin Privilege)
   const handleDeleteExam = async (pinOrId: string) => {
-    if (!window.confirm(`আপনি কি নিশ্চিতভাবে এই পরীক্ষাটি (PIN: ${pinOrId}) মুছে ফেলতে চান? এটি সার্ভার ও সকল ডেটাবেজ থেকে চিরতরে মুছে যাবে।`)) {
-      return;
-    }
     try {
       await fetch(`/api/tests/${pinOrId}`, { method: 'DELETE' });
       deleteStoredTest(pinOrId);
@@ -918,32 +920,85 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between gap-2 mt-5 pt-3 border-t border-slate-800/80">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        alert(`প্রশ্ন সংখ্যা: ${paper.questions?.length}\nপ্রথম প্রশ্ন: ${paper.questions?.[0]?.question || 'N/A'}`);
-                      }}
-                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
-                    >
-                      <Eye className="w-3.5 h-3.5" />
-                      <span>প্রিভিউ</span>
-                    </button>
+                  <div className="mt-5 pt-3 border-t border-slate-800/80">
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const fakeTest: AssignedTest = {
+                            id: paper.id,
+                            title: `${paper.institutionName} - ${paper.subject}`,
+                            subject: paper.subject,
+                            chapter: paper.examType,
+                            questionCount: paper.questions?.length || 0,
+                            durationMinutes: paper.durationMinutes || 20,
+                            pin: paper.id.replace(/\D/g, '').slice(0, 6) || '123456',
+                            createdAt: new Date().toISOString(),
+                            status: 'pending',
+                            studentName: 'নমুনা শিক্ষার্থী',
+                            proctoringEnabled: false,
+                            aiGradingEnabled: false,
+                            questions: paper.questions || []
+                          };
+                          if (onOpenTestPreview) {
+                            onOpenTestPreview(fakeTest);
+                          } else {
+                            setSelectedExamForInspect(fakeTest);
+                            setInspectMode('questions');
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>প্রিভিউ</span>
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (window.confirm(`আপনি কি "${paper.institutionName}" এর প্রশ্নপত্রটি মুছে ফেলতে চান?`)) {
-                          deleteInstitutionPaper(paper.id);
-                          setInstitutionPapers(prev => prev.filter(p => p.id !== paper.id));
-                          showToast('প্রতিষ্ঠান প্রশ্নপত্র মুছে ফেলা হয়েছে');
-                        }
-                      }}
-                      className="p-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 text-xs font-bold transition-colors cursor-pointer"
-                      title="মুছে ফেলুন"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeletingPaperId(deletingPaperId === paper.id ? null : paper.id)}
+                        className={`p-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                          deletingPaperId === paper.id
+                            ? 'bg-rose-600 text-white ring-2 ring-rose-500/50 shadow-sm'
+                            : 'bg-rose-600/20 hover:bg-rose-600/40 text-rose-300'
+                        }`}
+                        title={deletingPaperId === paper.id ? 'বাতিল করুন' : 'মুছে ফেলুন'}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* ডিলিট বাটনের নিচে ইন-লাইন অনুমতি বক্স (যাতে কোনো লেখা বা অপশন ঢেকে না যায়) */}
+                    {deletingPaperId === paper.id && (
+                      <div className="mt-2.5 p-3 rounded-xl bg-rose-950/50 border border-rose-800/70 animate-in fade-in duration-150 text-left">
+                        <div className="flex items-start gap-1.5 mb-2">
+                          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                          <p className="text-xs font-semibold text-rose-200 leading-snug">
+                            আপনি কি নিশ্চিতভাবে এই প্রশ্নপত্রটি মুছে ফেলতে চান?
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-end gap-2 pt-1.5 border-t border-rose-900/40">
+                          <button
+                            type="button"
+                            onClick={() => setDeletingPaperId(null)}
+                            className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+                          >
+                            বাতিল
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              deleteInstitutionPaper(paper.id);
+                              setInstitutionPapers(prev => prev.filter(p => p.id !== paper.id));
+                              setDeletingPaperId(null);
+                              showToast('প্রতিষ্ঠান প্রশ্নপত্র মুছে ফেলা হয়েছে');
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                          >
+                            হ্যাঁ, মুছুন
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1078,21 +1133,50 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               {parent.status === 'active' ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
                             </button>
 
-                            {/* Delete User Button */}
-                            <button
-                              type="button"
-                              onClick={async () => {
-                                if (window.confirm(`আপনি কি সত্যিই অভিভাবক ${parent.phone} এর অ্যাকাউন্ট মুছে ফেলতে চান?`)) {
-                                  await fetch(`/api/admin/parents/${parent.phone}`, { method: 'DELETE' });
-                                  setParentsList(prev => prev.filter(p => p.phone !== parent.phone));
-                                  showToast('অভিভাবক অ্যাকাউন্ট মুছে ফেলা হয়েছে');
-                                }
-                              }}
-                              className="p-1 rounded bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 transition-colors cursor-pointer"
-                              title="অ্যাকাউন্ট ডিলিট করুন"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {/* Delete User Button & Inline Confirmation */}
+                            <div className="relative inline-block text-left">
+                              <button
+                                type="button"
+                                onClick={() => setDeletingParentPhone(deletingParentPhone === parent.phone ? null : parent.phone)}
+                                className={`p-1 rounded transition-colors cursor-pointer flex items-center justify-center ${
+                                  deletingParentPhone === parent.phone
+                                    ? 'bg-rose-600 text-white ring-2 ring-rose-500/50'
+                                    : 'bg-rose-600/20 hover:bg-rose-600/40 text-rose-300'
+                                }`}
+                                title={deletingParentPhone === parent.phone ? 'বাতিল' : 'অ্যাকাউন্ট ডিলিট করুন'}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              {deletingParentPhone === parent.phone && (
+                                <div className="mt-1.5 p-2.5 bg-rose-950/95 border border-rose-800 rounded-xl text-left shadow-xl min-w-[190px] z-20">
+                                  <p className="text-[11px] font-bold text-rose-200 mb-1.5 leading-tight">
+                                    ⚠️ অ্যাকাউন্ট মুছে ফেলবেন?
+                                  </p>
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setDeletingParentPhone(null)}
+                                      className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition-colors cursor-pointer"
+                                    >
+                                      বাতিল
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={async () => {
+                                        await fetch(`/api/admin/parents/${parent.phone}`, { method: 'DELETE' });
+                                        setParentsList(prev => prev.filter(p => p.phone !== parent.phone));
+                                        setDeletingParentPhone(null);
+                                        showToast('অভিভাবক অ্যাকাউন্ট মুছে ফেলা হয়েছে');
+                                      }}
+                                      className="px-2 py-0.5 rounded-md bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold transition-colors cursor-pointer shadow-xs"
+                                    >
+                                      হ্যাঁ, মুছুন
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
 
                           </div>
                         </td>
@@ -1252,15 +1336,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               </button>
                             )}
 
-                            {/* Delete Exam Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteExam(test.pin || test.id)}
-                              className="p-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/40 text-rose-300 transition-colors cursor-pointer"
-                              title="পরীক্ষা চিরতরে মুছে ফেলুন"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            {/* Delete Exam Button & Inline Confirmation */}
+                            <div className="relative inline-block text-left">
+                              <button
+                                type="button"
+                                onClick={() => setDeletingExamPin(deletingExamPin === (test.pin || test.id) ? null : (test.pin || test.id))}
+                                className={`p-1.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center ${
+                                  deletingExamPin === (test.pin || test.id)
+                                    ? 'bg-rose-600 text-white ring-2 ring-rose-500/50'
+                                    : 'bg-rose-600/20 hover:bg-rose-600/40 text-rose-300'
+                                }`}
+                                title={deletingExamPin === (test.pin || test.id) ? 'বাতিল' : 'পরীক্ষা চিরতরে মুছে ফেলুন'}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              {deletingExamPin === (test.pin || test.id) && (
+                                <div className="mt-1.5 p-2.5 bg-rose-950/95 border border-rose-800 rounded-xl text-left shadow-xl min-w-[190px] z-20">
+                                  <p className="text-[11px] font-bold text-rose-200 mb-1.5 leading-tight">
+                                    ⚠️ পরীক্ষা মুছে ফেলবেন?
+                                  </p>
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => setDeletingExamPin(null)}
+                                      className="px-2 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition-colors cursor-pointer"
+                                    >
+                                      বাতিল
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        handleDeleteExam(test.pin || test.id);
+                                        setDeletingExamPin(null);
+                                      }}
+                                      className="px-2 py-0.5 rounded-md bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold transition-colors cursor-pointer shadow-xs"
+                                    >
+                                      হ্যাঁ, মুছুন
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
 
                           </div>
                         </td>
