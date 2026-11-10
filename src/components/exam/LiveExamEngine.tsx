@@ -4,7 +4,7 @@ import {
   ArrowLeft, Clock, CircleAlert, CircleCheck, Check, CheckCircle2,
   FileCheck, Send, ShieldCheck, ShieldAlert, X, FileText, Camera, 
   AlertTriangle, Eye, EyeOff, Maximize, MessageSquare, Copy,
-  Volume2, VolumeX, Play, Mic, MicOff, Smartphone, BookOpen, Shuffle, Lock, Timer
+  Volume2, VolumeX, Play, Mic, MicOff, Smartphone, BookOpen, Shuffle, Lock, Timer, Zap, Users
 } from "lucide-react";
 import { 
   getStoredTests, 
@@ -107,6 +107,15 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }
     return initial;
   });
+
+  // Feature 5: Answer Speed Anomaly Detection (প্রশ্ন পড়ার ন্যূনতম স্বাভাবিক সময় ট্র্যাকিং)
+  const questionStartTimeRef = useRef<number>(Date.now());
+  const [responseTimes, setResponseTimes] = useState<Record<string, number>>(() => test.questionResponseTimes || {});
+  const responseTimesRef = useRef<Record<string, number>>(test.questionResponseTimes || {});
+
+  useEffect(() => {
+    questionStartTimeRef.current = Date.now();
+  }, [activeQuestionIndex]);
 
   const [proctorLogs, setProctorLogs] = useState<string[]>([]);
   const [isSimulatingSuspicious, setIsSimulatingSuspicious] = useState(false);
@@ -671,14 +680,18 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         : result.type === 'book'
         ? 'ফ্রেমে বই, খাতা বা নোট পেপার সনাক্ত হয়েছে'
         : result.type === 'second_person'
-        ? 'ফ্রেমে অতিরিক্ত মানুষের উপস্থিতি সনাক্ত হয়েছে'
+        ? 'ফ্রেমে অতিরিক্ত মানুষের উপস্থিতি / দ্বিতীয় ব্যক্তি সনাক্ত হয়েছে'
         : `ফ্রেমে অননুমোদিত বস্তু (${result.label}) সনাক্ত হয়েছে`;
       
       handleGazeAway(reason);
 
+      if (result.type === 'second_person') {
+        speakObservationAudio("পরীক্ষার ফ্রেমে অতিরিক্ত মানুষের উপস্থিতি সনাক্ত হয়েছে। অনুগ্রহ করে একাকী পরীক্ষা দিন।");
+      }
+
       setTimeout(() => {
         setDetectedObject(null);
-      }, 4500);
+      }, 5000);
     });
 
     objectControllerRef.current = controller;
@@ -725,12 +738,118 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       }
     };
 
+    // Feature 4: Hardcore Keyboard, Clipboard & Screenshot Lock
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setLastWarning("🚫 পরীক্ষায় রাইট-ক্লিক বা কনটেক্সট মেনু ব্যবহার সম্পূর্ণ নিষিদ্ধ!");
+      handleGazeAway('অননুমোদিত রাইট-ক্লিক ব্যবহারের চেষ্টা');
+    };
+
+    const handleCopyCutPaste = (e: ClipboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        if (e.clipboardData) e.clipboardData.clearData();
+      } catch {}
+      setLastWarning("🚫 পরীক্ষায় টেক্সট কপি, পেস্ট বা কাট করা সম্পূর্ণ নিষিদ্ধ!");
+      handleGazeAway('অননুমোদিত ক্লিপবোর্ড (কপি/পেস্ট) ব্যবহারের চেষ্টা');
+    };
+
+    const handleSelectStart = (e: Event) => {
+      const target = e.target as HTMLElement | null;
+      if (target && target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+        e.preventDefault();
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key ? e.key.toLowerCase() : '';
+      const isCtrlOrCmd = e.ctrlKey || e.metaKey;
+      const isAlt = e.altKey;
+
+      // PrintScreen / Screenshot key
+      if (e.key === 'PrintScreen' || e.code === 'PrintScreen') {
+        e.preventDefault();
+        e.stopPropagation();
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText('');
+          }
+        } catch {}
+        setLastWarning("🚫 পরীক্ষায় স্ক্রিনশট নেওয়া সম্পূর্ণ নিষিদ্ধ ও শাস্তিযোগ্য!");
+        handleGazeAway('স্ক্রিনশট (PrintScreen) নেওয়ার চেষ্টা সনাক্ত হয়েছে');
+        return;
+      }
+
+      // F12 or Developer Tools keys
+      if (e.key === 'F12' || (isCtrlOrCmd && e.shiftKey && (key === 'i' || key === 'j' || key === 'c'))) {
+        e.preventDefault();
+        e.stopPropagation();
+        setLastWarning("🚫 ডেভেলপার টুলস বা ইন্সপেক্ট উইন্ডো খোলার চেষ্টা সনাক্ত হয়েছে!");
+        handleGazeAway('ডেভেলপার টুলস / ইন্সপেক্ট উইন্ডো খোলার চেষ্টা');
+        return;
+      }
+
+      // Ctrl/Cmd shortcuts: Copy (C), Paste (V), Cut (X), SelectAll (A), Save (S), Print (P), View Source (U)
+      if (isCtrlOrCmd && ['c', 'v', 'x', 'a', 's', 'p', 'u'].includes(key)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const actionMap: Record<string, string> = {
+          c: 'কপি',
+          v: 'পেস্ট',
+          x: 'কাট',
+          a: 'সব সিলেক্ট',
+          u: 'সোর্স কোড',
+          s: 'সংরক্ষণ',
+          p: 'প্রিন্ট'
+        };
+        const actionName = actionMap[key] || 'শর্টকাট';
+        setLastWarning(`🚫 পরীক্ষায় [Ctrl+${key.toUpperCase()}] (${actionName}) ব্যবহার নিষিদ্ধ!`);
+        handleGazeAway(`অননুমোদিত কীবোর্ড শর্টকাট [Ctrl+${key.toUpperCase()}] ব্যবহারের চেষ্টা`);
+        return;
+      }
+
+      // Alt+Tab or Alt navigation shortcuts
+      if (isAlt && (e.key === 'Tab' || key === 'tab' || e.key === 'Escape' || e.key === 'F4')) {
+        e.preventDefault();
+        e.stopPropagation();
+        setLastWarning("🚫 পরীক্ষায় উইন্ডো পরিবর্তনের চেষ্টা নিষিদ্ধ!");
+        handleGazeAway('উইন্ডো পরিবর্তনের চেষ্টা (Alt শর্টকাট)');
+        return;
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'PrintScreen' || e.code === 'PrintScreen') {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText('');
+          }
+        } catch {}
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('copy', handleCopyCutPaste);
+    document.addEventListener('cut', handleCopyCutPaste);
+    document.addEventListener('paste', handleCopyCutPaste);
+    document.addEventListener('selectstart', handleSelectStart);
+    window.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keyup', handleKeyUp, true);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('copy', handleCopyCutPaste);
+      document.removeEventListener('cut', handleCopyCutPaste);
+      document.removeEventListener('paste', handleCopyCutPaste);
+      document.removeEventListener('selectstart', handleSelectStart);
+      window.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keyup', handleKeyUp, true);
     };
   }, [isReviewOnly, isSubmitted]);
 
@@ -1213,6 +1332,17 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       return;
     }
 
+    // Feature 5: Answer Speed Anomaly Detection
+    const elapsedSeconds = Math.max(0.4, Math.round(((Date.now() - questionStartTimeRef.current) / 1000) * 10) / 10);
+    responseTimesRef.current[questionId] = elapsedSeconds;
+    setResponseTimes((prev) => ({ ...prev, [questionId]: elapsedSeconds }));
+
+    if (elapsedSeconds < 2.2) {
+      const anomalyReason = `অস্বাভাবিক দ্রুত উত্তর প্রদান (মাত্র ${elapsedSeconds} সেকেন্ডে উত্তর) - প্রশ্ন না পড়ে উত্তর দেওয়ার সম্ভাবনা`;
+      handleGazeAway(anomalyReason);
+      setLastWarning(`⚡ অস্বাভাবিক দ্রুত উত্তর সনাক্ত (${elapsedSeconds} সে.)! অনুগ্রহ করে প্রশ্ন ও অপশন ভালোভাবে পড়ে উত্তর দিন।`);
+    }
+
     setAnswers((prev) => ({
       ...prev,
       [questionId]: option
@@ -1259,7 +1389,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       return {
         ...q,
         studentAnswer: chosen,
-        isCorrect
+        isCorrect,
+        responseTimeSeconds: responseTimesRef.current[q.id] || q.responseTimeSeconds
       };
     });
 
@@ -1282,6 +1413,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       questions: updatedQuestions,
       proctoringFlags: finalFlags,
       violationSnapshots: violationSnapshotsRef.current,
+      questionResponseTimes: responseTimesRef.current,
       submittedAt: test.submittedAt || nowIso
     };
 
@@ -1496,8 +1628,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
                 {detectedObject && (
                   <div className="absolute top-7 left-1.5 right-1.5 bg-rose-600 text-white text-[7.5px] sm:text-[8px] font-black py-0.5 px-1 rounded shadow-md border border-rose-300 animate-bounce flex items-center justify-center gap-1 z-10">
-                    <Smartphone className="w-2.5 h-2.5" />
-                    <span>⚠️ ফ্রেমে {detectedObject} সনাক্ত!</span>
+                    {detectedObject.includes('মানুষ') ? (
+                      <Users className="w-2.5 h-2.5 shrink-0" />
+                    ) : detectedObject.includes('বই') ? (
+                      <BookOpen className="w-2.5 h-2.5 shrink-0" />
+                    ) : (
+                      <Smartphone className="w-2.5 h-2.5 shrink-0" />
+                    )}
+                    <span className="truncate">⚠️ {detectedObject} সনাক্ত!</span>
                   </div>
                 )}
 
@@ -1747,7 +1885,19 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 <Lock className="w-3 h-3 text-emerald-600" />
                 <span>প্রতি প্রশ্নে সময় ও ব্যাক-ট্র্যাক লক সক্রিয়</span>
               </span>
-              <span className="text-[10px] text-slate-500 font-semibold hidden lg:inline">
+              <span className="text-[10px] sm:text-[11px] font-bold text-rose-950 bg-rose-100/90 px-2 py-0.5 rounded-md border border-rose-300 flex items-center gap-1">
+                <ShieldAlert className="w-3 h-3 text-rose-600" />
+                <span>কীবোর্ড ও স্ক্রিনশট লক সক্রিয়</span>
+              </span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-amber-950 bg-amber-100/90 px-2 py-0.5 rounded-md border border-amber-300 flex items-center gap-1">
+                <Zap className="w-3 h-3 text-amber-600" />
+                <span>উত্তর প্রদানের গতি পর্যবেক্ষণ সক্রিয়</span>
+              </span>
+              <span className="text-[10px] sm:text-[11px] font-bold text-purple-950 bg-purple-100/90 px-2 py-0.5 rounded-md border border-purple-300 flex items-center gap-1">
+                <Users className="w-3 h-3 text-purple-600" />
+                <span>একাধিক ব্যক্তি ও বহিরাগত সনাক্তকরণ সক্রিয়</span>
+              </span>
+              <span className="text-[10px] text-slate-500 font-semibold hidden xl:inline">
                 • ওয়েবক্যাম ও সিস্টেম অ্যাক্টিভিটি স্বয়ংক্রিয়ভাবে রেকর্ড হচ্ছে
               </span>
             </div>
@@ -1813,7 +1963,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
       {/* Questions Answering Sheet - hidden for student right after submission until reviewed */}
       {(!isSubmitted || isReviewOnly || isReviewed) && (
-      <div className="space-y-4">
+      <div className={`space-y-4 ${!isReviewOnly && !isSubmitted ? "select-none" : ""}`}>
         {(activeQuestions || []).map((q, idx) => {
           const chosenAnswer = answers[q.id];
           const isCorrect = chosenAnswer === q.correctAnswer;

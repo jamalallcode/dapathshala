@@ -153,6 +153,46 @@ function scanFrameForObjects(video: HTMLVideoElement, scanCanvas: HTMLCanvasElem
       }
     }
 
+    // 3. Multi-Face / Second Person / Bystander Spatial Cluster Scan
+    // Primary examinee typically occupies central 22 <= X <= 58
+    // A second person / bystander appears on left flank (X < 22), right flank (X > 58), or top background
+    let leftFlankSkin = 0;
+    let rightFlankSkin = 0;
+    let topBgSkin = 0;
+    let centerSkin = 0;
+
+    for (let y = 5; y < 45; y++) {
+      for (let x = 0; x < w; x++) {
+        const idx = (y * w + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+
+        const isSkin = (
+          (r > 38 && g > 22 && b > 16 && r >= g && g >= b * 0.68 && (r - g) >= 3) ||
+          (r > 48 && g > 34 && b > 24 && Math.abs(r - g) < 55 && (r - b) >= 4) ||
+          (r > 72 && g > 48 && b > 32 && r > b)
+        );
+
+        if (isSkin) {
+          if (x < 22) leftFlankSkin++;
+          else if (x > 58) rightFlankSkin++;
+          else centerSkin++;
+
+          if (y < 20 && (x < 25 || x > 55)) topBgSkin++;
+        }
+      }
+    }
+
+    if ((leftFlankSkin > 35 && centerSkin > 40) || (rightFlankSkin > 35 && centerSkin > 40) || (topBgSkin > 32 && centerSkin > 40)) {
+      return {
+        detected: true,
+        type: 'second_person',
+        label: 'ফ্রেমে অতিরিক্ত মানুষের উপস্থিতি',
+        confidence: 0.92
+      };
+    }
+
   } catch (err) {}
   return null;
 }

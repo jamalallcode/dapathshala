@@ -32,6 +32,13 @@ import {
   getAlternativeQuestion,
   generateTwoSolutions
 } from '../../lib/curriculumQuestions';
+import { 
+  NCTB_CLASSES, 
+  NCTB_CURRICULUM_MAP, 
+  DifficultyLevel, 
+  getQuestionsFromNCTBBank, 
+  getAlternativeNCTBQuestion 
+} from '../../lib/nctbCurriculum';
 import { getCurrentParent, logoutParent, ParentUser } from '../../lib/parentAuth';
 import { ParentSettingsModal } from './ParentSettingsModal';
 import { InstitutionPaperExplorer } from './InstitutionPaperExplorer';
@@ -79,12 +86,16 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedSnapshot, setSelectedSnapshot] = useState<ViolationSnapshot | null>(null);
 
-  // Configuration for AI Question Builder
-  const [selectedClass, setSelectedClass] = useState('৮ম শ্রেণি');
-  const [selectedSubject, setSelectedSubject] = useState('সাধারণ গণিত');
-  const [selectedChapter, setSelectedChapter] = useState('বীজগণিত ও সমীকরণ');
-  const [questionCount, setQuestionCount] = useState(1);
-  const [durationMinutes, setDurationMinutes] = useState(15);
+  // Configuration for AI Question Builder & NCTB Question Bank
+  const [selectedClass, setSelectedClass] = useState<string>('১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)');
+  const [selectedSubject, setSelectedSubject] = useState<string>('সাধারণ গণিত');
+  const [selectedChapter, setSelectedChapter] = useState<string>('বীজগণিতীয় রাশি ও সমীকরণ');
+  const [selectedChapters, setSelectedChapters] = useState<string[]>(['বীজগণিতীয় রাশি ও সমীকরণ']);
+  const [selectedDifficulty, setSelectedDifficulty] = useState<DifficultyLevel>('all');
+  const [questionCount, setQuestionCount] = useState(20);
+  const [durationMinutes, setDurationMinutes] = useState(20);
+  const [recentlySwappedIndex, setRecentlySwappedIndex] = useState<number | null>(null);
+  const [manualBatchMode, setManualBatchMode] = useState<'batch' | 'blank'>('batch');
   const [proctoringEnabled, setProctoringEnabled] = useState(true);
   const [proctoringLevel, setProctoringLevel] = useState<1 | 2 | 3 | 4>(() => {
     const saved = localStorage.getItem('dapathshala_parent_proctoring_level');
@@ -444,58 +455,169 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     setExamTitleInput(`${cls} - ${sub}: ${chap} মূল্যায়ন`);
   };
 
-  // When class changes, auto-update exam title
+  // Dynamically compute subjects based on selected class
+  const getAvailableSubjects = (cls: string): string[] => {
+    const fromMap = NCTB_CURRICULUM_MAP[cls];
+    if (fromMap && Object.keys(fromMap).length > 0) {
+      return Object.keys(fromMap);
+    }
+    return Object.keys(subjectChapters);
+  };
+
+  // Dynamically compute chapters based on selected class & subject
+  const getAvailableChapters = (cls: string, sub: string): string[] => {
+    const fromMap = NCTB_CURRICULUM_MAP[cls]?.[sub];
+    if (fromMap && fromMap.length > 0) {
+      return fromMap;
+    }
+    return subjectChapters[sub] || ['সাধারণ অধ্যায়'];
+  };
+
+  // Central question generator from NCTB bank with strict chapter filtering
+  const fetchExamQuestionsFromCurriculum = (
+    cls: string,
+    sub: string,
+    chaps: string[],
+    diff: DifficultyLevel,
+    count: number
+  ): ExamQuestion[] => {
+    const raw = getQuestionsFromNCTBBank({
+      selectedClass: cls,
+      selectedSubject: sub,
+      selectedChapters: chaps,
+      difficulty: diff,
+      count: count
+    });
+
+    if (raw && raw.length > 0) {
+      return raw.map((q, idx) => {
+        const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
+        return {
+          id: q.id || `nctb_q_${Date.now()}_${idx}`,
+          question: q.question,
+          options: [...q.options],
+          correctAnswer: q.correctAnswer,
+          correctAnswerIndex: correctIdx !== -1 ? correctIdx : (q.correctAnswerIndex ?? 0),
+          explanation: q.explanation || '',
+          solutions: q.solutions || [q.explanation || 'পাঠ্যবই অনুযায়ী বিশ্লেষণ'],
+          difficulty: q.difficulty,
+          cognitiveLevel: q.cognitiveLevel,
+          chapter: q.chapter,
+          format: q.format,
+          stimulus: q.stimulus
+        };
+      });
+    }
+
+    // Fallback to legacy getQuestionsForChapter if needed
+    const fallback = getQuestionsForChapter(sub, chaps[0] || selectedChapter, count);
+    return fallback.map((q, idx) => {
+      const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
+      return {
+        id: q.id || `legacy_q_${Date.now()}_${idx}`,
+        question: q.question,
+        options: [...q.options],
+        correctAnswer: q.correctAnswer,
+        correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
+        explanation: q.explanation || '',
+        solutions: q.solutions || generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation),
+        difficulty: 'medium',
+        chapter: chaps[0] || selectedChapter
+      };
+    });
+  };
+
+  // When class changes, dynamically adapt subjects & chapters and auto-update title & questions
   const handleClassChange = (cls: string) => {
     setSelectedClass(cls);
-    updateExamTitle(cls, selectedSubject, selectedChapter);
+    const availableSubs = getAvailableSubjects(cls);
+    const newSub = availableSubs.includes(selectedSubject) ? selectedSubject : availableSubs[0];
+    setSelectedSubject(newSub);
+    const availableChaps = getAvailableChapters(cls, newSub);
+    const newChapters = availableChaps.length > 0 ? [availableChaps[0]] : ['সাধারণ অধ্যায়'];
+    setSelectedChapters(newChapters);
+    setSelectedChapter(newChapters[0]);
+    updateExamTitle(cls, newSub, newChapters[0]);
+
+    if (creationMode === 'ai') {
+      const newQuestions = fetchExamQuestionsFromCurriculum(cls, newSub, newChapters, selectedDifficulty, questionCount);
+      setGeneratedQuestions(newQuestions);
+    }
   };
 
   // When subject changes, set default chapter and auto-update title & questions
   const handleSubjectChange = (sub: string) => {
     setSelectedSubject(sub);
-    const chaps = subjectChapters[sub] || ['সাধারণ অধ্যায়'];
-    const newChap = chaps[0];
-    setSelectedChapter(newChap);
-    updateExamTitle(selectedClass, sub, newChap);
+    const availableChaps = getAvailableChapters(selectedClass, sub);
+    const newChapters = availableChaps.length > 0 ? [availableChaps[0]] : ['সাধারণ অধ্যায়'];
+    setSelectedChapters(newChapters);
+    setSelectedChapter(newChapters[0]);
+    updateExamTitle(selectedClass, sub, newChapters[0]);
 
     if (creationMode === 'ai') {
-      const questions = getQuestionsForChapter(sub, newChap, questionCount);
-      const mapped: ExamQuestion[] = questions.map((q, idx) => {
-        const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
-        return {
-          id: q.id || `ai_q_${Date.now()}_${idx}`,
-          question: q.question,
-          options: [...q.options],
-          correctAnswer: q.correctAnswer,
-          correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
-          explanation: q.explanation || '',
-          solutions: q.solutions || generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation)
-        };
-      });
-      setGeneratedQuestions(mapped);
+      const newQuestions = fetchExamQuestionsFromCurriculum(selectedClass, sub, newChapters, selectedDifficulty, questionCount);
+      setGeneratedQuestions(newQuestions);
     }
   };
 
-  // When chapter changes, auto-update title & questions
+  // Multi-chapter selection toggles
+  const handleToggleChapter = (chap: string) => {
+    let updated: string[];
+    if (selectedChapters.includes(chap)) {
+      if (selectedChapters.length === 1) {
+        showToast('⚠️ অন্তত ১টি অধ্যায় নির্বাচিত থাকতে হবে!');
+        return;
+      }
+      updated = selectedChapters.filter(c => c !== chap);
+    } else {
+      updated = [...selectedChapters, chap];
+    }
+    setSelectedChapters(updated);
+    setSelectedChapter(updated[0] || chap);
+    const titleChapPart = updated.length > 1 ? `${toBn(updated.length)}টি অধ্যায়` : updated[0];
+    updateExamTitle(selectedClass, selectedSubject, titleChapPart);
+
+    if (creationMode === 'ai') {
+      const newQuestions = fetchExamQuestionsFromCurriculum(selectedClass, selectedSubject, updated, selectedDifficulty, questionCount);
+      setGeneratedQuestions(newQuestions);
+      showToast(`✨ নির্বাচিত অধ্যায়সমূহ (${toBn(updated.length)}টি) থেকে প্রশ্ন সাজানো হয়েছে!`);
+    }
+  };
+
+  // Select all chapters of the current subject
+  const handleSelectAllChapters = () => {
+    const all = getAvailableChapters(selectedClass, selectedSubject);
+    setSelectedChapters(all);
+    setSelectedChapter(all[0] || 'সব অধ্যায়');
+    updateExamTitle(selectedClass, selectedSubject, 'সম্পূর্ণ বই / সকল অধ্যায়');
+
+    if (creationMode === 'ai') {
+      const newQuestions = fetchExamQuestionsFromCurriculum(selectedClass, selectedSubject, all, selectedDifficulty, questionCount);
+      setGeneratedQuestions(newQuestions);
+      showToast(`✨ বিষয়টির সকল (${toBn(all.length)}টি) অধ্যায় নির্বাচন করা হয়েছে!`);
+    }
+  };
+
+  // Difficulty change handler
+  const handleDifficultyChange = (diff: DifficultyLevel) => {
+    setSelectedDifficulty(diff);
+    if (creationMode === 'ai') {
+      const newQuestions = fetchExamQuestionsFromCurriculum(selectedClass, selectedSubject, selectedChapters, diff, questionCount);
+      setGeneratedQuestions(newQuestions);
+      const diffLabel = diff === 'easy' ? 'সহজ' : diff === 'medium' ? 'মাঝারি' : diff === 'hard' ? 'কঠিন' : 'সকল মাত্রা (মিশ্র)';
+      showToast(`🎯 প্রশ্নের মান "${diffLabel}" অনুযায়ী বিন্যস্ত করা হয়েছে!`);
+    }
+  };
+
+  // When single chapter changes (backward compatibility)
   const handleChapterChange = (chap: string) => {
+    setSelectedChapters([chap]);
     setSelectedChapter(chap);
     updateExamTitle(selectedClass, selectedSubject, chap);
 
     if (creationMode === 'ai') {
-      const questions = getQuestionsForChapter(selectedSubject, chap, questionCount);
-      const mapped: ExamQuestion[] = questions.map((q, idx) => {
-        const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
-        return {
-          id: q.id || `ai_q_${Date.now()}_${idx}`,
-          question: q.question,
-          options: [...q.options],
-          correctAnswer: q.correctAnswer,
-          correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
-          explanation: q.explanation || '',
-          solutions: q.solutions || generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation)
-        };
-      });
-      setGeneratedQuestions(mapped);
+      const newQuestions = fetchExamQuestionsFromCurriculum(selectedClass, selectedSubject, [chap], selectedDifficulty, questionCount);
+      setGeneratedQuestions(newQuestions);
     }
   };
 
@@ -515,21 +637,50 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       showToast(`✓ নতুন প্রশ্ন ${toBn(nextNum)} এর খালি ফরম্যাট যুক্ত হয়েছে! আপনার প্রশ্ন ও অপশন লিখুন।`);
     } else {
       const existingTexts = generatedQuestions.map(q => q.question);
-      const newFromBank = getAlternativeQuestion(selectedSubject, selectedChapter, existingTexts);
-      const correctIdx = newFromBank.options.findIndex(o => o === newFromBank.correctAnswer);
+      const nctbReplacement = getAlternativeNCTBQuestion(
+        selectedSubject,
+        selectedChapters,
+        existingTexts,
+        selectedDifficulty
+      );
 
-      const newQ: ExamQuestion = {
-        id: `ai_q_${Date.now()}_${nextNum}`,
-        question: newFromBank.question,
-        options: [...newFromBank.options],
-        correctAnswer: newFromBank.correctAnswer,
-        correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
-        explanation: newFromBank.explanation || '',
-        solutions: newFromBank.solutions || generateTwoSolutions(newFromBank.question, newFromBank.options, newFromBank.correctAnswer, newFromBank.explanation)
-      };
+      if (nctbReplacement) {
+        const correctIdx = nctbReplacement.options.findIndex(o => o === nctbReplacement.correctAnswer);
+        const newQ: ExamQuestion = {
+          id: nctbReplacement.id || `nctb_q_${Date.now()}_${nextNum}`,
+          question: nctbReplacement.question,
+          options: [...nctbReplacement.options],
+          correctAnswer: nctbReplacement.correctAnswer,
+          correctAnswerIndex: correctIdx !== -1 ? correctIdx : (nctbReplacement.correctAnswerIndex ?? 0),
+          explanation: nctbReplacement.explanation || '',
+          solutions: nctbReplacement.solutions || [nctbReplacement.explanation || ''],
+          difficulty: nctbReplacement.difficulty,
+          cognitiveLevel: nctbReplacement.cognitiveLevel,
+          chapter: nctbReplacement.chapter,
+          format: nctbReplacement.format,
+          stimulus: nctbReplacement.stimulus
+        };
+        setGeneratedQuestions(prev => [...prev, newQ]);
+        showToast(`✓ প্রশ্ন নম্বর ${toBn(nextNum)} অধ্যায় "${nctbReplacement.chapter}" থেকে যুক্ত হয়েছে!`);
+      } else {
+        const newFromBank = getAlternativeQuestion(selectedSubject, selectedChapters[0] || selectedChapter, existingTexts);
+        const correctIdx = newFromBank.options.findIndex(o => o === newFromBank.correctAnswer);
 
-      setGeneratedQuestions(prev => [...prev, newQ]);
-      showToast(`✓ প্রশ্ন নম্বর ${toBn(nextNum)} এআই দ্বারা যুক্ত হয়েছে!`);
+        const newQ: ExamQuestion = {
+          id: `ai_q_${Date.now()}_${nextNum}`,
+          question: newFromBank.question,
+          options: [...newFromBank.options],
+          correctAnswer: newFromBank.correctAnswer,
+          correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
+          explanation: newFromBank.explanation || '',
+          solutions: newFromBank.solutions || generateTwoSolutions(newFromBank.question, newFromBank.options, newFromBank.correctAnswer, newFromBank.explanation),
+          difficulty: 'medium',
+          chapter: selectedChapters[0] || selectedChapter
+        };
+
+        setGeneratedQuestions(prev => [...prev, newQ]);
+        showToast(`✓ প্রশ্ন নম্বর ${toBn(nextNum)} এআই দ্বারা যুক্ত হয়েছে!`);
+      }
     }
   };
 
@@ -625,43 +776,28 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     showToast('✨ পাঠ্যবইয়ের প্রশ্নব্যাংক থেকে আইডিয়া লোড হয়েছে। নিজের মতো এডিট করতে পারেন।');
   };
 
-  // Select creation mode from modal (১. নিজে প্রশ্ন তৈরি করুন / ২. এআই দিয়ে তৈরি করুন)
+  // Select creation mode from modal (১. ম্যানুয়াল মোড / ২. এআই মোড)
   const handleSelectCreationMode = (mode: 'manual' | 'ai') => {
     setCreationMode(mode);
     setIsFinalized(false);
     setCreatedTestResult(null);
 
+    const chapSummary = selectedChapters.length > 1 ? `${toBn(selectedChapters.length)}টি অধ্যায়` : (selectedChapters[0] || selectedChapter);
+    setExamTitleInput(`${selectedClass} - ${selectedSubject}: ${chapSummary} মূল্যায়ন`);
+
     if (mode === 'manual') {
-      // 1. নিজে প্রশ্ন তৈরি করুন: শুরু হবে ১টি সম্পূর্ণ খালি প্রশ্ন তৈরির ফরম্যাট দিয়ে
-      setGeneratedQuestions([
-        {
-          id: `manual_q_${Date.now()}_1`,
-          question: '',
-          options: ['', '', '', ''],
-          correctAnswer: '',
-          correctAnswerIndex: undefined,
-          explanation: ''
-        }
-      ]);
-      setExamTitleInput(`${selectedClass} - ${selectedSubject}: ${selectedChapter} মূল্যায়ন`);
-      showToast('✍️ নিজে প্রশ্ন তৈরির ফরম্যাট সক্রিয় হয়েছে! আপনার প্রশ্ন ও অপশন লিখুন।');
+      // ম্যানুয়াল মোড: নির্বাচিত অধ্যায় থেকে নির্দিষ্ট ব্যাচে (ডিফল্ট ২০টি প্রশ্ন) লোড হবে,
+      // শিক্ষক যেকোনো প্রশ্ন পছন্দ না হলে "স্কিপ / পরিবর্তন" বাটনে ক্লিক করে ওই অধ্যায় থেকেই তাত্ক্ষণিক নতুন প্রশ্ন দিয়ে রিপ্লেস করতে পারবেন
+      const batchCount = questionCount < 5 ? 20 : questionCount;
+      setQuestionCount(batchCount);
+      const batch = fetchExamQuestionsFromCurriculum(selectedClass, selectedSubject, selectedChapters, selectedDifficulty, batchCount);
+      setGeneratedQuestions(batch);
+      showToast(`✍️ ম্যানুয়াল মোডে ${toBn(batch.length)}টি প্রশ্ন লোড হয়েছে! অপছন্দ হলে 'স্কিপ / পরিবর্তন' চাপুন।`);
     } else {
-      // 2. এআই দিয়ে তৈরি করুন: স্বয়ংক্রিয়ভাবে কারিকুলাম ও অধ্যায় অনুযায়ী প্রশ্ন লোড হবে
-      const questions = getQuestionsForChapter(selectedSubject, selectedChapter, questionCount);
-      const mapped: ExamQuestion[] = questions.map((q, idx) => {
-        const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
-        return {
-          id: q.id || `ai_q_${Date.now()}_${idx}`,
-          question: q.question,
-          options: [...q.options],
-          correctAnswer: q.correctAnswer,
-          correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
-          explanation: q.explanation || '',
-          solutions: q.solutions || generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation)
-        };
-      });
-      setGeneratedQuestions(mapped);
-      setExamTitleInput(`${selectedClass} - ${selectedSubject}: ${selectedChapter} মূল্যায়ন`);
+      // এআই মোড: স্বয়ংক্রিয়ভাবে কারিকুলাম ও অধ্যায় অনুযায়ী প্রশ্ন লোড হবে
+      const questions = fetchExamQuestionsFromCurriculum(selectedClass, selectedSubject, selectedChapters, selectedDifficulty, questionCount);
+      setGeneratedQuestions(questions);
+      showToast(`✨ এআই দ্বারা ${toBn(questions.length)}টি প্রশ্ন প্রস্তুত করা হয়েছে!`);
     }
 
     setActiveViewMode('builder');
@@ -739,31 +875,60 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     showToast(`🏛️ "${paper.institutionName}" এর প্রশ্নপত্র (${toBn(questions.length)}টি প্রশ্ন) লোড হয়েছে!`);
   };
 
-  // Generate / Regenerate with AI
+  // Generate / Regenerate with AI strictly from selected NCTB chapters & difficulty
   const handleGenerateWithAI = () => {
-    const questions = getQuestionsForChapter(selectedSubject, selectedChapter, questionCount);
-    const mapped: ExamQuestion[] = questions.map((q, idx) => {
-      const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
-      return {
-        id: q.id || `ai_q_${Date.now()}_${idx}`,
-        question: q.question,
-        options: [...q.options],
-        correctAnswer: q.correctAnswer,
-        correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
-        explanation: q.explanation || '',
-        solutions: q.solutions || generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation)
-      };
-    });
-    setGeneratedQuestions(mapped);
-    showToast(`✨ এআই পাঠ্যবই অনুযায়ী ${toBn(mapped.length)}টি প্রশ্ন প্রস্তুত করেছে!`);
+    const questions = fetchExamQuestionsFromCurriculum(
+      selectedClass,
+      selectedSubject,
+      selectedChapters,
+      selectedDifficulty,
+      questionCount
+    );
+    setGeneratedQuestions(questions);
+    showToast(`✨ নির্বাচিত অধ্যায়সমূহ (${toBn(selectedChapters.length)}টি) থেকে ${toBn(questions.length)}টি প্রশ্ন প্রস্তুত হয়েছে!`);
   };
 
-  // Skip / Replace question with alternative from question bank
+  // Skip / Replace question with alternative from selected NCTB chapters
   const handleSkipQuestion = (index: number) => {
     const currentOnScreen = generatedQuestions.map(q => q.question);
     const previousQuestionText = currentOnScreen[index];
     const allExcluded = Array.from(new Set([...currentOnScreen, ...seenQuestionTexts]));
-    const replacement = getAlternativeQuestion(selectedSubject, selectedChapter, allExcluded);
+
+    // Try NCTB replacement first strictly from selected chapters and difficulty
+    const nctbReplacement = getAlternativeNCTBQuestion(
+      selectedSubject,
+      selectedChapters,
+      allExcluded,
+      selectedDifficulty
+    );
+
+    if (nctbReplacement) {
+      const correctIdx = nctbReplacement.options.findIndex(o => o === nctbReplacement.correctAnswer);
+      const updated = [...generatedQuestions];
+      updated[index] = {
+        id: nctbReplacement.id || `alt_${Date.now()}_${index}`,
+        question: nctbReplacement.question,
+        options: [...nctbReplacement.options],
+        correctAnswer: nctbReplacement.correctAnswer,
+        correctAnswerIndex: correctIdx !== -1 ? correctIdx : (nctbReplacement.correctAnswerIndex ?? 0),
+        explanation: nctbReplacement.explanation || '',
+        solutions: nctbReplacement.solutions || [nctbReplacement.explanation || 'পাঠ্যবই অনুযায়ী বিশ্লেষণ'],
+        difficulty: nctbReplacement.difficulty,
+        cognitiveLevel: nctbReplacement.cognitiveLevel,
+        chapter: nctbReplacement.chapter,
+        format: nctbReplacement.format,
+        stimulus: nctbReplacement.stimulus
+      };
+      setGeneratedQuestions(updated);
+      setSeenQuestionTexts(prev => Array.from(new Set([...prev, nctbReplacement.question, previousQuestionText])));
+      setRecentlySwappedIndex(index);
+      setTimeout(() => setRecentlySwappedIndex(null), 2500);
+      showToast(`✓ প্রশ্ন নম্বর ${toBn(index + 1)} এর স্থানে অধ্যায় "${nctbReplacement.chapter || selectedSubject}" থেকে নতুন বিকল্প প্রশ্ন প্রতিস্থাপিত হয়েছে!`);
+      return;
+    }
+
+    // Fallback to legacy getAlternativeQuestion
+    const replacement = getAlternativeQuestion(selectedSubject, selectedChapters[0] || selectedChapter, allExcluded);
     const correctIdx = replacement.options.findIndex(o => o === replacement.correctAnswer);
     const updated = [...generatedQuestions];
     updated[index] = {
@@ -773,11 +938,15 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       correctAnswer: replacement.correctAnswer,
       correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
       explanation: replacement.explanation || '',
-      solutions: replacement.solutions || generateTwoSolutions(replacement.question, replacement.options, replacement.correctAnswer, replacement.explanation)
+      solutions: replacement.solutions || generateTwoSolutions(replacement.question, replacement.options, replacement.correctAnswer, replacement.explanation),
+      difficulty: 'medium',
+      chapter: selectedChapters[0] || selectedChapter
     };
     setGeneratedQuestions(updated);
     setSeenQuestionTexts(prev => Array.from(new Set([...prev, replacement.question, previousQuestionText])));
-    showToast(`✓ প্রশ্ন নম্বর ${toBn(index + 1)} এর পরিবর্তে বিকল্প প্রশ্ন আনা হয়েছে!`);
+    setRecentlySwappedIndex(index);
+    setTimeout(() => setRecentlySwappedIndex(null), 2500);
+    showToast(`✓ প্রশ্ন নম্বর ${toBn(index + 1)} এর স্থানে নতুন বিকল্প প্রশ্ন প্রতিস্থাপিত হয়েছে!`);
   };
 
 
@@ -825,12 +994,13 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     setIsFinalized(true);
 
     const randomPin = Math.floor(100000 + Math.random() * 900000).toString();
-    const finalTitle = examTitleInput.trim() || `${selectedClass} - ${selectedSubject}: ${selectedChapter} পরীক্ষা`;
+    const chaptersStr = selectedChapters.length > 0 ? selectedChapters.join(', ') : selectedChapter;
+    const finalTitle = examTitleInput.trim() || `${selectedClass} - ${selectedSubject}: ${chaptersStr} পরীক্ষা`;
     const newTest: AssignedTest = {
       id: `test-${Date.now()}`,
       title: finalTitle,
       subject: selectedSubject,
-      chapter: selectedChapter,
+      chapter: chaptersStr,
       questionCount: generatedQuestions.length,
       durationMinutes: durationMinutes,
       pin: randomPin,
@@ -1680,57 +1850,70 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               />
             </div>
 
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${creationMode === 'ai' ? 'lg:grid-cols-4' : 'lg:grid-cols-4'} gap-4`}>
+            {/* Grid 1: Class, Subject, Difficulty, and Duration */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               
-              {/* Class Selection */}
+              {/* 1. Class Selection (১ম থেকে ১২শ শ্রেণি) */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  শ্রেণি / ক্লাস:
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span>শ্রেণি / ক্লাস:</span>
+                  <span className="text-[10px] font-semibold text-blue-600">১ম - ১২শ শ্রেণি</span>
                 </label>
                 <select
                   value={selectedClass}
                   onChange={(e) => handleClassChange(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
-                  {['১ম শ্রেণি', '২য় শ্রেণি', '৩য় শ্রেণি', '৪র্থ শ্রেণি', '৫ম শ্রেণি', '৬ষ্ঠ শ্রেণি', '৭ম শ্রেণি', '৮ম শ্রেণি', '৯ম শ্রেণি', '১০ম শ্রেণি'].map(cls => (
+                  {NCTB_CLASSES.map(cls => (
                     <option key={cls} value={cls}>{cls}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Subject Selection */}
+              {/* 2. Subject Selection (Dynamic based on selected class) */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  বিষয়:
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span>বিষয়:</span>
+                  <span className="text-[10px] font-semibold text-slate-500">{toBn(getAvailableSubjects(selectedClass).length)}টি বিষয়</span>
                 </label>
                 <select
                   value={selectedSubject}
                   onChange={(e) => handleSubjectChange(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
-                  {Object.keys(subjectChapters).map(sub => (
+                  {getAvailableSubjects(selectedClass).map(sub => (
                     <option key={sub} value={sub}>{sub}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Chapter Selection */}
+              {/* 3. Difficulty Level (কঠিন্যতার মাত্রা: সহজ / মাঝারি / কঠিন / সকল মাত্রা) */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  অধ্যায় / টপিক:
+                <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span>কঠিন্যতার মাত্রা:</span>
+                  <span className={`text-[10px] font-bold ${
+                    selectedDifficulty === 'easy' ? 'text-emerald-600' :
+                    selectedDifficulty === 'medium' ? 'text-amber-600' :
+                    selectedDifficulty === 'hard' ? 'text-rose-600' : 'text-blue-600'
+                  }`}>
+                    {selectedDifficulty === 'easy' ? 'সহজ' :
+                     selectedDifficulty === 'medium' ? 'মাঝারি' :
+                     selectedDifficulty === 'hard' ? 'কঠিন' : 'মিশ্র/সকল'}
+                  </span>
                 </label>
                 <select
-                  value={selectedChapter}
-                  onChange={(e) => handleChapterChange(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={selectedDifficulty}
+                  onChange={(e) => handleDifficultyChange(e.target.value as DifficultyLevel)}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
-                  {(subjectChapters[selectedSubject] || []).map(chap => (
-                    <option key={chap} value={chap}>{chap}</option>
-                  ))}
+                  <option value="all">🌐 সকল মাত্রা (সহজ+মাঝারি+কঠিন)</option>
+                  <option value="easy">🟢 সহজ (Easy Level)</option>
+                  <option value="medium">🟡 মাঝারি (Medium Level)</option>
+                  <option value="hard">🔴 কঠিন (Hard Level)</option>
                 </select>
               </div>
 
-              {/* Duration in Minutes */}
+              {/* 4. Duration in Minutes */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   পরীক্ষার সময়:
@@ -1738,7 +1921,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 <select
                   value={durationMinutes}
                   onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value={5}>৫ মিনিট</option>
                   <option value={10}>১০ মিনিট</option>
@@ -1755,6 +1938,85 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
             </div>
 
+            {/* Grid 2: Multi-Chapter Selection Panel (একাধিক অধ্যায় একসঙ্গে নির্বাচন) */}
+            <div className="mt-4 pt-3.5 border-t border-slate-200/80 bg-slate-50/70 p-4 rounded-2xl border border-slate-200">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 mb-3">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-blue-600" />
+                  <span className="text-xs sm:text-sm font-black text-slate-900">
+                    অধ্যায়সমূহ নির্বাচন করুন (এক বা একাধিক অধ্যায় একসঙ্গে নির্বাচন করা যাবে):
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSelectAllChapters}
+                    className="px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <Check className="w-3 h-3 stroke-[2.5]" />
+                    <span>সব অধ্যায় ({toBn(getAvailableChapters(selectedClass, selectedSubject).length)})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const first = getAvailableChapters(selectedClass, selectedSubject)[0];
+                      if (first) {
+                        setSelectedChapters([first]);
+                        setSelectedChapter(first);
+                        updateExamTitle(selectedClass, selectedSubject, first);
+                        if (creationMode === 'ai') {
+                          const newQ = fetchExamQuestionsFromCurriculum(selectedClass, selectedSubject, [first], selectedDifficulty, questionCount);
+                          setGeneratedQuestions(newQ);
+                        }
+                        showToast(`✓ শুধুমাত্র ১ম অধ্যায় "${first}" নির্বাচিত রাখা হলো।`);
+                      }
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-[11px] font-bold transition-colors cursor-pointer"
+                  >
+                    <span>ক্লিয়ার / রিসেট</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Interactive Pill Badges for All Chapters */}
+              <div className="flex flex-wrap gap-2">
+                {getAvailableChapters(selectedClass, selectedSubject).map((chap, cIdx) => {
+                  const isSelected = selectedChapters.includes(chap);
+                  return (
+                    <button
+                      key={chap}
+                      type="button"
+                      onClick={() => handleToggleChapter(chap)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-300 scale-102'
+                          : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 hover:border-slate-400'
+                      }`}
+                    >
+                      <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black ${
+                        isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {isSelected ? <Check className="w-3 h-3 stroke-[3]" /> : toBn(cIdx + 1)}
+                      </span>
+                      <span>{chap}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Selected Chapter Status Notice */}
+              <div className="mt-3 pt-2.5 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-600 font-medium">
+                <span className="flex items-center gap-1.5 font-bold text-blue-700">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                  <span>বর্তমানে {toBn(selectedChapters.length)}টি অধ্যায় সক্রিয়</span>
+                </span>
+                <span className="text-slate-500 italic hidden sm:inline">
+                  (এআই নিজ দায়িত্বে শুধুমাত্র এই নির্বাচিত অধ্যায়গুলো থেকেই নিখুঁতভাবে প্রশ্নপত্র তৈরি করবে)
+                </span>
+              </div>
+            </div>
+
             {/* AI Specific: Question Count & Reload Button */}
             {creationMode === 'ai' && (
               <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-amber-50/50 p-3.5 rounded-2xl border border-amber-200/60">
@@ -1765,20 +2027,14 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                     onChange={(e) => {
                       const newCount = Number(e.target.value);
                       setQuestionCount(newCount);
-                      const questions = getQuestionsForChapter(selectedSubject, selectedChapter, newCount);
-                      const mapped: ExamQuestion[] = questions.map((q, idx) => {
-                        const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
-                        return {
-                          id: q.id || `ai_q_${Date.now()}_${idx}`,
-                          question: q.question,
-                          options: [...q.options],
-                          correctAnswer: q.correctAnswer,
-                          correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
-                          explanation: q.explanation || '',
-                          solutions: q.solutions || generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation)
-                        };
-                      });
-                      setGeneratedQuestions(mapped);
+                      const questions = fetchExamQuestionsFromCurriculum(
+                        selectedClass,
+                        selectedSubject,
+                        selectedChapters,
+                        selectedDifficulty,
+                        newCount
+                      );
+                      setGeneratedQuestions(questions);
                     }}
                     className="bg-white border border-amber-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer"
                   >
@@ -1810,6 +2066,65 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                   <Sparkles className="w-3.5 h-3.5 text-amber-100" />
                   <span>এআই দিয়ে প্রশ্ন রিলোড করুন</span>
                 </button>
+              </div>
+            )}
+
+            {/* Manual Mode Specific: Batch Size Selector & Reload / Add Buttons */}
+            {creationMode === 'manual' && (
+              <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-blue-50/60 p-3.5 rounded-2xl border border-blue-200">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Edit3 className="w-4 h-4 text-blue-700" />
+                    <span className="text-xs font-black text-slate-800">ব্যাচ সাইজ:</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {[10, 20, 25, 30, 50, 100].map(cnt => (
+                      <button
+                        key={cnt}
+                        type="button"
+                        onClick={() => {
+                          setQuestionCount(cnt);
+                          const batch = fetchExamQuestionsFromCurriculum(selectedClass, selectedSubject, selectedChapters, selectedDifficulty, cnt);
+                          setGeneratedQuestions(batch);
+                          showToast(`✓ ${toBn(cnt)}টি প্রশ্নের ব্যাচ লোড হয়েছে!`);
+                        }}
+                        className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                          questionCount === cnt
+                            ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-300'
+                            : 'bg-white text-slate-700 hover:bg-blue-100 border border-blue-200'
+                        }`}
+                      >
+                        {toBn(cnt)}টি
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const batch = fetchExamQuestionsFromCurriculum(selectedClass, selectedSubject, selectedChapters, selectedDifficulty, questionCount);
+                      setGeneratedQuestions(batch);
+                      showToast(`✓ নির্বাচিত অধ্যায়সমূহ থেকে ${toBn(batch.length)}টি প্রশ্নের নতুন ব্যাচ লোড হয়েছে!`);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    title="নির্বাচিত অধ্যায়সমূহ থেকে সম্পূর্ণ নতুন ব্যাচ আনুন"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-blue-100" />
+                    <span>নতুন ব্যাচ আনুন</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleAddQuestion}
+                    className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 text-blue-700 border border-blue-300 text-xs font-bold shadow-2xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    title="নিজে হাতে নতুন প্রশ্ন লিখতে খালি কার্ড যোগ করুন"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-blue-600" />
+                    <span>খালি প্রশ্ন যোগ করুন</span>
+                  </button>
+                </div>
               </div>
             )}
 
@@ -2075,8 +2390,55 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 return (
                   <div 
                     key={q.id || `q_${qIndex}`}
-                    className="p-4 sm:p-5 rounded-2xl bg-slate-100 border border-slate-200/90 shadow-xs hover:-translate-y-1.5 hover:shadow-xl hover:shadow-slate-300/80 hover:border-blue-300/80 hover:bg-slate-50/95 transition-all duration-300 ease-out space-y-3 group cursor-default"
+                    className={`p-4 sm:p-5 rounded-2xl border transition-all duration-300 ease-out space-y-3 group cursor-default relative ${
+                      recentlySwappedIndex === qIndex
+                        ? 'bg-emerald-50/95 border-emerald-400 shadow-xl shadow-emerald-200/70 ring-2 ring-emerald-400 animate-in zoom-in-95'
+                        : 'bg-slate-100 border-slate-200/90 shadow-xs hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-300/80 hover:border-blue-300/80 hover:bg-slate-50/95'
+                    }`}
                   >
+                    {/* Live Swapped Notification Pill */}
+                    {recentlySwappedIndex === qIndex && (
+                      <div className="absolute -top-3 right-6 px-3 py-1 rounded-full bg-emerald-600 text-white text-[10px] font-black tracking-wider shadow-md flex items-center gap-1.5 animate-bounce z-10">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-200" />
+                        <span>নতুন বিকল্প প্রশ্ন প্রতিস্থাপিত হয়েছে!</span>
+                      </div>
+                    )}
+
+                    {/* Question Header Meta Badges: Chapter, Difficulty, Cognitive Level */}
+                    {(q.chapter || q.difficulty || q.cognitiveLevel) && (
+                      <div className="flex flex-wrap items-center gap-1.5 pb-1">
+                        {q.chapter && (
+                          <span className="px-2 py-0.5 rounded-md bg-blue-100/90 text-blue-900 text-[10px] font-bold border border-blue-200">
+                            📖 {q.chapter}
+                          </span>
+                        )}
+                        {q.difficulty && (
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
+                            q.difficulty === 'easy' ? 'bg-emerald-100/90 text-emerald-900 border-emerald-200' :
+                            q.difficulty === 'hard' ? 'bg-rose-100/90 text-rose-900 border-rose-200' :
+                            'bg-amber-100/90 text-amber-900 border-amber-200'
+                          }`}>
+                            {q.difficulty === 'easy' ? '🟢 সহজ' : q.difficulty === 'hard' ? '🔴 কঠিন' : '🟡 মাঝারি'}
+                          </span>
+                        )}
+                        {q.cognitiveLevel && (
+                          <span className="px-2 py-0.5 rounded-md bg-purple-100/90 text-purple-900 text-[10px] font-bold border border-purple-200">
+                            🧠 {q.cognitiveLevel === 'knowledge' ? 'জ্ঞান' :
+                               q.cognitiveLevel === 'comprehension' ? 'অনুধাবন' :
+                               q.cognitiveLevel === 'application' ? 'প্রয়োগ' : 'উচ্চতর দক্ষতা'}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Stimulus / উদ্দীপক (যদি উদ্দীপকভিত্তিক প্রশ্ন হয়) */}
+                    {q.stimulus && (
+                      <div className="bg-amber-50/90 border border-amber-200/80 rounded-xl p-2.5 text-xs text-slate-800 leading-relaxed font-serif">
+                        <span className="font-bold text-amber-950 block mb-0.5 text-[11px]">নিচের উদ্দীপকটি পড়ে সংশ্লিষ্ট প্রশ্নের উত্তর দিন:</span>
+                        {q.stimulus}
+                      </div>
+                    )}
+
                     {/* 1. Direct Question Row: Number Badge + Question Input + Action Buttons */}
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
@@ -2092,19 +2454,17 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                         />
                       </div>
 
-                      {/* Header Actions: Alternative Question (Only for AI Mode) and Delete */}
+                      {/* Header Actions: Alternative Question (Skip & Swap from same chapter) and Delete */}
                       <div className="flex items-center justify-end gap-1.5 shrink-0 pl-10 sm:pl-0">
-                        {creationMode === 'ai' && (
-                          <button
-                            type="button"
-                            onClick={() => handleSkipQuestion(qIndex)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-transparent hover:bg-slate-200 text-amber-800 text-xs font-bold transition-all border border-amber-300/70 cursor-pointer"
-                            title="এই প্রশ্নটি পরিবর্তন করতে চাইলে বিকল্প প্রশ্ন আনুন"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
-                            <span>বিকল্প প্রশ্ন</span>
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleSkipQuestion(qIndex)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 active:bg-amber-200 text-amber-900 text-xs font-bold transition-all border border-amber-300 shadow-2xs hover:scale-102 cursor-pointer active:scale-95 shrink-0"
+                          title="এই প্রশ্নটি পছন্দ না হলে নির্বাচিত অধ্যায় থেকেই আরেকটি নতুন প্রশ্ন দিয়ে প্রতিস্থাপন করুন"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5 text-amber-600" />
+                          <span>স্কিপ ও পরিবর্তন</span>
+                        </button>
 
                         {generatedQuestions.length > 1 && (
                           <button
@@ -3046,11 +3406,23 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                       <span className="font-bold text-slate-900">
                         {toBn(idx + 1)}. {q.question}
                       </span>
-                      <span className={`px-2 py-0.5 rounded font-bold text-[11px] ${
-                        isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                      }`}>
-                        {isCorrect ? '✓ সঠিক' : '✗ ভুল'}
-                      </span>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {q.responseTimeSeconds !== undefined && (
+                          <span className={`px-2 py-0.5 rounded font-bold text-[10.5px] border ${
+                            q.responseTimeSeconds < 2.2
+                              ? 'bg-rose-50 text-rose-700 border-rose-300 flex items-center gap-1'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}>
+                            {q.responseTimeSeconds < 2.2 && <Zap className="w-2.5 h-2.5 text-rose-600 animate-pulse" />}
+                            <span>{q.responseTimeSeconds < 2.2 ? 'অতি দ্রুত: ' : 'ব্যয়িত সময়: '}{toBn(q.responseTimeSeconds)} সে.</span>
+                          </span>
+                        )}
+                        <span className={`px-2 py-0.5 rounded font-bold text-[11px] ${
+                          isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {isCorrect ? '✓ সঠিক' : '✗ ভুল'}
+                        </span>
+                      </div>
                     </div>
                     <div className="text-slate-600">
                       <span>সন্তানের দেওয়া উত্তর: </span>
@@ -3416,20 +3788,20 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                     <Edit3 className="w-5 h-5" />
                   </div>
                   <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
-                    অভিভাবকের পছন্দ
+                    শিক্ষক ও অভিভাবক
                   </span>
                 </div>
                 
                 <h4 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-blue-700 mb-1.5 transition-colors flex items-center gap-1.5">
-                  <span>১. নিজে প্রশ্ন তৈরি করুন</span>
+                  <span>১. ম্যানুয়াল মোড (ব্যাচ ও স্কিপ)</span>
                 </h4>
                 
                 <p className="text-xs text-slate-600 leading-relaxed font-medium mb-4">
-                  কোনো অটোমেটিক প্রশ্ন থাকবে না। অভিভাবক নিজের হাতে প্রশ্ন ও ৪টি অপশন লিখে সঠিক উত্তর নির্ধারণ করবেন।
+                  নির্বাচিত অধ্যায়সমূহ থেকে নির্দিষ্ট ব্যাচে (১০/২০/৫০টি) প্রশ্ন আসবে। কোনো প্রশ্ন পছন্দ না হলে "স্কিপ ও পরিবর্তন" করে ওই অধ্যায় থেকেই নতুন প্রশ্ন প্রতিস্থাপন করতে পারবেন।
                 </p>
 
                 <div className="mt-auto w-full pt-3 border-t border-blue-100 flex items-center justify-between text-xs font-bold text-blue-700 group-hover:translate-x-0.5 transition-transform">
-                  <span>নিজে প্রশ্ন লিখতে ক্লিক করুন</span>
+                  <span>ম্যানুয়াল ব্যাচে প্রশ্ন সাজাতে ক্লিক করুন</span>
                   <ArrowRight className="w-4 h-4" />
                 </div>
               </button>

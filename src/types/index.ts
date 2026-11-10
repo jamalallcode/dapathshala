@@ -8,8 +8,14 @@ export interface ExamQuestion {
   correctAnswerIndex?: number;
   explanation: string;
   solutions?: string[];
+  difficulty?: 'easy' | 'medium' | 'hard';
+  cognitiveLevel?: string;
+  chapter?: string;
+  format?: string;
+  stimulus?: string;
   studentAnswer?: string;
   isCorrect?: boolean;
+  responseTimeSeconds?: number;
 }
 
 export interface ViolationSnapshot {
@@ -39,6 +45,7 @@ export interface AssignedTest {
   aiGradingEnabled: boolean;
   proctoringFlags?: string[];
   violationSnapshots?: ViolationSnapshot[];
+  questionResponseTimes?: Record<string, number>;
   parentComment?: string;
   questions: ExamQuestion[];
   submittedAt?: string;
@@ -55,6 +62,7 @@ export interface StudentSubmission {
   totalQuestions: number;
   proctoringFlags: string[];
   violationSnapshots?: ViolationSnapshot[];
+  questionResponseTimes?: Record<string, number>;
   status: 'submitted' | 'reviewed';
   isPublished: boolean;
   parentComment?: string;
