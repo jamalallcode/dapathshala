@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import fs from 'fs';
 import path from 'path';
+import { GoogleGenAI } from '@google/genai';
 
 // Safe process-level error handlers
 process.on('uncaughtException', (err) => {
@@ -32,7 +33,8 @@ function resolvePort(): number {
 
 const PORT = resolvePort();
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
 // Health check endpoint for pre-warming & container health probes
 app.get('/api/health', (_req, res) => {
@@ -353,6 +355,108 @@ app.delete('/api/institution-papers/:id', (req, res) => {
   const filtered = existing.filter((p: any) => p && p.id !== id);
   saveJson(INSTITUTION_PAPERS_FILE, filtered);
   res.json({ success: true, remaining: filtered.length });
+});
+
+// API: AI Vision Extract Questions from Image / PDF Page (Ephemeral in-memory only, image is NEVER saved)
+app.post('/api/ai/vision-extract-questions', async (req, res) => {
+  try {
+    const { fileBase64, mimeType, mode, targetClass, subject, institutionName } = req.body || {};
+    if (!fileBase64) {
+      return res.status(400).json({ error: 'কোনো ফাইল বা ইমেজ ডেটা পাওয়া যায়নি।' });
+    }
+
+    const apiKey = (process.env.GEMINI_API_KEY || (process.env as any).VITE_GEMINI_API_KEY || (req.headers['x-gemini-key'] as string) || '').trim();
+    if (!apiKey) {
+      return res.status(400).json({ 
+        error: 'Gemini API Key সেট করা নেই। দয়া করে পরিবেশ ভেরিয়েবল (GEMINI_API_KEY) অথবা সেটিংসে এপিআই কী যুক্ত করুন।' 
+      });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+    const cleanBase64 = fileBase64.includes(',') ? fileBase64.split(',')[1] : fileBase64;
+    const cleanMimeType = mimeType || 'image/jpeg';
+
+    const systemPrompt = `You are an expert Bangladeshi academic curriculum (NCTB) teacher and question creation engine.
+Analyze the attached image or document page carefully.
+
+TARGET CONTEXT:
+Class: ${targetClass || 'Auto-detect'}
+Subject: ${subject || 'Auto-detect'}
+Institution/Source: ${institutionName || 'Auto-detect'}
+MODE: "${mode === 'book_page' ? 'BOOK_PAGE_QUESTION_FORMULATION' : 'QUESTION_PAPER_EXTRACTION'}"
+
+TASK:
+${mode === 'book_page' 
+  ? `The image contains reading content or a chapter from a textbook.
+     1. Read the Bengali text thoroughly.
+     2. Formulate 5 to 10 high-standard multiple-choice questions (MCQs) assessing factual recall, understanding, and application of this specific page's content.
+     3. For each question, provide exactly 4 distinct, plausible options starting with 'ক. ', 'খ. ', 'গ. ', 'ঘ. '.
+     4. Correctly mark the accurate answer string and zero-based index (0, 1, 2, or 3).
+     5. Provide a short 1-sentence explanation referencing the textbook content.`
+  : `The image contains an actual question paper (such as a school test paper, board question paper, or coaching test).
+     1. Accurately transcribe and extract ALL questions and options from this page.
+     2. Keep the exact question text and all options ('ক. ', 'খ. ', 'গ. ', 'ঘ. ').
+     3. Detect or solve the correct answer (mark index 0, 1, 2, or 3) and provide a concise explanation.`
+}
+
+IMPORTANT: Respond ONLY with a valid JSON object. Do not include markdown codeblocks or conversational text.
+JSON Structure:
+{
+  "detectedClass": "string",
+  "detectedSubject": "string",
+  "detectedInstitution": "string",
+  "questions": [
+    {
+      "question": "১. ...",
+      "options": ["ক. ...", "খ. ...", "গ. ...", "ঘ. ..."],
+      "correctAnswer": "ক. ...",
+      "correctAnswerIndex": 0,
+      "explanation": "সংক্ষিপ্ত ব্যাখ্যা..."
+    }
+  ]
+}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              data: cleanBase64,
+              mimeType: cleanMimeType.startsWith('image/') ? cleanMimeType : 'application/pdf',
+            },
+          },
+          { text: systemPrompt }
+        ]
+      },
+    });
+
+    const rawText = response.text || '';
+    let parsedData: any = null;
+    try {
+      const cleaned = rawText.replace(/```json/gi, '').replace(/```/g, '').trim();
+      parsedData = JSON.parse(cleaned);
+    } catch {
+      const match = rawText.match(/\{[\s\S]*\}/);
+      if (match) {
+        parsedData = JSON.parse(match[0]);
+      } else {
+        throw new Error('এআই থেকে রেসপন্সটি সঠিক ফরম্যাটে পাওয়া যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন।');
+      }
+    }
+
+    // Success response - note: fileBase64 is NEVER saved to disk or DB.
+    return res.json({
+      success: true,
+      data: parsedData,
+      questionCount: parsedData.questions?.length || 0
+    });
+  } catch (err: any) {
+    console.error('Vision extraction error:', err);
+    return res.status(500).json({ 
+      error: err?.message || 'ছবি বা পিডিএফ প্রসেস করার সময় কোনো ত্রুটি হয়েছে।' 
+    });
+  }
 });
 
 // API: Parent Registration (Phone, Password & Name)

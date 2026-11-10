@@ -50,6 +50,7 @@ import {
   saveInstitutionPapers 
 } from '../../lib/institutionPapers';
 import { AdminPaperBulkUploadModal } from './AdminPaperBulkUploadModal';
+import { AdminAIVisionQuestionModal } from './AdminAIVisionQuestionModal';
 
 interface AdminDashboardProps {
   onExitAdmin: () => void;
@@ -98,6 +99,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Modals & Action States
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [showVisionModal, setShowVisionModal] = useState(false);
   const [selectedExamForInspect, setSelectedExamForInspect] = useState<AssignedTest | null>(null);
   const [inspectMode, setInspectMode] = useState<'questions' | 'submission'>('questions');
   
@@ -837,14 +839,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </p>
               </div>
 
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowVisionModal(true)}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-lg shadow-emerald-900/40 transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <span>ছবি/পিডিএফ এআই ভিশন কনভার্ট</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setShowBulkUploadModal(true)}
                   className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white text-xs sm:text-sm font-bold flex items-center gap-2 shadow-lg shadow-purple-900/40 transition-all cursor-pointer"
                 >
                   <Upload className="w-4 h-4" />
-                  <span>নতুন প্রশ্নপত্র বাল্ক আপলোড</span>
+                  <span>বাল্ক টেক্সট পেস্ট</span>
                 </button>
               </div>
             </div>
@@ -1709,6 +1720,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         onClose={() => {
           setShowBulkUploadModal(false);
           setInstitutionPapers(getStoredInstitutionPapers());
+        }}
+      />
+
+      {/* ======================================================== */}
+      {/* AI VISION QUESTION CONVERTER & VERIFICATION MODAL        */}
+      {/* ======================================================== */}
+      <AdminAIVisionQuestionModal
+        isOpen={showVisionModal}
+        onClose={() => {
+          setShowVisionModal(false);
+        }}
+        onSavedSuccess={() => {
+          setInstitutionPapers(getStoredInstitutionPapers());
+          showToast('নতুন প্রশ্নপত্র সফলভাবে ডাটাবেজে সংরক্ষিত হয়েছে');
         }}
       />
 
