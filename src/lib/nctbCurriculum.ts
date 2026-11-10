@@ -2,6 +2,7 @@
  * NCTB National Curriculum Master Engine (Class 1 to 12)
  * Comprehensive Question Bank, Multi-Chapter Filtering, and Difficulty Management
  */
+import { CHAPTER_QUESTION_BANK } from './curriculumQuestions';
 
 export type DifficultyLevel = 'easy' | 'medium' | 'hard' | 'all';
 export type CognitiveLevel = 'knowledge' | 'comprehension' | 'application' | 'higher_ability';
@@ -277,6 +278,493 @@ export const MASTER_NCTB_QUESTIONS: NCTBQuestion[] = [
     format: 'standard',
     explanation: 'উপপাদ্য ২১ অনুযায়ী: বৃত্তের ব্যাস দ্বারা গঠিত যেকোনো অর্ধবৃত্তস্থ কোণের পরিমাপ এক সমকোণ বা ৯০ ডিগ্রি।'
   },
+  // ------------------- বাস্তব সংখ্যা ও সেট-ফাংশন -------------------
+  {
+    id: 'nctb_math_009',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বাস্তব সংখ্যা ও সেট-ফাংশন',
+    question: 'নিচের কোনটি একটি অমূলদ সংখ্যা (Irrational number)?',
+    options: ['√2', '√4', '0.5', '3/4'],
+    correctAnswer: '√2',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'যেকোনো পূর্ণবর্গ নয় এমন স্বাভাবিক সংখ্যার বর্গমূল একটি অমূলদ সংখ্যা। এখানে √2 এর দশমিক মান অসীম অনাবৃত দশমিক।'
+  },
+  {
+    id: 'nctb_math_010',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বাস্তব সংখ্যা ও সেট-ফাংশন',
+    question: 'যদি A = {1, 2, 3} হয়, তবে A সেটের শক্তি সেট P(A) এর উপাদান সংখ্যা কত?',
+    options: ['8টি', '6টি', '4টি', '16টি'],
+    correctAnswer: '8টি',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'application',
+    format: 'standard',
+    explanation: 'যেকোনো সেটের উপাদান সংখ্যা n হলে তার শক্তি সেটের উপাদান সংখ্যা 2^n হয়। এখানে n = 3, সুতরাং উপাদান সংখ্যা 2³ = 8টি।'
+  },
+  {
+    id: 'nctb_math_011',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বাস্তব সংখ্যা ও সেট-ফাংশন',
+    question: 'f(x) = x² - 4x + 3 হলে, f(2) এর মান নিচের কোনটি?',
+    options: ['-1', '1', '0', '3'],
+    correctAnswer: '-1',
+    correctAnswerIndex: 0,
+    difficulty: 'medium',
+    cognitiveLevel: 'application',
+    format: 'standard',
+    explanation: 'f(2) = 2² - 4(2) + 3 = 4 - 8 + 3 = -1।'
+  },
+  {
+    id: 'nctb_math_012',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বাস্তব সংখ্যা ও সেট-ফাংশন',
+    question: 'পৌনঃপুনিক দশমিক 0.3̇ এর সাধারণ ভগ্নাংশ রূপ কোনটি?',
+    options: ['1/3', '3/10', '3/99', '1/9'],
+    correctAnswer: '1/3',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'comprehension',
+    format: 'standard',
+    explanation: '0.3̇ = 3/9 = 1/3।'
+  },
+  {
+    id: 'nctb_math_013',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বাস্তব সংখ্যা ও সেট-ফাংশন',
+    question: 'A ∩ B = ∅ হলে A ও B কে পরস্পরের কী সেট বলা হয়?',
+    options: ['নিশ্ছেদ সেট (Disjoint set)', 'উপসেট (Subset)', 'সার্বিক সেট (Universal set)', 'পূরক সেট (Complement set)'],
+    correctAnswer: 'নিশ্ছেদ সেট (Disjoint set)',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'দুটি সেটের সাধারণ উপাদান বা ছেদ ফাঁকা সেট (∅) হলে তাদেরকে পরস্পরের নিশ্ছেদ সেট বলে।'
+  },
+  {
+    id: 'nctb_math_014',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বাস্তব সংখ্যা ও সেট-ফাংশন',
+    question: 'A = {a, b} এবং B = {b, c} হলে A ∪ B সেটটি কোনটি?',
+    options: ['{a, b, c}', '{b}', '{a, c}', '∅'],
+    correctAnswer: '{a, b, c}',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'comprehension',
+    format: 'standard',
+    explanation: 'সংযোগ সেট A ∪ B হলো উভয় সেটের সকল উপাদান নিয়ে গঠিত সেট, অর্থাৎ {a, b, c}।'
+  },
+
+  // ------------------- পরিমিতি (ঘনবস্তু ও ক্ষেত্রফল) -------------------
+  {
+    id: 'nctb_math_015',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'পরিমিতি (ঘনবস্তু ও ক্ষেত্রফল)',
+    question: 'একটি সমবাহু ত্রিভুজের প্রতিটি বাহুর দৈর্ঘ্য a হলে এর ক্ষেত্রফল নির্ণয়ের সূত্র কোনটি?',
+    options: ['(√3/4) a²', '(√3/2) a', 'a²/4', '(3/4) a²'],
+    correctAnswer: '(√3/4) a²',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'সমবাহু ত্রিভুজের ক্ষেত্রফলের প্রমিত সূত্র: Δ = (√3/4) a²।'
+  },
+  {
+    id: 'nctb_math_016',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'পরিমিতি (ঘনবস্তু ও ক্ষেত্রফল)',
+    question: 'একটি বেলন বা সিলিন্ডারের ভূমির ব্যাসার্ধ r এবং উচ্চতা h হলে এর আয়তন কত?',
+    options: ['πr²h', '2πrh', '1/3 πr²h', '4/3 πr³'],
+    correctAnswer: 'πr²h',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'সিলিন্ডারের আয়তন = ভূমির ক্ষেত্রফল × উচ্চতা = πr² × h = πr²h।'
+  },
+  {
+    id: 'nctb_math_017',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'পরিমিতি (ঘনবস্তু ও ক্ষেত্রফল)',
+    question: 'একটি আয়তাকার ঘনবস্তুর দৈর্ঘ্য ৫ মি, প্রস্থ ৪ মি ও উচ্চতা ৩ মি হলে এর আয়তন কত?',
+    options: ['৬০ ঘনমিটার', '৪৭ ঘনমিটার', '৯৪ ঘনমিটার', '৫০ ঘনমিটার'],
+    correctAnswer: '৬০ ঘনমিটার',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'application',
+    format: 'standard',
+    explanation: 'ঘনবস্তুর আয়তন = দৈর্ঘ্য × প্রস্থ × উচ্চতা = ৫ × ৪ × ৩ = ৬০ ঘনমিটার।'
+  },
+  {
+    id: 'nctb_math_018',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'পরিমিতি (ঘনবস্তু ও ক্ষেত্রফল)',
+    question: 'একটি বর্গের এক বাহুর দৈর্ঘ্য ৬ সেমি হলে এর কর্ণের দৈর্ঘ্য কত?',
+    options: ['6√2 সেমি', '12 সেমি', '36 সেমি', '6 সেমি'],
+    correctAnswer: '6√2 সেমি',
+    correctAnswerIndex: 0,
+    difficulty: 'medium',
+    cognitiveLevel: 'application',
+    format: 'standard',
+    explanation: 'বর্গের কর্ণের দৈর্ঘ্য = a√2 = 6√2 সেমি।'
+  },
+  {
+    id: 'nctb_math_019',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'পরিমিতি (ঘনবস্তু ও ক্ষেত্রফল)',
+    question: 'r ব্যাসার্ধবিশিষ্ট একটি গোলকের সমগ্র পৃষ্ঠের ক্ষেত্রফল কত?',
+    options: ['4πr²', 'πr²', '2πr²', '4/3 πr³'],
+    correctAnswer: '4πr²',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'গোলকের পৃষ্ঠতলের ক্ষেত্রফল A = 4πr²।'
+  },
+  {
+    id: 'nctb_math_020',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'পরিমিতি (ঘনবস্তু ও ক্ষেত্রফল)',
+    question: 'একটি বৃত্তাকার মাঠের ব্যাসার্ধ ১৪ মিটার হলে এর পরিধি কত? (π = 22/7 ধরে)',
+    options: ['৮৮ মিটার', '৪৪ মিটার', '৬১৬ মিটার', '১৭৬ মিটার'],
+    correctAnswer: '৮৮ মিটার',
+    correctAnswerIndex: 0,
+    difficulty: 'medium',
+    cognitiveLevel: 'application',
+    format: 'standard',
+    explanation: 'বৃত্তের পরিধি = 2πr = 2 × (22/7) × 14 = 2 × 22 × 2 = 88 মিটার।'
+  },
+
+  // ------------------- পরিসংখ্যান ও মধ্যক-প্রচুরক -------------------
+  {
+    id: 'nctb_math_021',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'পরিসংখ্যান ও মধ্যক-প্রচুরক',
+    question: 'উপাত্তসমূহের সর্বোচ্চ মান এবং সর্বনিম্ন মানের পার্থক্যকে কী বলা হয়?',
+    options: ['পরিসর (Range)', 'শ্রেণি ব্যবধান', 'মধ্যক', 'প্রচুরক'],
+    correctAnswer: 'পরিসর (Range)',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'পরিসর = (সর্বোচ্চ মান - সর্বনিম্ন মান) + ১ (বা পার্থক্য হলো সর্বোচ্চ ও সর্বনিম্ন মানের বিয়োগফল)।'
+  },
+  {
+    id: 'nctb_math_022',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'পরিসংখ্যান ও মধ্যক-প্রচুরক',
+    question: 'প্রচুরক নির্ণয়ের সূত্র L + [f₁ / (f₁ + f₂)] × h এ L কিসের প্রতীক?',
+    options: ['প্রচুরক শ্রেণির নিম্নসীমা', 'মধ্যক শ্রেণির নিম্নসীমা', 'সর্বোচ্চ গণসংখ্যা', 'মোট গণসংখ্যা'],
+    correctAnswer: 'প্রচুরক শ্রেণির নিম্নসীমা',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'প্রচুরক সূত্রে L হলো প্রচুরক শ্রেণির নিম্নসীমা, f₁ = fm - f(m-1), f₂ = fm - f(m+1) এবং h হলো শ্রেণি ব্যাপ্তি।'
+  },
+  {
+    id: 'nctb_math_023',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'পরিসংখ্যান ও মধ্যক-প্রচুরক',
+    question: '৪, ৭, ৮, ৯, ১০, ১২ উপাত্তগুলোর মধ্যক (Median) কত?',
+    options: ['8.5', '8', '9', '8.3'],
+    correctAnswer: '8.5',
+    correctAnswerIndex: 0,
+    difficulty: 'medium',
+    cognitiveLevel: 'application',
+    format: 'standard',
+    explanation: 'এখানে মোট পদ সংখ্যা n = 6 (জোড়)। মধ্যক = (৩য় পদ + ৪র্থ পদ)/২ = (৮ + ৯)/২ = ১৭/২ = ৮.৫।'
+  },
+  {
+    id: 'nctb_math_024',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'পরিসংখ্যান ও মধ্যক-প্রচুরক',
+    question: '৫, ৮, ৭, ৮, ৯, ৮, ১১ উপাত্তগুলোর প্রচুরক (Mode) কোনটি?',
+    options: ['৮', '৭', '৯', '৫'],
+    correctAnswer: '৮',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'comprehension',
+    format: 'standard',
+    explanation: 'যে সংখ্যাটি উপাত্তে সর্বাধিক সংখ্যক বার (৩ বার) এসেছে তা হলো ৮, সুতরাং প্রচুরক = ৮।'
+  },
+  {
+    id: 'nctb_math_025',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'পরিসংখ্যান ও মধ্যক-প্রচুরক',
+    question: 'ক্রমযোজিত গণসংখ্যা সারণি মূলত কোনটির জন্য অপরিহার্য?',
+    options: ['মধ্যক ও অজিভ রেখা অঙ্কন', 'গাণিতিক গড় নির্ণয়', 'প্রচুরক নির্ণয়', 'পরিসর নির্ণয়'],
+    correctAnswer: 'মধ্যক ও অজিভ রেখা অঙ্কন',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'comprehension',
+    format: 'standard',
+    explanation: 'উপাত্তের মধ্যক নির্ণয় এবং অজিভ রেখা (Ogive curve) অঙ্কনে ক্রমযোজিত গণসংখ্যা অপরিহার্য।'
+  },
+  {
+    id: 'nctb_math_026',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'পরিসংখ্যান ও মধ্যক-প্রচুরক',
+    question: 'শ্রেণি বিন্যাসিত উপাত্তের গাণিতিক গড় নির্ণয়ের সংক্ষিপ্ত পদ্ধতির সূত্র কোনটি?',
+    options: ['x̄ = a + (∑fiui / n) × h', 'x̄ = ∑fixi / n', 'x̄ = a + ∑fiui', 'x̄ = L + (n/2 - Fc) × h'],
+    correctAnswer: 'x̄ = a + (∑fiui / n) × h',
+    correctAnswerIndex: 0,
+    difficulty: 'medium',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'সংক্ষিপ্ত পদ্ধতিতে গড় নির্ণয়ের সূত্র: x̄ = a + (∑fiui / n) × h, যেখানে a = আনুমানিক গড় এবং u = ধাপ বিচ্যুতি।'
+  },
+
+  // ------------------- বীজগাণিতিক রাশি ও সমীকরণ (অতিরিক্ত) -------------------
+  {
+    id: 'nctb_math_027',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বীজগাণিতিক রাশি ও সমীকরণ',
+    question: 'x + y = 6 এবং x - y = 2 হলে, x ও y এর মান যথাক্রমে কত?',
+    options: ['4, 2', '5, 1', '3, 3', '6, 0'],
+    correctAnswer: '4, 2',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'application',
+    format: 'standard',
+    explanation: 'সমীকরণ দুটি যোগ করে পাই: 2x = 8 => x = 4। বিয়োগ করে পাই: 2y = 4 => y = 2।'
+  },
+  {
+    id: 'nctb_math_028',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বীজগাণিতিক রাশি ও সমীকরণ',
+    question: 'log₂ 16 এর সঠিক মান কত?',
+    options: ['4', '8', '2', '16'],
+    correctAnswer: '4',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'comprehension',
+    format: 'standard',
+    explanation: 'log₂ 16 = log₂ (2⁴) = 4 log₂ 2 = 4 × 1 = 4।'
+  },
+  {
+    id: 'nctb_math_029',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বীজগাণিতিক রাশি ও সমীকরণ',
+    question: '2^(x+1) = 32 হলে x এর মান কত?',
+    options: ['4', '5', '3', '2'],
+    correctAnswer: '4',
+    correctAnswerIndex: 0,
+    difficulty: 'medium',
+    cognitiveLevel: 'application',
+    format: 'standard',
+    explanation: '2^(x+1) = 2⁵ => x + 1 = 5 => x = 4।'
+  },
+  {
+    id: 'nctb_math_030',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বীজগাণিতিক রাশি ও সমীকরণ',
+    question: 'একটি সমান্তর ধারার ১ম পদ a এবং সাধারণ অন্তর d হলে n-তম পদ কোনটি?',
+    options: ['a + (n - 1)d', 'a + nd', 'a + (n + 1)d', 'a + d'],
+    correctAnswer: 'a + (n - 1)d',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'সমান্তর ধারার n-তম পদের সূত্র: an = a + (n - 1)d।'
+  },
+  {
+    id: 'nctb_math_031',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বীজগাণিতিক রাশি ও সমীকরণ',
+    question: '2 + 4 + 6 + ... ধারাটির ১০ম পদ কত?',
+    options: ['20', '18', '22', '24'],
+    correctAnswer: '20',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'application',
+    format: 'standard',
+    explanation: 'a = 2, d = 2। ১০ম পদ = 2 + (10 - 1) × 2 = 2 + 18 = 20।'
+  },
+  {
+    id: 'nctb_math_032',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বীজগাণিতিক রাশি ও সমীকরণ',
+    question: 'যদি a:b = 2:3 এবং b:c = 4:5 হয়, তবে a:b:c এর ধারাবাহিক অনুপাত কত?',
+    options: ['8:12:15', '2:3:5', '6:9:15', '8:10:15'],
+    correctAnswer: '8:12:15',
+    correctAnswerIndex: 0,
+    difficulty: 'medium',
+    cognitiveLevel: 'application',
+    format: 'standard',
+    explanation: 'a/b = 2/3 = 8/12 এবং b/c = 4/5 = 12/15। সুতরাং a:b:c = 8:12:15।'
+  },
+
+  // ------------------- বৃত্ত ও জ্যামিতিক উপপাদ্য (অতিরিক্ত) -------------------
+  {
+    id: 'nctb_math_033',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বৃত্ত ও জ্যামিতিক উপপাদ্য',
+    question: 'বৃত্তের কেন্দ্র থেকে ব্যাস ভিন্ন কোনো জ্যা-এর ওপর অঙ্কিত লম্ব ওই জ্যা-কে কী করে?',
+    options: ['সমদ্বিখণ্ডিত করে', 'অসমান অংশে বিভক্ত করে', 'ত্রিখণ্ডিত করে', 'স্পর্শ করে'],
+    correctAnswer: 'সমদ্বিখণ্ডিত করে',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'NCTB উপপাদ্য ১৭: বৃত্তের কেন্দ্র ও ব্যাস ভিন্ন কোনো জ্যা-এর মধ্যবিন্দুর সংযোজক রেখাংশ ওই জ্যা-এর ওপর লম্ব এবং লম্ব জ্যা-কে সমদ্বিখণ্ডিত করে।'
+  },
+  {
+    id: 'nctb_math_034',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বৃত্ত ও জ্যামিতিক উপপাদ্য',
+    question: 'বৃত্তস্থ চতুর্ভুজের বিপরীত কোণদ্বয়ের সমষ্টি কত?',
+    options: ['১৮০° (দুই সমকোণ)', '৩৬০° (চার সমকোণ)', '৯০° (এক সমকোণ)', '২৭০°'],
+    correctAnswer: '১৮০° (দুই সমকোণ)',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'উপপাদ্য ২৩: বৃত্তে অন্তর্লিখিত চতুর্ভুজের যেকোনো দুটি বিপরীত কোণের সমষ্টি দুই সমকোণ বা ১৮০ ডিগ্রি।'
+  },
+  {
+    id: 'nctb_math_035',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বৃত্ত ও জ্যামিতিক উপপাদ্য',
+    question: 'একই বৃত্তাংশস্থ সকল কোণ পরস্পরের কেমন হয়?',
+    options: ['সমান', 'অসমান', 'দ্বিগুণ', 'পূরক'],
+    correctAnswer: 'সমান',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'উপপাদ্য ২২: বৃত্তের একই বৃত্তাংশস্থ সকল কোণই পরস্পর সমান।'
+  },
+  {
+    id: 'nctb_math_036',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বৃত্ত ও জ্যামিতিক উপপাদ্য',
+    question: 'বৃত্তের বহিঃস্থ কোনো বিন্দু থেকে বৃত্তে কয়টি স্পর্শক টানা যায়?',
+    options: ['২টি', '১টি', '৪টি', 'অসংখ্য'],
+    correctAnswer: '২টি',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'উপপাদ্য ২৫: বৃত্তের বহিঃস্থ কোনো বিন্দু থেকে বৃত্তে সর্বাধিক দুটি স্পর্শক টানা যায় এবং তাদের দৈর্ঘ্য সমান হয়।'
+  },
+  {
+    id: 'nctb_math_037',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'বৃত্ত ও জ্যামিতিক উপপাদ্য',
+    question: 'বৃত্তের স্পর্শক এবং স্পর্শবিন্দুগামী ব্যাসার্ধের মধ্যবর্তী কোণ কত?',
+    options: ['৯০° (এক সমকোণ)', '৪৫°', '৬০°', '১৮০°'],
+    correctAnswer: '৯০° (এক সমকোণ)',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'উপপাদ্য ২৬: বৃত্তের স্পর্শক স্পর্শবিন্দুগামী ব্যাসার্ধের ওপর লম্ব (৯০° কোণ)।'
+  },
+
+  // ------------------- ত্রিকোণমিতি ও দূরত্বের সমস্যা (অতিরিক্ত) -------------------
+  {
+    id: 'nctb_math_038',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'ত্রিকোণমিতি ও দূরত্বের সমস্যা',
+    question: 'sec²θ - tan²θ এর মান কত?',
+    options: ['1', '0', '-1', '2'],
+    correctAnswer: '1',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'ত্রিকোণমিতিক মৌলিক অভেদ: sec²θ - tan²θ = 1 (যেখানে cos θ ≠ 0)।'
+  },
+  {
+    id: 'nctb_math_039',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'ত্রিকোণমিতি ও দূরত্বের সমস্যা',
+    question: 'cos 60° এর সঠিক মান কোনটি?',
+    options: ['1/2', '√3/2', '1/√2', '1'],
+    correctAnswer: '1/2',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'আদর্শ কোণের ত্রিকোণমিতিক মান: cos 60° = 1/2।'
+  },
+  {
+    id: 'nctb_math_040',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'ত্রিকোণমিতি ও দূরত্বের সমস্যা',
+    question: 'একটি সমকোণী ত্রিভুজে tan θ = 3/4 হলে, sin θ এর মান কত?',
+    options: ['3/5', '4/5', '5/3', '4/3'],
+    correctAnswer: '3/5',
+    correctAnswerIndex: 0,
+    difficulty: 'medium',
+    cognitiveLevel: 'application',
+    format: 'standard',
+    explanation: 'লম্ব = 3, ভূমি = 4 হলে অতিভুজ = √(3² + 4²) = 5। অতএব sin θ = লম্ব/অতিভুজ = 3/5।'
+  },
+  {
+    id: 'nctb_math_041',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'ত্রিকোণমিতি ও দূরত্বের সমস্যা',
+    question: 'ভূ-রেখার সমান্তরাল রেখার নিচের কোনো বিন্দু ভূ-রেখার সাথে যে কোণ উৎপন্ন করে তাকে কী বলে?',
+    options: ['অবনতি কোণ (Angle of depression)', 'উন্নতি কোণ', 'প্রবৃদ্ধ কোণ', 'সম্পূরক কোণ'],
+    correctAnswer: 'অবনতি কোণ (Angle of depression)',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'ভূ-সমান্তরাল রেখার নিচে অবস্থিত বিন্দুর সাথে উৎপন্ন কোণকে অবনতি কোণ বলে, আর উপরে থাকলে উন্নতি কোণ বলে।'
+  },
+  {
+    id: 'nctb_math_042',
+    class: '১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)',
+    subject: 'সাধারণ গণিত',
+    chapter: 'ত্রিকোণমিতি ও দূরত্বের সমস্যা',
+    question: 'cot 45° এর সঠিক মান কত?',
+    options: ['1', '0', '√3', '1/√3'],
+    correctAnswer: '1',
+    correctAnswerIndex: 0,
+    difficulty: 'easy',
+    cognitiveLevel: 'knowledge',
+    format: 'standard',
+    explanation: 'tan 45° = 1, সুতরাং cot 45° = 1 / tan 45° = 1/1 = 1।'
+  },
 
   // ------------------- পদার্থবিজ্ঞান (Physics) -------------------
   {
@@ -529,6 +1017,147 @@ export interface MultiChapterQueryOptions {
   excludeIds?: string[];
 }
 
+/**
+ * Dynamic fallback generator for any remaining questions needed
+ * Generates mathematically & conceptually accurate NCTB curriculum questions
+ */
+function generateDynamicNCTBQuestions(
+  selectedClass: string,
+  selectedSubject: string,
+  selectedChapters: string[],
+  neededCount: number,
+  startIndex: number
+): NCTBQuestion[] {
+  const generated: NCTBQuestion[] = [];
+  const chaptersPool = selectedChapters.length > 0 
+    ? selectedChapters 
+    : ['বীজগাণিতিক রাশি ও সমীকরণ', 'ত্রিকোণমিতি ও দূরত্বের সমস্যা', 'বৃত্ত ও জ্যামিতিক উপপাদ্য', 'পরিমিতি (ঘনবস্তু ও ক্ষেত্রফল)', 'পরিসংখ্যান ও মধ্যক-প্রচুরক'];
+
+  for (let i = 0; i < neededCount; i++) {
+    const chap = chaptersPool[i % chaptersPool.length];
+    const qIndex = startIndex + i + 1;
+    let newQ: NCTBQuestion;
+
+    if (chap.includes('বীজগণিত') || chap.includes('সমীকরণ')) {
+      const p = 2 + (i % 6);
+      const q = 3 + ((i * 2) % 5);
+      const sum = p + q;
+      const prod = p * q;
+      newQ = {
+        id: `dyn_math_alg_${Date.now()}_${qIndex}`,
+        class: selectedClass,
+        subject: selectedSubject,
+        chapter: chap,
+        question: `x² - ${sum}x + ${prod} = 0 সমীকরণটির মূলদ্বয় (Roots) কোনটি?`,
+        options: [`${p}, ${q}`, `-${p}, -${q}`, `${p + 1}, ${q - 1}`, `-${p}, ${q}`],
+        correctAnswer: `${p}, ${q}`,
+        correctAnswerIndex: 0,
+        difficulty: 'medium',
+        cognitiveLevel: 'application',
+        format: 'standard',
+        explanation: `মধ্যপদ বিভাজন (Middle-term factorization): x² - ${p}x - ${q}x + ${prod} = 0 => (x - ${p})(x - ${q}) = 0। অতএব মূলদ্বয় x = ${p}, ${q}।`
+      };
+    } else if (chap.includes('ত্রিকোণমিতি') || chap.includes('দূরত্ব')) {
+      const angles = [30, 45, 60];
+      const ang = angles[i % angles.length];
+      const dist = 10 * ((i % 4) + 1);
+      const tanVals: Record<number, { val: string; h: string }> = {
+        30: { val: '1/√3', h: `${dist}/√3` },
+        45: { val: '1', h: `${dist}` },
+        60: { val: '√3', h: `${dist}√3` }
+      };
+      const res = tanVals[ang];
+      newQ = {
+        id: `dyn_math_tri_${Date.now()}_${qIndex}`,
+        class: selectedClass,
+        subject: selectedSubject,
+        chapter: chap,
+        question: `একটি টাওয়ারের পাদদেশ থেকে ${dist} মিটার দূরে ভূ-তলের কোনো বিন্দুতে শীর্ষের উন্নতি কোণ ${ang}° হলে টাওয়ারটির উচ্চতা কত?`,
+        options: [`${res.h} মিটার`, `${dist * 2} মিটার`, `${dist / 2} মিটার`, `${dist + 10} মিটার`],
+        correctAnswer: `${res.h} মিটার`,
+        correctAnswerIndex: 0,
+        difficulty: 'medium',
+        cognitiveLevel: 'application',
+        format: 'standard',
+        explanation: `tan ${ang}° = লম্ব / ভূমি = h / ${dist} => h = ${dist} × tan ${ang}° = ${res.h} মিটার।`
+      };
+    } else if (chap.includes('পরিমিতি') || chap.includes('ক্ষেত্রফল') || chap.includes('ঘনবস্তু')) {
+      const a = 3 + (i % 7);
+      const vol = a * a * a;
+      newQ = {
+        id: `dyn_math_per_${Date.now()}_${qIndex}`,
+        class: selectedClass,
+        subject: selectedSubject,
+        chapter: chap,
+        question: `একটি সুষম ঘনকের (Cube) এক ধারের দৈর্ঘ্য ${a} সেমি হলে, এর সম্পূর্ণ আয়তন কত?`,
+        options: [`${vol} ঘন সেমি`, `${vol + 10} ঘন সেমি`, `${a * 6} ঘন সেমি`, `${a * a} ঘন সেমি`],
+        correctAnswer: `${vol} ঘন সেমি`,
+        correctAnswerIndex: 0,
+        difficulty: 'easy',
+        cognitiveLevel: 'application',
+        format: 'standard',
+        explanation: `ঘনকের আয়তন V = a³ = ${a}³ = ${vol} ঘন সেন্টিমিটার।`
+      };
+    } else if (chap.includes('পরিসংখ্যান') || chap.includes('মধ্যক') || chap.includes('প্রচুরক')) {
+      const base = 10 + (i * 2);
+      const nums = [base, base + 2, base + 4, base + 4, base + 6, base + 8];
+      const median = (base + 4 + base + 4) / 2;
+      newQ = {
+        id: `dyn_math_stat_${Date.now()}_${qIndex}`,
+        class: selectedClass,
+        subject: selectedSubject,
+        chapter: chap,
+        question: `${nums.join(', ')} উপাত্তগুলোর মধ্যক (Median) কত?`,
+        options: [`${median}`, `${median - 1}`, `${median + 2}`, `${base}`],
+        correctAnswer: `${median}`,
+        correctAnswerIndex: 0,
+        difficulty: 'medium',
+        cognitiveLevel: 'comprehension',
+        format: 'standard',
+        explanation: `এখানে মোট পদ n = 6। মধ্যক = (৩য় পদ + ৪র্থ পদ)/২ = (${nums[2]} + ${nums[3]})/২ = ${median}।`
+      };
+    } else if (chap.includes('বৃত্ত') || chap.includes('জ্যামিতি')) {
+      const r = 7 * ((i % 3) + 1);
+      const circ = Math.round(2 * (22 / 7) * r);
+      newQ = {
+        id: `dyn_math_geom_${Date.now()}_${qIndex}`,
+        class: selectedClass,
+        subject: selectedSubject,
+        chapter: chap,
+        question: `কোনো বৃত্তের ব্যাসার্ধ ${r} সেমি হলে এর পরিধি কত? (π = ২২/৭ ধরে)`,
+        options: [`${circ} সেমি`, `${circ / 2} সেমি`, `${circ * 2} সেমি`, `${circ + 14} সেমি`],
+        correctAnswer: `${circ} সেমি`,
+        correctAnswerIndex: 0,
+        difficulty: 'easy',
+        cognitiveLevel: 'application',
+        format: 'standard',
+        explanation: `বৃত্তের পরিধি = 2πr = 2 × (22/7) × ${r} = ${circ} সেন্টিমিটার।`
+      };
+    } else {
+      const n = 2 + (i % 4);
+      const powerElements = Math.pow(2, n);
+      newQ = {
+        id: `dyn_math_set_${Date.now()}_${qIndex}`,
+        class: selectedClass,
+        subject: selectedSubject,
+        chapter: chap,
+        question: `একটি সেটের উপাদান সংখ্যা ${n} হলে তার শক্তি সেটের (Power Set) উপাদান সংখ্যা কত?`,
+        options: [`${powerElements}টি`, `${powerElements * 2}টি`, `${n * 2}টি`, `${powerElements - 1}টি`],
+        correctAnswer: `${powerElements}টি`,
+        correctAnswerIndex: 0,
+        difficulty: 'easy',
+        cognitiveLevel: 'knowledge',
+        format: 'standard',
+        explanation: `শক্তি সেটের উপাদান সংখ্যার সূত্র 2^n। এখানে n = ${n}, সুতরাং 2^${n} = ${powerElements}টি।`
+      };
+    }
+
+    generated.push(newQ);
+  }
+
+  return generated;
+}
+
 export function getQuestionsFromNCTBBank(options: MultiChapterQueryOptions): NCTBQuestion[] {
   const {
     selectedClass,
@@ -541,7 +1170,7 @@ export function getQuestionsFromNCTBBank(options: MultiChapterQueryOptions): NCT
 
   const excludeSet = new Set(excludeIds);
 
-  // Filter pool matching class (or normalized), subject, and any of selected chapters
+  // 1. Primary Filter from MASTER_NCTB_QUESTIONS matching subject & selected chapters
   let filtered = MASTER_NCTB_QUESTIONS.filter(q => {
     if (excludeSet.has(q.id)) return false;
 
@@ -565,14 +1194,84 @@ export function getQuestionsFromNCTBBank(options: MultiChapterQueryOptions): NCT
     return true;
   });
 
-  // If filtered pool is smaller than required count, allow related questions from same subject
+  // 2. If filtered count is still less than requested count, pull from CHAPTER_QUESTION_BANK
+  if (filtered.length < count && CHAPTER_QUESTION_BANK) {
+    const existingQuestionTexts = new Set(filtered.map(q => q.question.trim()));
+    const matchingBankQuestions: NCTBQuestion[] = [];
+
+    // Map curriculum chapter names to CHAPTER_QUESTION_BANK keys
+    const subjectKeywords = selectedSubject.toLowerCase();
+    const chapterKeywords = selectedChapters.join(' ').toLowerCase();
+
+    for (const [bankKey, seedList] of Object.entries(CHAPTER_QUESTION_BANK)) {
+      if (!Array.isArray(seedList)) continue;
+      const keyLower = bankKey.toLowerCase();
+
+      // Check if bankKey matches any selected chapter or subject
+      const isMathMatch = subjectKeywords.includes('গণিত') && (
+        keyLower.includes('বীজগণিত') || 
+        keyLower.includes('ত্রিকোণমিতি') || 
+        keyLower.includes('জ্যামিতি') || 
+        keyLower.includes('পরিসংখ্যান') || 
+        keyLower.includes('লগারিদম') || 
+        keyLower.includes('পাটিগণিত')
+      );
+
+      const isDirectMatch = selectedChapters.some(c => 
+        c.includes(bankKey) || bankKey.includes(c)
+      ) || selectedSubject.includes(bankKey) || bankKey.includes(selectedSubject);
+
+      if (isMathMatch || isDirectMatch) {
+        seedList.forEach((seed, sIdx) => {
+          if (!existingQuestionTexts.has(seed.question.trim())) {
+            const correctIdx = seed.options.findIndex(o => o === seed.correctAnswer);
+            matchingBankQuestions.push({
+              id: `ch_bank_${bankKey}_${sIdx}_${Date.now()}`,
+              class: selectedClass,
+              subject: selectedSubject,
+              chapter: selectedChapters[sIdx % Math.max(1, selectedChapters.length)] || bankKey,
+              question: seed.question,
+              options: [...seed.options],
+              correctAnswer: seed.correctAnswer,
+              correctAnswerIndex: correctIdx !== -1 ? correctIdx : 0,
+              difficulty: 'medium',
+              cognitiveLevel: 'comprehension',
+              format: 'standard',
+              explanation: seed.explanation || '',
+              solutions: seed.solutions
+            });
+            existingQuestionTexts.add(seed.question.trim());
+          }
+        });
+      }
+    }
+
+    // Add matching bank questions
+    filtered = [...filtered, ...matchingBankQuestions];
+  }
+
+  // 3. If still less than count, allow wider subject pool from MASTER_NCTB_QUESTIONS
   if (filtered.length < count) {
+    const existingIds = new Set(filtered.map(f => f.id));
     const backupPool = MASTER_NCTB_QUESTIONS.filter(q => 
       !excludeSet.has(q.id) &&
-      (q.subject.includes(selectedSubject) || selectedSubject.includes(q.subject)) &&
-      !filtered.some(f => f.id === q.id)
+      !existingIds.has(q.id) &&
+      (q.subject.includes(selectedSubject) || selectedSubject.includes(q.subject))
     );
     filtered = [...filtered, ...backupPool];
+  }
+
+  // 4. If still less than count (guarantee exact question count like 20, 25, 30, 50, etc.)
+  if (filtered.length < count) {
+    const needed = count - filtered.length;
+    const dynamicQuestions = generateDynamicNCTBQuestions(
+      selectedClass,
+      selectedSubject,
+      selectedChapters,
+      needed,
+      filtered.length
+    );
+    filtered = [...filtered, ...dynamicQuestions];
   }
 
   // Shuffle candidate list
@@ -611,8 +1310,17 @@ export function getAlternativeNCTBQuestion(
     return true;
   });
 
-  if (candidates.length === 0) return null;
+  if (candidates.length > 0) {
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }
 
-  const pick = candidates[Math.floor(Math.random() * candidates.length)];
-  return pick;
+  // Fallback to dynamic generator if all candidates are exhausted
+  const dyn = generateDynamicNCTBQuestions(
+    '১০ম শ্রেণি',
+    selectedSubject,
+    selectedChapters,
+    1,
+    Date.now() % 100
+  );
+  return dyn[0] || null;
 }

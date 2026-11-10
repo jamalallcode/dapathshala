@@ -517,34 +517,37 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       count: count
     });
 
-    if (raw && raw.length > 0) {
-      return raw.map((q, idx) => {
-        const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
-        const resolvedSolutions = (q.solutions && q.solutions.length >= 2)
-          ? q.solutions
-          : generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation || 'পাঠ্যবই অনুযায়ী বিশ্লেষণ');
-        const resolvedCognitive = q.cognitiveLevel || inferBloomLevelFromQuestion(q.question, q.explanation);
+    const mapped: ExamQuestion[] = (raw || []).map((q, idx) => {
+      const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
+      const resolvedSolutions = (q.solutions && q.solutions.length >= 2)
+        ? q.solutions
+        : generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation || 'পাঠ্যবই অনুযায়ী বিশ্লেষণ');
+      const resolvedCognitive = q.cognitiveLevel || inferBloomLevelFromQuestion(q.question, q.explanation);
 
-        return {
-          id: q.id || `nctb_q_${Date.now()}_${idx}`,
-          question: q.question,
-          options: [...q.options],
-          correctAnswer: q.correctAnswer,
-          correctAnswerIndex: correctIdx !== -1 ? correctIdx : (q.correctAnswerIndex ?? 0),
-          explanation: q.explanation || '',
-          solutions: resolvedSolutions,
-          difficulty: q.difficulty,
-          cognitiveLevel: resolvedCognitive,
-          chapter: q.chapter,
-          format: q.format,
-          stimulus: q.stimulus
-        };
-      });
+      return {
+        id: q.id || `nctb_q_${Date.now()}_${idx}`,
+        question: q.question,
+        options: [...q.options],
+        correctAnswer: q.correctAnswer,
+        correctAnswerIndex: correctIdx !== -1 ? correctIdx : (q.correctAnswerIndex ?? 0),
+        explanation: q.explanation || '',
+        solutions: resolvedSolutions,
+        difficulty: q.difficulty,
+        cognitiveLevel: resolvedCognitive,
+        chapter: q.chapter,
+        format: q.format,
+        stimulus: q.stimulus
+      };
+    });
+
+    if (mapped.length >= count) {
+      return mapped.slice(0, count);
     }
 
     // Fallback to legacy getQuestionsForChapter if needed
-    const fallback = getQuestionsForChapter(sub, chaps[0] || selectedChapter, count);
-    return fallback.map((q, idx) => {
+    const needed = count - mapped.length;
+    const fallback = getQuestionsForChapter(sub, chaps[0] || selectedChapter, needed);
+    const fallbackMapped: ExamQuestion[] = fallback.map((q, idx) => {
       const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
       const resolvedCognitive = inferBloomLevelFromQuestion(q.question, q.explanation);
       return {
@@ -560,6 +563,8 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         chapter: chaps[0] || selectedChapter
       };
     });
+
+    return [...mapped, ...fallbackMapped].slice(0, count);
   };
 
   // When class changes, dynamically adapt subjects & chapters and auto-update title & questions
