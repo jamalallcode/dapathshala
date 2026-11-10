@@ -14,7 +14,6 @@ import {
   UserPlus,
   LogOut,
   Phone,
-  Crown,
   Lock
 } from 'lucide-react';
 import { AssignedTest, UserRole } from '../../types';
@@ -48,9 +47,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   // 20-clicks Secret Admin Trigger
   const [adminClicks, setAdminClicks] = useState(0);
   const [showSecretAdminModal, setShowSecretAdminModal] = useState(false);
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
-    return localStorage.getItem('dapathshala_is_admin') === 'true';
-  });
   const adminClickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Consecutive 20-click handler for the marked graduation cap icon
@@ -76,7 +72,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   };
 
   const handleAdminSuccess = () => {
-    setIsAdminLoggedIn(true);
     if (onAdminLogin) {
       onAdminLogin();
     } else {
@@ -192,27 +187,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           {/* Modern Login & Register Actions */}
           <div className="flex items-center gap-2 sm:gap-2.5 text-xs font-bold">
-
-            {isAdminLoggedIn && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (onAdminLogin) {
-                    onAdminLogin();
-                  } else {
-                    onSelectRole('parent');
-                    setTimeout(() => {
-                      window.dispatchEvent(new Event('dapathshala_open_admin_portal'));
-                    }, 120);
-                  }
-                }}
-                className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm border border-purple-400/40 cursor-pointer animate-in fade-in"
-                title="সুপার-অ্যাডমিন কন্ট্রোল সেন্টার"
-              >
-                <Crown className="w-3.5 h-3.5 text-amber-300" />
-                <span>অ্যাডমিন প্যানেল</span>
-              </button>
-            )}
 
             {currentParent ? (
               <div className="flex items-center gap-2">

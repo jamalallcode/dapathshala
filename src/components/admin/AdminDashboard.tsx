@@ -345,6 +345,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleAdminLogout = () => {
     if (window.confirm('আপনি কি অ্যাডমিন প্যানেল থেকে লগআউট করতে চান?')) {
       localStorage.removeItem('dapathshala_is_admin');
+      localStorage.removeItem('dapathshala_admin_session');
       onExitAdmin();
     }
   };
