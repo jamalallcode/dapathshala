@@ -21,7 +21,8 @@ import {
   Sliders,
   Sparkles,
   ShieldAlert,
-  FolderArchive
+  FolderArchive,
+  Home
 } from 'lucide-react';
 import { UserRole, AssignedTest } from '../../types';
 import { getCurrentParent, ParentUser, updateParentProfile } from '../../lib/parentAuth';
@@ -184,99 +185,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }`}
       >
         {/* ======================================================== */}
-        {/* 1. TOP HEADER: Photo + Name & Mobile Number              */}
+        {/* 1. TOP HEADER: Brand Logo & Title                        */}
         {/* ======================================================== */}
         <div className="h-14 border-b border-slate-800/90 flex items-center justify-between px-3 bg-[#090e1a] shrink-0">
-          <div className="flex items-center gap-2.5 overflow-hidden min-w-0">
-            
-            {/* Hidden File Input for Avatar Upload from Computer */}
-            <input 
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarFileSelect}
-              className="hidden"
-            />
-
-            {/* Profile Avatar / Initial Letter - Click to upload from computer */}
-            {activeView === 'admin' ? (
-              <div 
-                className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 via-purple-600 to-indigo-700 border border-amber-400/60 flex items-center justify-center shrink-0 shadow-md shadow-purple-950/40 select-none"
-                title="দাপাঠশালা সুপার-অ্যাডমিন"
-              >
-                <Crown className="w-5 h-5 text-amber-200" />
-              </div>
-            ) : (
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className={`relative w-9 h-9 rounded-full overflow-hidden border-2 flex items-center justify-center shrink-0 shadow-xs cursor-pointer group/avatar transition-transform hover:scale-105 ${
-                  currentRole === 'student'
-                    ? 'bg-gradient-to-br from-emerald-600 to-teal-700 border-emerald-400/60'
-                    : 'bg-gradient-to-br from-blue-600 to-indigo-700 border-blue-400/60'
-                }`}
-                title="কম্পিউটার থেকে ছবি সেট করতে ক্লিক করুন"
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    fileInputRef.current?.click();
-                  }
-                }}
-              >
-                {(currentRole === 'student' ? studentUser?.avatar : parentUser?.avatar) ? (
-                  <img 
-                    src={currentRole === 'student' ? studentUser?.avatar : parentUser?.avatar} 
-                    alt={currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')} 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="text-white font-black text-sm select-none">
-                    {getFirstLetter(currentRole === 'student' ? studentUser?.name : parentUser?.name)}
-                  </span>
-                )}
-
-                {/* Hover overlay with Camera Icon */}
-                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity rounded-full">
-                  <Camera className="w-4 h-4 text-white" />
-                </div>
-              </div>
-            )}
-            
-            {/* Name & Info */}
-            {activeView === 'admin' ? (
-              <div 
-                onMouseEnter={(e) => handleItemMouseEnter('সুপার-অ্যাডমিন (মাস্টার কন্ট্রোল ও সার্বিক নিয়ন্ত্রণ)', e)}
-                onMouseMove={handleItemMouseMove}
-                onMouseLeave={handleItemMouseLeave}
-                className="truncate min-w-0"
-                title="সুপার-অ্যাডমিন"
-              >
-                <span className="font-black text-white text-sm tracking-tight block truncate">
-                  সুপার-অ্যাডমিন
-                </span>
-                <span className="text-[11px] text-amber-300 font-bold block truncate">
-                  মাস্টার অথরিটি • সিস্টেম
-                </span>
-              </div>
-            ) : (
-              <div 
-                onClick={() => handleLinkClick(onNavigateHome)}
-                onMouseEnter={(e) => handleItemMouseEnter(`${currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')} (${currentRole === 'student' ? (studentUser?.studentClass || 'শিক্ষার্থী কর্নার') : (parentUser?.phone || '০১৭৮৯৫৩৯৪৯৪')})`, e)}
-                onMouseMove={handleItemMouseMove}
-                onMouseLeave={handleItemMouseLeave}
-                className="truncate min-w-0 cursor-pointer group"
-                title={`${currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')} - মূল ওয়েবসাইট`}
-              >
-                <span className="font-bold text-white text-sm tracking-tight block truncate group-hover:text-blue-300 transition-colors">
-                  {currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')}
-                </span>
-                <span className="text-xs text-slate-400 font-semibold block truncate">
-                  {currentRole === 'student' 
-                    ? (studentUser?.studentClass ? `${studentUser.studentClass} • ${studentUser.phone || ''}` : (studentUser?.phone || 'শিক্ষার্থী কর্নার'))
-                    : (parentUser?.phone || '০১৭৮৯৫৩৯৪৯৪')}
-                </span>
-              </div>
-            )}
+          <div 
+            onClick={() => handleLinkClick(onNavigateHome)}
+            className="flex items-center gap-2.5 overflow-hidden min-w-0 cursor-pointer group"
+            title="দাপাঠশালা - মূল হোম / ল্যান্ডিং পেজে যান"
+          >
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-md ${
+              activeView === 'admin' 
+                ? 'bg-gradient-to-tr from-amber-500 to-purple-600 text-white' 
+                : currentRole === 'student'
+                ? 'bg-gradient-to-tr from-emerald-500 to-teal-600 text-white'
+                : 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white'
+            }`}>
+              {activeView === 'admin' ? (
+                <Crown className="w-4.5 h-4.5 text-amber-200" />
+              ) : currentRole === 'student' ? (
+                <GraduationCap className="w-4.5 h-4.5 text-white" />
+              ) : (
+                <Sparkles className="w-4.5 h-4.5 text-white" />
+              )}
+            </div>
+            <div className="truncate min-w-0">
+              <span className="font-black text-white text-sm tracking-tight block truncate group-hover:text-blue-300 transition-colors">
+                দাপাঠশালা
+              </span>
+              <span className="text-[10px] text-slate-400 font-bold block truncate">
+                {activeView === 'admin' 
+                  ? 'মাস্টার অ্যাডমিন হাব' 
+                  : currentRole === 'student' 
+                  ? 'শিক্ষার্থী পোর্টাল' 
+                  : 'অভিভাবক ড্যাশবোর্ড'}
+              </span>
+            </div>
           </div>
 
           {/* Mobile Close Button only */}
@@ -665,6 +608,114 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* ======================================================== */}
+        {/* 3. BOTTOM FOOTER: User Profile + Landing Page Button     */}
+        {/* ======================================================== */}
+        <div className="border-t border-slate-800/90 bg-[#090e1a] p-2.5 shrink-0 space-y-2">
+          
+          {/* Hidden File Input for Avatar Upload from Computer */}
+          <input 
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleAvatarFileSelect}
+            className="hidden"
+          />
+
+          {/* User Profile Section (Admin / Parent / Student) */}
+          <div 
+            onClick={() => handleLinkClick(onNavigateHome)}
+            onMouseEnter={(e) => handleItemMouseEnter(
+              activeView === 'admin' 
+                ? 'সুপার-অ্যাডমিন • ল্যান্ডিং পেজে যান' 
+                : `${currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')} • ল্যান্ডিং পেজে যান`, 
+              e
+            )}
+            onMouseMove={handleItemMouseMove}
+            onMouseLeave={handleItemMouseLeave}
+            className="flex items-center gap-2.5 p-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-blue-500/40 transition-all cursor-pointer group"
+            title="মূল ল্যান্ডিং পেজে যান"
+          >
+            {/* Avatar / Crown */}
+            {activeView === 'admin' ? (
+              <div 
+                className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 via-purple-600 to-indigo-700 border border-amber-400/60 flex items-center justify-center shrink-0 shadow-md shadow-purple-950/40 select-none"
+                title="দাপাঠশালা সুপার-অ্যাডমিন"
+              >
+                <Crown className="w-4.5 h-4.5 text-amber-200" />
+              </div>
+            ) : (
+              <div 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
+                className={`relative w-9 h-9 rounded-full overflow-hidden border-2 flex items-center justify-center shrink-0 shadow-xs cursor-pointer group/avatar transition-transform hover:scale-105 ${
+                  currentRole === 'student'
+                    ? 'bg-gradient-to-br from-emerald-600 to-teal-700 border-emerald-400/60'
+                    : 'bg-gradient-to-br from-blue-600 to-indigo-700 border-blue-400/60'
+                }`}
+                title="কম্পিউটার থেকে ছবি পরিবর্তন করতে ক্লিক করুন"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }
+                }}
+              >
+                {(currentRole === 'student' ? studentUser?.avatar : parentUser?.avatar) ? (
+                  <img 
+                    src={currentRole === 'student' ? studentUser?.avatar : parentUser?.avatar} 
+                    alt={currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')} 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-white font-black text-sm select-none">
+                    {getFirstLetter(currentRole === 'student' ? studentUser?.name : parentUser?.name)}
+                  </span>
+                )}
+
+                {/* Hover overlay with Camera Icon */}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity rounded-full">
+                  <Camera className="w-3.5 h-3.5 text-white" />
+                </div>
+              </div>
+            )}
+
+            {/* Name & Role Details */}
+            <div className="truncate min-w-0 flex-1">
+              <span className="font-bold text-white text-xs tracking-tight block truncate group-hover:text-blue-300 transition-colors">
+                {activeView === 'admin'
+                  ? 'সুপার-অ্যাডমিন'
+                  : currentRole === 'student'
+                  ? (studentUser?.name || 'শিক্ষার্থী')
+                  : (parentUser?.name || 'অভিভাবক')}
+              </span>
+              <span className="text-[11px] text-slate-400 font-medium block truncate">
+                {activeView === 'admin'
+                  ? 'মাস্টার অথরিটি • সিস্টেম'
+                  : currentRole === 'student'
+                  ? (studentUser?.studentClass ? `${studentUser.studentClass} • ${studentUser.phone || ''}` : (studentUser?.phone || 'শিক্ষার্থী কর্নার'))
+                  : (parentUser?.phone || '০১৭৮৯৫৩৯৪৯৪')}
+              </span>
+            </div>
+          </div>
+
+          {/* Explicit Landing Page Action Button */}
+          <button
+            type="button"
+            onClick={() => handleLinkClick(onNavigateHome)}
+            onMouseEnter={(e) => handleItemMouseEnter('মূল ল্যান্ডিং পেজে ফিরে যান', e)}
+            onMouseMove={handleItemMouseMove}
+            onMouseLeave={handleItemMouseLeave}
+            className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 hover:from-blue-600/30 hover:via-indigo-600/30 hover:to-purple-600/30 border border-blue-500/30 hover:border-blue-400/60 text-blue-300 hover:text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98 shadow-xs"
+            title="মূল ল্যান্ডিং পেজে যান"
+          >
+            <Home className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+            <span className="truncate">ল্যান্ডিং পেজে যান</span>
+          </button>
+        </div>
         {/* Interactive Cursor-Following Tooltip                     */}
         {/* ======================================================== */}
         {cursorTooltip && (
