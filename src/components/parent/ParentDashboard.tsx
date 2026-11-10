@@ -1450,6 +1450,17 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     ? tests.filter(t => t.status === 'submitted')
     : tests;
 
+  // If user opened Official A4 Printable Question Paper, render it naturally as a regular full page (never a popup)
+  if (printModalTest) {
+    return (
+      <PrintableQuestionPaperModal
+        test={printModalTest}
+        onClose={() => setPrintModalTest(null)}
+        onLaunchOnlineExam={onOpenTest}
+      />
+    );
+  }
+
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-6 sm:pt-6 sm:pb-8 space-y-4">
       
@@ -4637,15 +4648,6 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             </div>
           </div>
         </div>
-      )}
-
-      {/* Official 2-Column A4 Printable Question Paper Modal (Dual Mode - Classroom & Offline Exam) */}
-      {printModalTest && (
-        <PrintableQuestionPaperModal
-          test={printModalTest}
-          onClose={() => setPrintModalTest(null)}
-          onLaunchOnlineExam={onOpenTest}
-        />
       )}
 
     </div>

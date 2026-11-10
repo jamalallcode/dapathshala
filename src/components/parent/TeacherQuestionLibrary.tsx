@@ -309,6 +309,17 @@ export const TeacherQuestionLibrary: React.FC<TeacherQuestionLibraryProps> = ({
     e.target.value = '';
   };
 
+  // If user opened Official A4 Printable Question Paper, render it naturally as a regular full page
+  if (printTest) {
+    return (
+      <PrintableQuestionPaperModal
+        test={printTest}
+        onClose={() => setPrintTest(null)}
+        onLaunchOnlineExam={onDirectStartExam}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Hidden File Input for JSON Backup Import */}
@@ -944,15 +955,6 @@ export const TeacherQuestionLibrary: React.FC<TeacherQuestionLibraryProps> = ({
             );
           })}
         </div>
-      )}
-
-      {/* Official 2-Column A4 Printable Modal */}
-      {printTest && (
-        <PrintableQuestionPaperModal
-          test={printTest}
-          onClose={() => setPrintTest(null)}
-          onLaunchOnlineExam={onDirectStartExam}
-        />
       )}
     </div>
   );

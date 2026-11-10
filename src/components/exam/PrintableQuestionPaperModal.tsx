@@ -11,7 +11,8 @@ import {
   Settings2, 
   BookOpen, 
   Brain,
-  HelpCircle
+  HelpCircle,
+  ArrowLeft
 } from 'lucide-react';
 import { AssignedTest } from '../../types';
 import { toBn } from '../../lib/utils';
@@ -66,29 +67,40 @@ export const PrintableQuestionPaperModal: React.FC<PrintableQuestionPaperModalPr
   const questions = test.questions || [];
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:static print:inset-auto">
+    <div className="w-full min-h-screen bg-slate-100 flex flex-col print:p-0 print:bg-white print:static print:min-h-0">
       
-      {/* Modal Container */}
-      <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[94vh] flex flex-col border border-slate-200 shadow-2xl overflow-hidden print:border-none print:shadow-none print:max-w-none print:max-h-none print:w-full print:rounded-none">
+      {/* Page Container */}
+      <div className="w-full flex-1 flex flex-col print:border-none print:shadow-none print:w-full">
         
         {/* ======================================================== */}
         {/* TOP BAR / CONTROLS (Hidden during actual print)          */}
         {/* ======================================================== */}
-        <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-900 text-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0 print:hidden">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-              <Printer className="w-5 h-5" />
+        <div className="p-3 sm:p-4 border-b border-slate-800 bg-slate-900 text-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0 sticky top-0 z-20 shadow-md print:hidden">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            {/* Back Button */}
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-colors cursor-pointer shrink-0 border border-slate-700 active:scale-95"
+              title="ড্যাশবোর্ডে ফিরে যান"
+            >
+              <ArrowLeft className="w-4 h-4 text-slate-400" />
+              <span>ফিরে যান</span>
+            </button>
+
+            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Printer className="w-4.5 h-4.5" />
             </div>
             <div className="truncate min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
                   দ্বৈত এক্সাম মোড (Dual Mode)
                 </span>
                 <span className="text-xs font-bold text-slate-300">
                   পিন: <strong className="text-amber-400 font-mono">{test.pin}</strong>
                 </span>
               </div>
-              <h3 className="text-base sm:text-lg font-black tracking-tight text-white truncate mt-0.5">
+              <h3 className="text-sm sm:text-base font-black tracking-tight text-white truncate mt-0.5">
                 অফিসিয়াল ২-কলাম A4 প্রিন্ট ও স্কুল ফরম্যাট
               </h3>
             </div>
@@ -139,7 +151,7 @@ export const PrintableQuestionPaperModal: React.FC<PrintableQuestionPaperModalPr
             <button
               type="button"
               onClick={() => handlePrint(activeTab === 'answer_key' ? 'answers_only' : 'questions_only')}
-              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-md shadow-emerald-900/30 transition-all cursor-pointer active:scale-95"
+              className="px-3.5 sm:px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-md shadow-emerald-900/30 transition-all cursor-pointer active:scale-95"
               title="A4 পেজে সরাসরি প্রিন্ট বা PDF ডাউনলোড করুন"
             >
               <Printer className="w-4 h-4" />
@@ -154,7 +166,7 @@ export const PrintableQuestionPaperModal: React.FC<PrintableQuestionPaperModalPr
                   onClose();
                   onLaunchOnlineExam(test);
                 }}
-                className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm flex items-center gap-1.5 transition-all cursor-pointer"
                 title="লাইভ ক্যামেরা ও টাইমার সহ অনলাইনে পরীক্ষা শুরু করুন"
               >
                 <Globe className="w-4 h-4" />
@@ -166,10 +178,11 @@ export const PrintableQuestionPaperModal: React.FC<PrintableQuestionPaperModalPr
             <button
               type="button"
               onClick={onClose}
-              className="w-8 h-8 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer"
-              title="বন্ধ করুন"
+              className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold flex items-center gap-1 border border-slate-700 transition-colors cursor-pointer"
+              title="বন্ধ করে ড্যাশবোর্ডে ফিরে যান"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
+              <span className="hidden md:inline">বন্ধ করুন</span>
             </button>
           </div>
         </div>
@@ -291,10 +304,10 @@ export const PrintableQuestionPaperModal: React.FC<PrintableQuestionPaperModalPr
         {/* ======================================================== */}
         {/* PRINTABLE BODY / A4 PREVIEW CONTAINER                   */}
         {/* ======================================================== */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-100 print:bg-white print:p-0 print:overflow-visible">
+        <div className="flex-1 p-3 sm:p-8 bg-slate-100 print:bg-white print:p-0">
           
           {/* A4 Paper Sheet Wrapper */}
-          <div className="max-w-[210mm] mx-auto bg-white p-6 sm:p-10 shadow-lg border border-slate-200/90 rounded-2xl print:shadow-none print:border-none print:p-4 print:rounded-none print:max-w-none text-slate-950 font-serif">
+          <div className="max-w-[210mm] mx-auto bg-white p-6 sm:p-10 shadow-xl border border-slate-200/90 rounded-2xl print:shadow-none print:border-none print:p-4 print:rounded-none print:max-w-none text-slate-950 font-serif">
             
             {/* ======================================================== */}
             {/* VIEW 1: OFFICIAL QUESTION PAPER (2-COLUMN A4 FORMAT)    */}
@@ -501,10 +514,20 @@ export const PrintableQuestionPaperModal: React.FC<PrintableQuestionPaperModalPr
         </div>
 
         {/* ======================================================== */}
-        {/* MODAL FOOTER (PRINT ACTION STRIP)                        */}
+        {/* FOOTER (PRINT ACTION STRIP)                              */}
         {/* ======================================================== */}
-        <div className="p-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 print:hidden">
-          <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
+        <div className="p-3.5 sm:p-4 border-t border-slate-200 bg-white flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0 sticky bottom-0 z-20 shadow-lg print:hidden">
+          <div className="flex items-center gap-2.5 text-xs text-slate-600 font-medium">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-colors cursor-pointer border border-slate-300"
+              title="ড্যাশবোর্ডে ফিরে যান"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-slate-600" />
+              <span>ফিরে যান</span>
+            </button>
+            <span className="hidden sm:inline">|</span>
             <span>পরীক্ষার পিন: <strong className="text-blue-700 font-mono font-black">{test.pin}</strong></span>
             <span>• মোট {toBn(questions.length)}টি প্রশ্ন</span>
           </div>
