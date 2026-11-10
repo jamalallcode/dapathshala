@@ -73,7 +73,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
     return localStorage.getItem('dapathshala_is_admin') === 'true';
   });
+  const [cursorTooltip, setCursorTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleItemMouseEnter = (text: string, e: React.MouseEvent) => {
+    setCursorTooltip({
+      text,
+      x: e.clientX,
+      y: e.clientY + 18
+    });
+  };
+
+  const handleItemMouseMove = (e: React.MouseEvent) => {
+    setCursorTooltip(prev => (prev ? { ...prev, x: e.clientX, y: e.clientY + 18 } : null));
+  };
+
+  const handleItemMouseLeave = () => {
+    setCursorTooltip(null);
+  };
 
   const getFirstLetter = (name?: string): string => {
     if (!name || !name.trim()) return 'অ';
@@ -139,6 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }, []);
 
   const handleLinkClick = (action: () => void) => {
+    setCursorTooltip(null);
     action();
     if (window.innerWidth < 1024) {
       onClose();
@@ -181,55 +199,84 @@ export const Sidebar: React.FC<SidebarProps> = ({
             />
 
             {/* Profile Avatar / Initial Letter - Click to upload from computer */}
-            <div 
-              onClick={() => fileInputRef.current?.click()}
-              className={`relative w-9 h-9 rounded-full overflow-hidden border-2 flex items-center justify-center shrink-0 shadow-xs cursor-pointer group/avatar transition-transform hover:scale-105 ${
-                currentRole === 'student'
-                  ? 'bg-gradient-to-br from-emerald-600 to-teal-700 border-emerald-400/60'
-                  : 'bg-gradient-to-br from-blue-600 to-indigo-700 border-blue-400/60'
-              }`}
-              title="কম্পিউটার থেকে ছবি সেট করতে ক্লিক করুন"
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  fileInputRef.current?.click();
-                }
-              }}
-            >
-              {(currentRole === 'student' ? studentUser?.avatar : parentUser?.avatar) ? (
-                <img 
-                  src={currentRole === 'student' ? studentUser?.avatar : parentUser?.avatar} 
-                  alt={currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')} 
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="text-white font-black text-sm select-none">
-                  {getFirstLetter(currentRole === 'student' ? studentUser?.name : parentUser?.name)}
-                </span>
-              )}
-
-              {/* Hover overlay with Camera Icon */}
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity rounded-full">
-                <Camera className="w-4 h-4 text-white" />
+            {activeView === 'admin' ? (
+              <div 
+                className="relative w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 via-purple-600 to-indigo-700 border border-amber-400/60 flex items-center justify-center shrink-0 shadow-md shadow-purple-950/40 select-none"
+                title="দাপাঠশালা সুপার-অ্যাডমিন"
+              >
+                <Crown className="w-5 h-5 text-amber-200" />
               </div>
-            </div>
+            ) : (
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className={`relative w-9 h-9 rounded-full overflow-hidden border-2 flex items-center justify-center shrink-0 shadow-xs cursor-pointer group/avatar transition-transform hover:scale-105 ${
+                  currentRole === 'student'
+                    ? 'bg-gradient-to-br from-emerald-600 to-teal-700 border-emerald-400/60'
+                    : 'bg-gradient-to-br from-blue-600 to-indigo-700 border-blue-400/60'
+                }`}
+                title="কম্পিউটার থেকে ছবি সেট করতে ক্লিক করুন"
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    fileInputRef.current?.click();
+                  }
+                }}
+              >
+                {(currentRole === 'student' ? studentUser?.avatar : parentUser?.avatar) ? (
+                  <img 
+                    src={currentRole === 'student' ? studentUser?.avatar : parentUser?.avatar} 
+                    alt={currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')} 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-white font-black text-sm select-none">
+                    {getFirstLetter(currentRole === 'student' ? studentUser?.name : parentUser?.name)}
+                  </span>
+                )}
+
+                {/* Hover overlay with Camera Icon */}
+                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity rounded-full">
+                  <Camera className="w-4 h-4 text-white" />
+                </div>
+              </div>
+            )}
             
-            {/* Name & Mobile Number */}
-            <div 
-              onClick={() => handleLinkClick(onNavigateHome)}
-              className="truncate min-w-0 cursor-pointer group"
-              title="মূল ওয়েবসাইট / ল্যান্ডিং পেজে যান"
-            >
-              <span className="font-bold text-white text-sm tracking-tight block truncate group-hover:text-blue-300 transition-colors">
-                {currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')}
-              </span>
-              <span className="text-xs text-slate-400 font-semibold block truncate">
-                {currentRole === 'student' 
-                  ? (studentUser?.studentClass ? `${studentUser.studentClass} • ${studentUser.phone || ''}` : (studentUser?.phone || 'শিক্ষার্থী কর্নার'))
-                  : (parentUser?.phone || '০১৭৮৯৫৩৯৪৯৪')}
-              </span>
-            </div>
+            {/* Name & Info */}
+            {activeView === 'admin' ? (
+              <div 
+                onMouseEnter={(e) => handleItemMouseEnter('সুপার-অ্যাডমিন (মাস্টার কন্ট্রোল ও সার্বিক নিয়ন্ত্রণ)', e)}
+                onMouseMove={handleItemMouseMove}
+                onMouseLeave={handleItemMouseLeave}
+                className="truncate min-w-0"
+                title="সুপার-অ্যাডমিন"
+              >
+                <span className="font-black text-white text-sm tracking-tight block truncate">
+                  সুপার-অ্যাডমিন
+                </span>
+                <span className="text-[11px] text-amber-300 font-bold block truncate">
+                  মাস্টার অথরিটি • সিস্টেম
+                </span>
+              </div>
+            ) : (
+              <div 
+                onClick={() => handleLinkClick(onNavigateHome)}
+                onMouseEnter={(e) => handleItemMouseEnter(`${currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')} (${currentRole === 'student' ? (studentUser?.studentClass || 'শিক্ষার্থী কর্নার') : (parentUser?.phone || '০১৭৮৯৫৩৯৪৯৪')})`, e)}
+                onMouseMove={handleItemMouseMove}
+                onMouseLeave={handleItemMouseLeave}
+                className="truncate min-w-0 cursor-pointer group"
+                title={`${currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')} - মূল ওয়েবসাইট`}
+              >
+                <span className="font-bold text-white text-sm tracking-tight block truncate group-hover:text-blue-300 transition-colors">
+                  {currentRole === 'student' ? (studentUser?.name || 'শিক্ষার্থী') : (parentUser?.name || 'অভিভাবক')}
+                </span>
+                <span className="text-xs text-slate-400 font-semibold block truncate">
+                  {currentRole === 'student' 
+                    ? (studentUser?.studentClass ? `${studentUser.studentClass} • ${studentUser.phone || ''}` : (studentUser?.phone || 'শিক্ষার্থী কর্নার'))
+                    : (parentUser?.phone || '০১৭৮৯৫৩৯৪৯৪')}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Mobile Close Button only */}
@@ -248,46 +295,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* ======================================================== */}
         <div className="flex-1 overflow-y-auto py-3 space-y-1 text-sm font-semibold">
           
-          {/* Admin Switcher Bar (If Admin is Logged In) */}
-          {isAdminLoggedIn && (
+          {/* Admin Mode Badge (Strictly Admin only - No Guardian or Student options) */}
+          {activeView === 'admin' ? (
             <div className="px-3 pb-2 mb-2 border-b border-purple-900/40">
-              <div className="flex items-center gap-1 bg-[#12192e] p-1 rounded-xl border border-purple-900/50">
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleLinkClick(() => {
-                      onOpenAdminDashboard?.();
-                    });
-                  }}
-                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    activeView === 'admin'
-                      ? 'bg-purple-600 text-white shadow-xs'
-                      : 'text-purple-300 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  <Crown className="w-3.5 h-3.5 text-amber-300" />
-                  <span>অ্যাডমিন</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleLinkClick(() => {
-                      onRoleChange('parent');
-                      onNavigateDashboard();
-                    });
-                  }}
-                  className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                    activeView !== 'admin'
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                  }`}
-                >
-                  <Users className="w-3.5 h-3.5" />
-                  <span>অভিভাবক</span>
-                </button>
+              <div className="flex items-center gap-2 bg-[#12192e] px-3 py-2 rounded-xl border border-purple-500/30 shadow-xs">
+                <Crown className="w-4 h-4 text-amber-300 shrink-0" />
+                <div className="min-w-0">
+                  <span className="text-xs font-black text-white block truncate">এডমিন এক্সেস</span>
+                  <span className="text-[10px] text-purple-300 font-semibold block truncate">সার্বজনীন নিয়ন্ত্রণ হাব</span>
+                </div>
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* VIEW A: DEDICATED SUPER-ADMIN CONTROLLING SUITE */}
           {activeView === 'admin' ? (
@@ -300,6 +319,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={() => handleLinkClick(() => onSelectAdminTab?.('overview'))}
+                onMouseEnter={(e) => handleItemMouseEnter('মাস্টার ওভারভিউ', e)}
+                onMouseMove={handleItemMouseMove}
+                onMouseLeave={handleItemMouseLeave}
+                title="মাস্টার ওভারভিউ"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'overview'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -316,6 +339,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={() => handleLinkClick(() => onSelectAdminTab?.('papers'))}
+                onMouseEnter={(e) => handleItemMouseEnter('কেন্দ্রীয় প্রশ্নব্যাংক', e)}
+                onMouseMove={handleItemMouseMove}
+                onMouseLeave={handleItemMouseLeave}
+                title="কেন্দ্রীয় প্রশ্নব্যাংক"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'papers'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -332,6 +359,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={() => handleLinkClick(() => onSelectAdminTab?.('users'))}
+                onMouseEnter={(e) => handleItemMouseEnter('ব্যবহারকারী ও একাউন্ট', e)}
+                onMouseMove={handleItemMouseMove}
+                onMouseLeave={handleItemMouseLeave}
+                title="ব্যবহারকারী ও একাউন্ট"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'users'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -348,6 +379,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={() => handleLinkClick(() => onSelectAdminTab?.('exams'))}
+                onMouseEnter={(e) => handleItemMouseEnter('গ্লোবাল পরীক্ষা ও খাতা', e)}
+                onMouseMove={handleItemMouseMove}
+                onMouseLeave={handleItemMouseLeave}
+                title="গ্লোবাল পরীক্ষা ও খাতা"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'exams'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -364,6 +399,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={() => handleLinkClick(() => onSelectAdminTab?.('proctoring'))}
+                onMouseEnter={(e) => handleItemMouseEnter('প্রক্টরিং সিকিউরিটি', e)}
+                onMouseMove={handleItemMouseMove}
+                onMouseLeave={handleItemMouseLeave}
+                title="প্রক্টরিং সিকিউরিটি"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'proctoring'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -380,6 +419,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={() => handleLinkClick(() => onSelectAdminTab?.('notice'))}
+                onMouseEnter={(e) => handleItemMouseEnter('নোটিশ ব্রডকাস্ট', e)}
+                onMouseMove={handleItemMouseMove}
+                onMouseLeave={handleItemMouseLeave}
+                title="নোটিশ ব্রডকাস্ট"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'notice'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -396,6 +439,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={() => handleLinkClick(() => onSelectAdminTab?.('system'))}
+                onMouseEnter={(e) => handleItemMouseEnter('সিস্টেম ও ব্যাকআপ', e)}
+                onMouseMove={handleItemMouseMove}
+                onMouseLeave={handleItemMouseLeave}
+                title="সিস্টেম ও ব্যাকআপ"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'system'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -422,7 +469,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onSelectParentTab('assigned');
                     });
                   }}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
+                  onMouseEnter={(e) => handleItemMouseEnter('প্রশ্নপত্র তৈরি', e)}
+                  onMouseMove={handleItemMouseMove}
+                  onMouseLeave={handleItemMouseLeave}
+                  title="প্রশ্নপত্র তৈরি"
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                     parentTab === 'assigned' && activeView === 'dashboard'
                       ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
                       : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
@@ -446,6 +497,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onSelectParentTab('library');
                     });
                   }}
+                  onMouseEnter={(e) => handleItemMouseEnter('আমার প্রশ্ন লাইব্রেরি (আর্কাইভ)', e)}
+                  onMouseMove={handleItemMouseMove}
+                  onMouseLeave={handleItemMouseLeave}
+                  title="আমার প্রশ্ন লাইব্রেরি (আর্কাইভ)"
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                     parentTab === 'library' && activeView === 'dashboard'
                       ? 'bg-indigo-600/30 text-white font-bold border-l-2 border-indigo-400'
@@ -471,7 +526,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onNavigateDashboard();
                     onSelectParentTab('report');
                   })}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
+                  onMouseEnter={(e) => handleItemMouseEnter('ফলাফল ও রিপোর্ট', e)}
+                  onMouseMove={handleItemMouseMove}
+                  onMouseLeave={handleItemMouseLeave}
+                  title="ফলাফল ও রিপোর্ট"
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                     parentTab === 'report' && activeView === 'dashboard'
                       ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
                       : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
@@ -493,7 +552,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onNavigateDashboard();
                     onSelectParentTab('games');
                   })}
-                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors ${
+                  onMouseEnter={(e) => handleItemMouseEnter('কুইজ ও ব্রেইন গেমস', e)}
+                  onMouseMove={handleItemMouseMove}
+                  onMouseLeave={handleItemMouseLeave}
+                  title="কুইজ ও ব্রেইন গেমস"
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                     parentTab === 'games' && activeView === 'dashboard'
                       ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
                       : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
@@ -515,7 +578,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onNavigateDashboard();
                     onOpenSettings?.();
                   })}
-                  className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white"
+                  onMouseEnter={(e) => handleItemMouseEnter('প্রক্টরিং সেটিংস (লেভেল ১-৪)', e)}
+                  onMouseMove={handleItemMouseMove}
+                  onMouseLeave={handleItemMouseLeave}
+                  title="প্রক্টরিং সেটিংস (লেভেল ১-৪)"
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 truncate min-w-0">
                     <ShieldAlert className="w-4.5 h-4.5 text-purple-400 shrink-0" />
@@ -533,13 +600,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     type="button"
                     onClick={() => handleLinkClick(() => onOpenAdminDashboard?.())}
+                    onMouseEnter={(e) => handleItemMouseEnter('সুপার-অ্যাডমিন কন্ট্রোল সেন্টার', e)}
+                    onMouseMove={handleItemMouseMove}
+                    onMouseLeave={handleItemMouseLeave}
+                    title="সুপার-অ্যাডমিন কন্ট্রোল সেন্টার"
                     className="w-full flex items-center justify-between p-2.5 rounded-xl bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:from-purple-800 hover:to-indigo-800 border border-purple-500/40 text-white font-bold text-xs transition-all shadow-md cursor-pointer group"
                   >
-                    <div className="flex items-center gap-2">
-                      <Crown className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
-                      <span>অ্যাডমিন ড্যাশবোর্ড</span>
+                    <div className="flex items-center gap-2 truncate min-w-0">
+                      <Crown className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
+                      <span className="truncate">অ্যাডমিন ড্যাশবোর্ড</span>
                     </div>
-                    <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-1.5 py-0.2 rounded-full">
+                    <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-1.5 py-0.2 rounded-full shrink-0">
                       CONTROL
                     </span>
                   </button>
@@ -557,7 +628,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     const el = document.getElementById('student-exam-list');
                     el?.scrollIntoView({ behavior: 'smooth' });
                   })}
-                  className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors bg-emerald-600/25 text-white font-bold border-l-2 border-emerald-500 hover:bg-emerald-600/35"
+                  onMouseEnter={(e) => handleItemMouseEnter('নির্ধারিত পরীক্ষাসমূহ', e)}
+                  onMouseMove={handleItemMouseMove}
+                  onMouseLeave={handleItemMouseLeave}
+                  title="নির্ধারিত পরীক্ষাসমূহ"
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors bg-emerald-600/25 text-white font-bold border-l-2 border-emerald-500 hover:bg-emerald-600/35 cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 truncate min-w-0">
                     <BookOpen className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
@@ -575,7 +650,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     const input = document.getElementById('student-pin-input');
                     input?.focus();
                   })}
-                  className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white"
+                  onMouseEnter={(e) => handleItemMouseEnter('পিন দিয়ে নতুন পরীক্ষা শুরু করুন', e)}
+                  onMouseMove={handleItemMouseMove}
+                  onMouseLeave={handleItemMouseLeave}
+                  title="পিন দিয়ে নতুন পরীক্ষা শুরু করুন"
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 truncate min-w-0">
                     <Key className="w-4.5 h-4.5 text-amber-400 shrink-0" />
@@ -593,7 +672,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onNavigateDashboard();
                     onSelectParentTab('games');
                   })}
-                  className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white"
+                  onMouseEnter={(e) => handleItemMouseEnter('কুইজ ও ব্রেইন গেমস', e)}
+                  onMouseMove={handleItemMouseMove}
+                  onMouseLeave={handleItemMouseLeave}
+                  title="কুইজ ও ব্রেইন গেমস"
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 truncate min-w-0">
                     <Brain className="w-4.5 h-4.5 text-rose-400 shrink-0" />
@@ -605,6 +688,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
 
         </div>
+
+        {/* ======================================================== */}
+        {/* Interactive Cursor-Following Tooltip                     */}
+        {/* ======================================================== */}
+        {cursorTooltip && (
+          <div
+            style={{
+              left: `${Math.max(12, Math.min(cursorTooltip.x, window.innerWidth - 240))}px`,
+              top: `${(cursorTooltip.y + 40 > window.innerHeight) ? cursorTooltip.y - 45 : cursorTooltip.y}px`
+            }}
+            className="fixed z-[9999] pointer-events-none -translate-x-2 px-3 py-1.5 bg-slate-900/95 backdrop-blur-md text-white text-xs font-bold rounded-lg shadow-2xl border border-purple-500/50 whitespace-nowrap animate-in fade-in zoom-in-95 duration-100 flex items-center gap-1.5"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+            <span>{cursorTooltip.text}</span>
+          </div>
+        )}
 
         {/* ======================================================== */}
         {/* 3. INTERACTIVE RESIZE DRAG HANDLE (Desktop)               */}

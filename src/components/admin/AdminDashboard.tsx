@@ -436,16 +436,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <button
               type="button"
-              onClick={onExitAdmin}
-              className="px-3 py-1.5 rounded-xl bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 hover:text-white border border-blue-500/40 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
-              title="অভিভাবক মোডে ফিরে যান"
-            >
-              <Users className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">অভিভাবক ভিউ</span>
-            </button>
-
-            <button
-              type="button"
               onClick={handleAdminLogout}
               className="px-3 py-1.5 rounded-xl bg-rose-600/30 hover:bg-rose-600/60 text-rose-300 hover:text-white border border-rose-500/40 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
               title="অ্যাডমিন থেকে লগআউট করুন"

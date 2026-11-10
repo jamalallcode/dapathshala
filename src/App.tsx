@@ -497,8 +497,7 @@ export function App() {
           ) : activeView === 'admin' ? (
             <AdminDashboard
               onExitAdmin={() => {
-                setActiveView('dashboard');
-                setCurrentRole('parent');
+                setActiveView('landing');
               }}
               onNavigateHome={handleNavigateHome}
               onOpenTestPreview={handleOpenExam}
