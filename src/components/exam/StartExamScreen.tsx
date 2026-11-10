@@ -290,7 +290,7 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ test: initialT
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                  <span>নকল এড়াতে ফ্রন্ট ক্যামেরা নজরদারি ও ফুলস্ক্রিন সুরক্ষা</span>
+                  <span>নকল এড়াতে ফ্রন্ট ক্যামেরা নজরদারি ও স্মার্ট প্রক্টরিং সক্রিয়</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
@@ -308,14 +308,15 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ test: initialT
                     await document.documentElement.requestFullscreen();
                   }
                 } catch (err) {
-                  console.warn("Fullscreen error", err);
+                  // Non-blocking fallback if browser or iframe denies fullscreen
+                  console.warn("Fullscreen optional request error", err);
                 }
                 setIsExamStarted(true);
               }}
               className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
             >
               <Play className="w-5 h-5 fill-white" />
-              <span>ফুলস্ক্রিনে পরীক্ষা শুরু করুন</span>
+              <span>পরীক্ষা শুরু করুন</span>
             </button>
           </div>
         )}

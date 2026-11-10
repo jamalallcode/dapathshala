@@ -370,20 +370,16 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }
   };
 
-  // Fullscreen enforcement listener
+  // Fullscreen state listener
   useEffect(() => {
     if (isReviewOnly || isSubmitted) return;
 
     const handleFullscreenChange = () => {
       const active = !!document.fullscreenElement;
       setIsFullscreen(active);
-      if (!active) {
-        triggerSuspiciousFlag('ফুলস্ক্রিন থেকে বের হওয়া বা নতুন ট্যাব খোলার চেষ্টা সনাক্ত হয়েছে!');
-      }
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    enterFullscreen();
 
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
@@ -1485,49 +1481,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       onContextMenu={(e) => e.preventDefault()}
     >
       
-      {/* 1. Fullscreen Lockdown Shield Overlay when not in Fullscreen Mode */}
-      {!isFullscreen && !isReviewOnly && !isSubmitted && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-slate-900 border-2 border-rose-500 rounded-3xl p-6 sm:p-8 text-center text-white space-y-5 shadow-2xl animate-in zoom-in-95">
-            <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto border border-rose-500/40">
-              <ShieldAlert className="w-10 h-10" />
-            </div>
-            <div className="space-y-2">
-              <span className="px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 text-xs font-bold border border-rose-500/40">
-                🔒 কঠোর অ্যান্টি-চিটিং নিরাপত্তা
-              </span>
-              <h3 className="text-xl font-black">
-                নতুন ট্যাব ও উইন্ডো খোলা সম্পূর্ণ নিষিদ্ধ
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                পরীক্ষা চলাকালে কোনো নতুন ট্যাব, ব্রাউজার উইন্ডো বা অন্য অ্যাপ্লিকেশন খোলার অপশন বন্ধ রাখা হয়েছে। পরীক্ষাটি শুধুমাত্র সম্পূর্ণ পর্দা (Fullscreen) মোডে দেওয়ার অনুমতি রয়েছে।
-              </p>
-            </div>
 
-            <div className="p-3.5 rounded-xl bg-slate-800/80 border border-slate-700 text-xs text-amber-300 font-semibold space-y-1 text-left">
-              <p>• ফুলস্ক্রিন ছাড়া কোনো প্রশ্ন দেখতে বা উত্তর দিতে পারবেন না।</p>
-              <p>• নতুন ট্যাব খোলার চেষ্টা সনাক্ত হলে পরীক্ষা স্বয়ংক্রিয়ভাবে বাতিল হয়ে যাবে।</p>
-            </div>
-
-            <button
-              type="button"
-              onClick={enterFullscreen}
-              className="w-full py-3.5 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
-            >
-              <Maximize className="w-4.5 h-4.5" />
-              <span>ফুলস্ক্রিন চালু করে পরীক্ষায় প্রবেশ করুন</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 2. Top-bar Hover Warning */}
-      {isHoveringTopBar && !isReviewOnly && !isSubmitted && (
-        <div className="fixed top-2 left-1/2 -translate-x-1/2 z-50 bg-rose-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xl border border-rose-400 animate-pulse flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>ট্যাব বার বা ব্রাউজারের বাইরে মাউস নেওয়া সম্পূর্ণ নিষিদ্ধ! পরীক্ষা ফুলস্ক্রিনে রাখুন।</span>
-        </div>
-      )}
 
       {/* Realtime Anti-Cheating Floating Warning (Non-blocking notification bar at top) */}
       {lastWarning && (
@@ -1825,7 +1779,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             )}
           </div>
           <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate">
-            {isReviewOnly || isSubmitted ? "উত্তরপত্র ও খাতা পর্যালোচনা" : "লাইভ পরীক্ষা চলমান (ফ্রন্ট ক্যামেরা নজরদারি ও ফুলস্ক্রিন সুরক্ষা)"}
+            {isReviewOnly || isSubmitted ? "উত্তরপত্র ও খাতা পর্যালোচনা" : "লাইভ পরীক্ষা চলমান (ফ্রন্ট ক্যামেরা নজরদারি ও স্মার্ট প্রক্টরিং)"}
           </p>
         </div>
 
