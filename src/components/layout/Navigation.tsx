@@ -204,21 +204,9 @@ export const Navigation: React.FC<NavigationProps> = ({
             <Home className="w-4.5 h-4.5 pointer-events-none" />
           </button>
 
-          {/* Clean Menu Items (সর্বোচ্চ ৫ টি আইটেম) */}
+          {/* Clean Menu Items (সর্বোচ্চ ৪ টি আইটেম) */}
           <div className="hidden md:flex items-center gap-1 ml-3 text-xs sm:text-sm font-semibold text-slate-200">
-            {/* ১. হোম */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                onNavigateHome?.();
-              }}
-              className="px-2.5 py-1.5 rounded-lg hover:bg-slate-800 hover:text-white transition-colors cursor-pointer"
-            >
-              হোম
-            </button>
-
-            {/* ২. আমাদের সম্পর্কে */}
+            {/* ১. আমাদের সম্পর্কে */}
             <button
               type="button"
               onClick={() => setActiveNavModal('about')}

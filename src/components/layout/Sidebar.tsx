@@ -569,31 +569,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </button>
               </div>
 
-              {/* Menu: প্রক্টরিং সেটিংস (৪টি লেভেল) */}
-              <div>
-                <button
-                  type="button"
-                  onClick={() => handleLinkClick(() => {
-                    onRoleChange('parent');
-                    onNavigateDashboard();
-                    onOpenSettings?.();
-                  })}
-                  onMouseEnter={(e) => handleItemMouseEnter('প্রক্টরিং সেটিংস (লেভেল ১-৪)', e)}
-                  onMouseMove={handleItemMouseMove}
-                  onMouseLeave={handleItemMouseLeave}
-                  title="প্রক্টরিং সেটিংস (লেভেল ১-৪)"
-                  className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 truncate min-w-0">
-                    <ShieldAlert className="w-4.5 h-4.5 text-purple-400 shrink-0" />
-                    <span className="truncate">প্রক্টরিং সেটিংস (৪টি লেভেল)</span>
-                  </div>
-                  <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-mono font-bold">
-                    লেভেল ১-৪
-                  </span>
-                </button>
-              </div>
-
               {/* Exclusive Admin Quick Access Card for Admin Users */}
               {isAdminLoggedIn && (
                 <div className="pt-3 px-3 mt-2 border-t border-slate-800">
