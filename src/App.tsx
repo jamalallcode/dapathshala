@@ -88,7 +88,7 @@ export function App() {
     };
   }, [isResizingSidebar, sidebarWidth]);
   
-  const [parentActiveTab, setParentActiveTab] = useState<'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games'>('assigned');
+  const [parentActiveTab, setParentActiveTab] = useState<'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games' | 'library'>('assigned');
   const [showCreateModalExternal, setShowCreateModalExternal] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
 
@@ -398,7 +398,7 @@ export function App() {
     } catch {}
   };
 
-  const handleSelectParentTabFromSidebar = (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings') => {
+  const handleSelectParentTabFromSidebar = (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games' | 'library') => {
     setCurrentRole('parent');
     setActiveView('dashboard');
     if (tab === 'settings') {

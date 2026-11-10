@@ -27,7 +27,7 @@ interface NavigationProps {
   onNavigateHome?: () => void;
   onNavigateDashboard?: () => void;
   onOpenCreateExam?: () => void;
-  onSelectTab?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games') => void;
+  onSelectTab?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games' | 'library') => void;
   onOpenSettings?: () => void;
   isHomeActive?: boolean;
   onToggleSidebar?: () => void;

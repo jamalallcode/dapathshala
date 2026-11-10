@@ -5,7 +5,7 @@ import {
   TrendingUp, Award, BookOpen, Sparkles, RefreshCw, Edit3, X,
   Save, AlertCircle, Camera, ExternalLink, HelpCircle, GraduationCap, ArrowRight, ArrowLeft,
   RotateCcw, MessageCircle, Lightbulb, ChevronDown, Printer, Settings,
-  Brain, Trophy, Target, Zap, Landmark, School, Lock
+  Brain, Trophy, Target, Zap, Landmark, School, Lock, Globe, FolderArchive
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AssignedTest, StudentSubmission, ExamQuestion, ViolationSnapshot } from '../../types';
@@ -44,13 +44,22 @@ import { ParentSettingsModal } from './ParentSettingsModal';
 import { InstitutionPaperExplorer } from './InstitutionPaperExplorer';
 import { AdminPaperBulkUploadModal } from '../admin/AdminPaperBulkUploadModal';
 import { InstitutionPaper } from '../../lib/institutionPapers';
+import { 
+  BLOOM_LEVELS, 
+  BloomLevel, 
+  normalizeBloomLevel, 
+  inferBloomLevelFromQuestion, 
+  calculateBloomStats 
+} from '../../lib/bloomTaxonomy';
+import { PrintableQuestionPaperModal } from '../exam/PrintableQuestionPaperModal';
+import { TeacherQuestionLibrary } from './TeacherQuestionLibrary';
 
 interface ParentDashboardProps {
   onOpenTest: (test: AssignedTest) => void;
   onOpenReview: (test: AssignedTest) => void;
   onNavigateHome?: () => void;
-  activeTab?: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games';
-  onTabChange?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games') => void;
+  activeTab?: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games' | 'library';
+  onTabChange?: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games' | 'library') => void;
   showCreateModalExternal?: boolean;
   onCloseCreateModalExternal?: () => void;
   isSettingsOpenExternal?: boolean;
@@ -132,6 +141,8 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
   // Custom exam title input
   const [examTitleInput, setExamTitleInput] = useState('');
+  // Track which paper is currently being edited/modified in builder
+  const [editingPaperId, setEditingPaperId] = useState<string | null>(null);
 
   // Questions state for authoring (starts with a single blank question format for manual mode)
   const [generatedQuestions, setGeneratedQuestions] = useState<ExamQuestion[]>([
@@ -157,12 +168,29 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     }));
   };
 
+  // State to track which question's explanation & steps are in edit mode
+  const [editingSolutionIndices, setEditingSolutionIndices] = useState<Record<number, boolean>>({});
+  const toggleEditSolution = (qIdx: number) => {
+    setEditingSolutionIndices(prev => ({
+      ...prev,
+      [qIdx]: !prev[qIdx]
+    }));
+    // Auto-expand if currently closed
+    setExpandedSolutions(prev => ({
+      ...prev,
+      [qIdx]: true
+    }));
+  };
+
   // Success Link Generation Modal & Finalized State
   const [createdTestResult, setCreatedTestResult] = useState<AssignedTest | null>(null);
   const [isFinalized, setIsFinalized] = useState(false);
 
   // Question Paper Preview Modal (clean view without starting exam or auto-submitting)
   const [previewPaperTest, setPreviewPaperTest] = useState<AssignedTest | null>(null);
+
+  // Official 2-Column A4 Printable Modal (School / Coaching Offline Exam & Answer Key)
+  const [printModalTest, setPrintModalTest] = useState<AssignedTest | null>(null);
 
   // Review & Evaluation Modal
   const [reviewTest, setReviewTest] = useState<AssignedTest | null>(null);
@@ -492,6 +520,11 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     if (raw && raw.length > 0) {
       return raw.map((q, idx) => {
         const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
+        const resolvedSolutions = (q.solutions && q.solutions.length >= 2)
+          ? q.solutions
+          : generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation || 'পাঠ্যবই অনুযায়ী বিশ্লেষণ');
+        const resolvedCognitive = q.cognitiveLevel || inferBloomLevelFromQuestion(q.question, q.explanation);
+
         return {
           id: q.id || `nctb_q_${Date.now()}_${idx}`,
           question: q.question,
@@ -499,9 +532,9 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           correctAnswer: q.correctAnswer,
           correctAnswerIndex: correctIdx !== -1 ? correctIdx : (q.correctAnswerIndex ?? 0),
           explanation: q.explanation || '',
-          solutions: q.solutions || [q.explanation || 'পাঠ্যবই অনুযায়ী বিশ্লেষণ'],
+          solutions: resolvedSolutions,
           difficulty: q.difficulty,
-          cognitiveLevel: q.cognitiveLevel,
+          cognitiveLevel: resolvedCognitive,
           chapter: q.chapter,
           format: q.format,
           stimulus: q.stimulus
@@ -513,6 +546,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     const fallback = getQuestionsForChapter(sub, chaps[0] || selectedChapter, count);
     return fallback.map((q, idx) => {
       const correctIdx = q.options.findIndex(o => o === q.correctAnswer);
+      const resolvedCognitive = inferBloomLevelFromQuestion(q.question, q.explanation);
       return {
         id: q.id || `legacy_q_${Date.now()}_${idx}`,
         question: q.question,
@@ -522,6 +556,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         explanation: q.explanation || '',
         solutions: q.solutions || generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation),
         difficulty: 'medium',
+        cognitiveLevel: resolvedCognitive,
         chapter: chaps[0] || selectedChapter
       };
     });
@@ -745,6 +780,39 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       return copy;
     });
     showToast(`✓ প্রশ্ন ${toBn(qIdx + 1)} এর সঠিক উত্তর নির্ধারণ করা হয়েছে।`);
+  };
+
+  // Update Bloom's Taxonomy cognitive level for a question
+  const handleUpdateCognitiveLevel = (qIdx: number, level: BloomLevel) => {
+    setGeneratedQuestions(prev => {
+      const copy = [...prev];
+      copy[qIdx] = { ...copy[qIdx], cognitiveLevel: level };
+      return copy;
+    });
+    showToast(`✓ প্রশ্ন ${toBn(qIdx + 1)} এর স্তর "${BLOOM_LEVELS[level].banglaName}" এ নির্ধারিত হয়েছে।`);
+  };
+
+  // Update explanation text for a question
+  const handleUpdateExplanation = (qIdx: number, newExplanation: string) => {
+    setGeneratedQuestions(prev => {
+      const copy = [...prev];
+      copy[qIdx] = { ...copy[qIdx], explanation: newExplanation };
+      return copy;
+    });
+  };
+
+  // Update specific solution method (Method 1 or Method 2) for a question
+  const handleUpdateSolutionMethod = (qIdx: number, methodIdx: number, newText: string) => {
+    setGeneratedQuestions(prev => {
+      const copy = [...prev];
+      const q = copy[qIdx];
+      const currentSolutions = q.solutions && q.solutions.length >= 2
+        ? [...q.solutions]
+        : generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation);
+      currentSolutions[methodIdx] = newText;
+      copy[qIdx] = { ...q, solutions: currentSolutions };
+      return copy;
+    });
   };
 
   // Delete a question
@@ -996,15 +1064,19 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     const randomPin = Math.floor(100000 + Math.random() * 900000).toString();
     const chaptersStr = selectedChapters.length > 0 ? selectedChapters.join(', ') : selectedChapter;
     const finalTitle = examTitleInput.trim() || `${selectedClass} - ${selectedSubject}: ${chaptersStr} পরীক্ষা`;
+    const nowIso = new Date().toISOString();
+
     const newTest: AssignedTest = {
-      id: `test-${Date.now()}`,
+      id: editingPaperId ? editingPaperId : `test-${Date.now()}`,
       title: finalTitle,
       subject: selectedSubject,
       chapter: chaptersStr,
+      studentClass: selectedClass,
       questionCount: generatedQuestions.length,
       durationMinutes: durationMinutes,
       pin: randomPin,
       createdAt: 'আজ, এইমাত্র',
+      lastModifiedAt: nowIso,
       status: 'pending',
       studentName: 'পরীক্ষার্থী / সন্তান',
       totalMarks: generatedQuestions.length * 20,
@@ -1012,14 +1084,145 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       proctoringLevel: proctoringEnabled ? proctoringLevel : 2,
       aiGradingEnabled: true,
       questions: generatedQuestions,
-      parentPhone: currentParent?.phone
+      parentPhone: currentParent?.phone,
+      isSavedToLibrary: true,
+      customTags: ['নির্ধারিত পরীক্ষা']
     };
 
-    const updated = [newTest, ...tests];
+    let updated: AssignedTest[];
+    if (editingPaperId) {
+      updated = tests.map(t => (t.id === editingPaperId ? newTest : t));
+    } else {
+      updated = [newTest, ...tests];
+    }
+
     setTests(updated);
     saveStoredTests(updated);
     syncTestToServer(newTest);
     setCreatedTestResult(newTest);
+    setEditingPaperId(null);
+  };
+
+  // Save directly to Teacher's Library without publishing exam
+  const handleSaveToLibraryDirect = () => {
+    if (generatedQuestions.length === 0) {
+      showToast('⚠️ দয়া করে অন্তত ১টি প্রশ্ন লিখুন!');
+      return;
+    }
+
+    for (let i = 0; i < generatedQuestions.length; i++) {
+      const q = generatedQuestions[i];
+      if (!q.question.trim()) {
+        showToast(`⚠️ দয়া করে প্রশ্ন নম্বর ${toBn(i + 1)} এর বিবরণ লিখুন।`);
+        return;
+      }
+      const filledOptions = q.options.filter(o => o.trim() !== '');
+      if (filledOptions.length < 2) {
+        showToast(`⚠️ প্রশ্ন নম্বর ${toBn(i + 1)} এ অন্তত ২টি অপশন লিখুন।`);
+        return;
+      }
+      let finalCorrect = q.correctAnswer?.trim();
+      if (!finalCorrect && q.correctAnswerIndex !== undefined && q.options[q.correctAnswerIndex]?.trim()) {
+        finalCorrect = q.options[q.correctAnswerIndex].trim();
+        q.correctAnswer = finalCorrect;
+      }
+      if (!finalCorrect) {
+        showToast(`⚠️ প্রশ্ন নম্বর ${toBn(i + 1)} এর সঠিক উত্তরের পাশের বৃত্তে ক্লিক করুন।`);
+        return;
+      }
+    }
+
+    const chaptersStr = selectedChapters.length > 0 ? selectedChapters.join(', ') : selectedChapter;
+    const finalTitle = examTitleInput.trim() || `${selectedClass} - ${selectedSubject}: ${chaptersStr} প্রশ্নপত্র`;
+    const nowIso = new Date().toISOString();
+
+    if (editingPaperId) {
+      const updated = tests.map(t => {
+        if (t.id === editingPaperId) {
+          return {
+            ...t,
+            title: finalTitle,
+            subject: selectedSubject,
+            chapter: chaptersStr,
+            studentClass: selectedClass,
+            questionCount: generatedQuestions.length,
+            durationMinutes: durationMinutes,
+            questions: generatedQuestions,
+            isSavedToLibrary: true,
+            lastModifiedAt: nowIso
+          };
+        }
+        return t;
+      });
+      setTests(updated);
+      saveStoredTests(updated);
+      const updatedTest = updated.find(t => t.id === editingPaperId);
+      if (updatedTest) syncTestToServer(updatedTest);
+      showToast(`✓ প্রশ্নপত্র "${finalTitle}" সফলভাবে আপডেট ও লাইব্রেরিতে সংরক্ষিত হয়েছে!`);
+      setEditingPaperId(null);
+      onTabChange?.('library');
+      setActiveViewMode('tests');
+    } else {
+      const randomPin = Math.floor(100000 + Math.random() * 900000).toString();
+      const newTest: AssignedTest = {
+        id: `test-${Date.now()}`,
+        title: finalTitle,
+        subject: selectedSubject,
+        chapter: chaptersStr,
+        studentClass: selectedClass,
+        questionCount: generatedQuestions.length,
+        durationMinutes: durationMinutes,
+        pin: randomPin,
+        createdAt: 'আজ, এইমাত্র',
+        lastModifiedAt: nowIso,
+        status: 'pending',
+        studentName: 'শিক্ষার্থী / পরীক্ষার্থী',
+        totalMarks: generatedQuestions.length * 20,
+        proctoringEnabled: proctoringEnabled,
+        proctoringLevel: proctoringEnabled ? proctoringLevel : 2,
+        aiGradingEnabled: true,
+        questions: generatedQuestions,
+        parentPhone: currentParent?.phone,
+        isSavedToLibrary: true,
+        customTags: ['শিক্ষকের প্রশ্নব্যাংক']
+      };
+
+      const updated = [newTest, ...tests];
+      setTests(updated);
+      saveStoredTests(updated);
+      syncTestToServer(newTest);
+      showToast(`✓ নতুন প্রশ্নপত্র "${finalTitle}" সফলভাবে লাইব্রেরিতে সংরক্ষিত হয়েছে!`);
+      onTabChange?.('library');
+      setActiveViewMode('tests');
+    }
+  };
+
+  // Load an existing paper into Builder for editing/modifying
+  const handleEditPaperInBuilder = (test: AssignedTest) => {
+    setEditingPaperId(test.id);
+    setExamTitleInput(test.title || '');
+    if (test.studentClass) {
+      setSelectedClass(test.studentClass);
+    }
+    if (test.subject) {
+      setSelectedSubject(test.subject);
+    }
+    if (test.chapter) {
+      const parts = test.chapter.split(', ').map(s => s.trim()).filter(Boolean);
+      setSelectedChapters(parts);
+      if (parts[0]) setSelectedChapter(parts[0]);
+    }
+    if (test.durationMinutes) {
+      setDurationMinutes(test.durationMinutes);
+    }
+    if (Array.isArray(test.questions) && test.questions.length > 0) {
+      setGeneratedQuestions(test.questions.map(q => ({ ...q })));
+    }
+    setCreationMode('manual');
+    setIsFinalized(false);
+    onTabChange?.('assigned');
+    setActiveViewMode('builder');
+    showToast(`📝 "${test.title}" এডিটিং মোডে লোড হয়েছে। পরিমার্জন শেষে সেভ করুন।`);
   };
 
   // Copy Link Helper with Full Cross-Device Support
@@ -1265,6 +1468,8 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               <Brain className="w-6 h-6 text-rose-300" />
             ) : activeTab === 'review' ? (
               <FileCheck className="w-6 h-6 text-emerald-300" />
+            ) : activeTab === 'library' ? (
+              <FolderArchive className="w-6 h-6 text-indigo-200" />
             ) : (
               <GraduationCap className="w-6 h-6" />
             )}
@@ -1278,7 +1483,9 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                   ? 'কুইজ ও ব্রেইন গেমস' 
                   : activeTab === 'review'
                   ? 'খাতা মূল্যায়ন ও পরীক্ষণ'
-                  : 'অভিভাবক পোর্টাল'}
+                  : activeTab === 'library'
+                  ? 'আমার প্রশ্ন লাইব্রেরি ও প্রশ্নব্যাংক'
+                  : 'অভিভাবক ও শিক্ষক পোর্টাল'}
               </h1>
             </div>
             <p className="text-xs sm:text-sm text-slate-500 font-semibold">
@@ -1288,13 +1495,15 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 ? 'দ্রুত মেধা বিকাশ, সাধারণ জ্ঞান ও গণিত চ্যালেঞ্জের ইন্টারেক্টিভ প্ল্যাটফর্ম'
                 : activeTab === 'review'
                 ? 'সন্তানের জমা দেওয়া উত্তরপত্র যাচাই, প্রতিটি প্রশ্নে নম্বর প্রদান ও ফিডব্যাক'
+                : activeTab === 'library'
+                ? 'আজীবন সংরক্ষিত প্রশ্নপত্র, পরিমার্জন, ডুপ্লিকেট সেট তৈরি, ফিল্টারিং ও প্রিন্টিং সুবিধা'
                 : 'এআই প্রশ্নপত্র তৈরি, লিংক শেয়ার ও ফ্রন্ট ক্যামেরা লাইভ খাতা মূল্যায়ন'}
             </p>
           </div>
         </div>
 
         {/* Header Right Status / Back Button */}
-        {activeTab === 'report' || activeTab === 'games' ? (
+        {activeTab === 'report' || activeTab === 'games' || activeTab === 'library' ? (
           <button
             type="button"
             onClick={() => onTabChange?.('assigned')}
@@ -1306,7 +1515,10 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         ) : (activeViewMode === 'builder' || activeViewMode === 'institution_papers') ? (
           <button
             type="button"
-            onClick={() => setActiveViewMode('tests')}
+            onClick={() => {
+              setActiveViewMode('tests');
+              setEditingPaperId(null);
+            }}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold transition-all cursor-pointer border border-slate-200 shadow-2xs"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -1317,12 +1529,29 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             {/* নতুন প্রশ্ন তৈরি করুন (স্থানান্তরিত: উপরে ব্যানার কার্ডে) */}
             <button
               type="button"
-              onClick={() => setShowCreationModeModal(true)}
+              onClick={() => {
+                setEditingPaperId(null);
+                setShowCreationModeModal(true);
+              }}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs active:scale-98"
               title="নতুন প্রশ্নপত্র বা পরীক্ষা তৈরি করুন"
             >
               <Plus className="w-4 h-4 text-white" />
               <span>নতুন প্রশ্ন তৈরি করুন</span>
+            </button>
+
+            {/* আমার প্রশ্ন লাইব্রেরি Tab Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveViewMode('tests');
+                onTabChange?.('library');
+              }}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs bg-indigo-50 border-indigo-200 text-indigo-900 hover:bg-indigo-100 hover:border-indigo-300"
+              title="সংরক্ষিত সকল প্রশ্নপত্র ও শিক্ষকের আর্কাইভ দেখুন"
+            >
+              <FolderArchive className="w-4 h-4 text-indigo-600" />
+              <span>প্রশ্ন লাইব্রেরি ({toBn(tests.length)})</span>
             </button>
 
             <button
@@ -1333,13 +1562,13 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 onTabChange?.('assigned');
               }}
               className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs ${
-                activeTab !== 'review' && filterMode === 'all'
+                activeTab === 'assigned' && filterMode === 'all'
                   ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
                   : 'bg-blue-50 border-blue-200 text-blue-900 hover:bg-blue-100 hover:border-blue-300'
               }`}
               title="সকল নির্ধারিত পরীক্ষা দেখুন"
             >
-              <FileText className={`w-4 h-4 ${activeTab !== 'review' && filterMode === 'all' ? 'text-white' : 'text-blue-600'}`} />
+              <FileText className={`w-4 h-4 ${activeTab === 'assigned' && filterMode === 'all' ? 'text-white' : 'text-blue-600'}`} />
               <span>নির্ধারিত পরীক্ষা: {toBn(tests.length)}টি</span>
             </button>
 
@@ -1706,10 +1935,63 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       )}
 
       {/* ======================================================== */}
+      {/* VIEW 5: শিক্ষকের নিজস্ব লাইব্রেরি ও প্রশ্ন আর্কাইভ (STEP 5) */}
+      {/* ======================================================== */}
+      {activeTab === 'library' && (
+        <TeacherQuestionLibrary
+          tests={tests}
+          onSaveTests={(updated) => {
+            setTests(updated);
+            saveStoredTests(updated);
+            updated.forEach(t => syncTestToServer(t));
+          }}
+          onEditPaper={handleEditPaperInBuilder}
+          onOpenCreateModal={() => {
+            onTabChange?.('assigned');
+            setActiveViewMode('builder');
+            setEditingPaperId(null);
+          }}
+          onDirectStartExam={onOpenTest}
+          onToast={showToast}
+        />
+      )}
+
+      {/* ======================================================== */}
       {/* VIEW 1: DUAL-MODE BUILDER: MANUAL OR AI                  */}
       {/* ======================================================== */}
-      {activeTab !== 'report' && activeTab !== 'games' && activeViewMode === 'builder' && (
+      {activeTab !== 'report' && activeTab !== 'games' && activeTab !== 'library' && activeViewMode === 'builder' && (
         <div className="space-y-6">
+          {/* Editing Mode Alert Banner */}
+          {editingPaperId && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-indigo-950 flex items-center gap-2">
+                    <span>প্রশ্নপত্র পরিমার্জন ও সংস্কার মোড</span>
+                    <span className="text-[10px] bg-indigo-200/80 text-indigo-900 font-bold px-2 py-0.5 rounded-full">
+                      লাইব্রেরি আপডেট
+                    </span>
+                  </h4>
+                  <p className="text-xs text-indigo-700">
+                    আপনি পূর্বের সংরক্ষিত প্রশ্নপত্রে পরিবর্তন বা বিকল্প প্রশ্ন প্রতিস্থাপন করছেন। কাজ শেষ হলে "পরিবর্তন লাইব্রেরিতে সেভ করুন" চাপুন।
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingPaperId(null);
+                  showToast('✓ পরিমার্জন মোড বাতিল করে নতুন প্রশ্ন তৈরির মোডে ফেরা হয়েছে।');
+                }}
+                className="text-xs font-bold text-slate-500 hover:text-slate-800 bg-white hover:bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-lg cursor-pointer shrink-0"
+              >
+                পরিমার্জন বাতিল
+              </button>
+            </div>
+          )}
           
           {/* Top Mode Switcher Bar */}
           <div className="bg-white rounded-2xl p-1.5 border border-slate-200 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5">
@@ -2384,9 +2666,113 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               </div>
             )}
 
+            {/* Bloom's Taxonomy Cognitive Balance Bar */}
+            {generatedQuestions.length > 0 && (() => {
+              const stats = calculateBloomStats(generatedQuestions);
+              return (
+                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border border-slate-800 shadow-lg space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300">
+                        <Brain className="w-4.5 h-4.5" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm sm:text-base font-black tracking-tight flex items-center gap-1.5">
+                          <span>ব্লুমস ট্যাক্সোনমি ও কগনিটিভ দক্ষতার ভারসাম্য (Bloom's Taxonomy)</span>
+                        </h4>
+                        <p className="text-[11px] text-slate-300 font-medium">
+                          NCTB ও জাতীয় শিক্ষাক্রমের আলোকে প্রতিটি স্তরের প্রশ্নের সুষম বণ্টন
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-200 bg-white/10 px-3 py-1 rounded-full border border-white/15 self-start sm:self-auto">
+                      মোট প্রশ্ন: {toBn(generatedQuestions.length)}টি
+                    </span>
+                  </div>
+
+                  {/* Visual Multi-Segment Bar */}
+                  <div className="h-3 w-full bg-slate-800 rounded-full overflow-hidden flex shadow-inner border border-slate-700/50">
+                    <div 
+                      style={{ width: `${stats.percentages.knowledge}%` }} 
+                      className="bg-blue-500 h-full transition-all" 
+                      title={`জ্ঞানমূলক: ${stats.counts.knowledge}টি (${stats.percentages.knowledge}%)`} 
+                    />
+                    <div 
+                      style={{ width: `${stats.percentages.comprehension}%` }} 
+                      className="bg-emerald-500 h-full transition-all" 
+                      title={`অনুধাবনমূলক: ${stats.counts.comprehension}টি (${stats.percentages.comprehension}%)`} 
+                    />
+                    <div 
+                      style={{ width: `${stats.percentages.application}%` }} 
+                      className="bg-amber-500 h-full transition-all" 
+                      title={`প্রয়োগমূলক: ${stats.counts.application}টি (${stats.percentages.application}%)`} 
+                    />
+                    <div 
+                      style={{ width: `${stats.percentages.higher_order}%` }} 
+                      className="bg-purple-500 h-full transition-all" 
+                      title={`উচ্চতর দক্ষতা: ${stats.counts.higher_order}টি (${stats.percentages.higher_order}%)`} 
+                    />
+                  </div>
+
+                  {/* 4 Interactive Level Chips with standard benchmark */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+                    {/* Knowledge */}
+                    <div className="p-2.5 rounded-xl bg-blue-500/15 border border-blue-400/30">
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="flex items-center gap-1 text-blue-300">
+                          <span>📘</span> জ্ঞানমূলক
+                        </span>
+                        <span className="font-mono text-white font-black">{toBn(stats.counts.knowledge)}টি ({toBn(stats.percentages.knowledge)}%)</span>
+                      </div>
+                      <span className="text-[10px] text-blue-200/70 block mt-0.5">বোর্ড মান: ৪০% (সংজ্ঞা/সূত্র)</span>
+                    </div>
+
+                    {/* Comprehension */}
+                    <div className="p-2.5 rounded-xl bg-emerald-500/15 border border-emerald-400/30">
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="flex items-center gap-1 text-emerald-300">
+                          <span>📗</span> অনুধাবনমূলক
+                        </span>
+                        <span className="font-mono text-white font-black">{toBn(stats.counts.comprehension)}টি ({toBn(stats.percentages.comprehension)}%)</span>
+                      </div>
+                      <span className="text-[10px] text-emerald-200/70 block mt-0.5">বোর্ড মান: ৩০% (অর্থ/ব্যাখ্যা)</span>
+                    </div>
+
+                    {/* Application */}
+                    <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-400/30">
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="flex items-center gap-1 text-amber-300">
+                          <span>📙</span> প্রয়োগমূলক
+                        </span>
+                        <span className="font-mono text-white font-black">{toBn(stats.counts.application)}টি ({toBn(stats.percentages.application)}%)</span>
+                      </div>
+                      <span className="text-[10px] text-amber-200/70 block mt-0.5">বোর্ড মান: ২০% (অংক/গণনা)</span>
+                    </div>
+
+                    {/* Higher Order */}
+                    <div className="p-2.5 rounded-xl bg-purple-500/15 border border-purple-400/30">
+                      <div className="flex items-center justify-between font-bold">
+                        <span className="flex items-center gap-1 text-purple-300">
+                          <span>📕</span> উচ্চতর দক্ষতা
+                        </span>
+                        <span className="font-mono text-white font-black">{toBn(stats.counts.higher_order)}টি ({toBn(stats.percentages.higher_order)}%)</span>
+                      </div>
+                      <span className="text-[10px] text-purple-200/70 block mt-0.5">বোর্ড মান: ১০% (বিশ্লেষণ/যুক্তি)</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Questions List */}
             <div className="space-y-4">
               {(generatedQuestions || []).map((q, qIndex) => {
+                const currentBloom = q.cognitiveLevel 
+                  ? normalizeBloomLevel(q.cognitiveLevel) 
+                  : inferBloomLevelFromQuestion(q.question, q.explanation);
+                const bloomMeta = BLOOM_LEVELS[currentBloom];
+                const isEditingSol = Boolean(editingSolutionIndices[qIndex]);
+
                 return (
                   <div 
                     key={q.id || `q_${qIndex}`}
@@ -2404,9 +2790,9 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                       </div>
                     )}
 
-                    {/* Question Header Meta Badges: Chapter, Difficulty, Cognitive Level */}
-                    {(q.chapter || q.difficulty || q.cognitiveLevel) && (
-                      <div className="flex flex-wrap items-center gap-1.5 pb-1">
+                    {/* Question Header Meta Badges: Chapter, Difficulty, & Interactive Bloom's Taxonomy Level Selector */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-1 border-b border-slate-200/70">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         {q.chapter && (
                           <span className="px-2 py-0.5 rounded-md bg-blue-100/90 text-blue-900 text-[10px] font-bold border border-blue-200">
                             📖 {q.chapter}
@@ -2421,15 +2807,27 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                             {q.difficulty === 'easy' ? '🟢 সহজ' : q.difficulty === 'hard' ? '🔴 কঠিন' : '🟡 মাঝারি'}
                           </span>
                         )}
-                        {q.cognitiveLevel && (
-                          <span className="px-2 py-0.5 rounded-md bg-purple-100/90 text-purple-900 text-[10px] font-bold border border-purple-200">
-                            🧠 {q.cognitiveLevel === 'knowledge' ? 'জ্ঞান' :
-                               q.cognitiveLevel === 'comprehension' ? 'অনুধাবন' :
-                               q.cognitiveLevel === 'application' ? 'প্রয়োগ' : 'উচ্চতর দক্ষতা'}
-                          </span>
-                        )}
                       </div>
-                    )}
+
+                      {/* Interactive Bloom's Taxonomy Cognitive Level Dropdown Selector */}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">ট্যাক্সোনমি স্তর:</span>
+                        <div className="relative inline-flex items-center">
+                          <select
+                            value={currentBloom}
+                            onChange={(e) => handleUpdateCognitiveLevel(qIndex, e.target.value as BloomLevel)}
+                            className={`text-[11px] font-black pl-2 pr-6 py-1 rounded-lg border shadow-2xs appearance-none cursor-pointer transition-colors focus:outline-none focus:ring-1 focus:ring-purple-400 ${bloomMeta.badgeBg} ${bloomMeta.badgeBorder}`}
+                            title="ব্লুমস ট্যাক্সোনমি অনুযায়ী এই প্রশ্নের কগনিটিভ স্তর পরিবর্তন করুন"
+                          >
+                            <option value="knowledge">📘 জ্ঞানমূলক (Knowledge)</option>
+                            <option value="comprehension">📗 অনুধাবনমূলক (Comprehension)</option>
+                            <option value="application">📙 প্রয়োগমূলক (Application)</option>
+                            <option value="higher_order">📕 উচ্চতর দক্ষতা (Higher Order)</option>
+                          </select>
+                          <ChevronDown className="w-3 h-3 absolute right-1.5 pointer-events-none text-slate-600" />
+                        </div>
+                      </div>
+                    </div>
 
                     {/* Stimulus / উদ্দীপক (যদি উদ্দীপকভিত্তিক প্রশ্ন হয়) */}
                     {q.stimulus && (
@@ -2480,7 +2878,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                       </div>
                     </div>
 
-                    {/* 2. 4 Clean Options (Left column strictly aligned with Question Number, no 'সঠিক' / 'টিক দিন' labels) */}
+                    {/* 2. 4 Clean Options */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 pt-1">
                       {(q.options || ['', '', '', '']).map((opt, optIndex) => {
                         const isCorrect = (q.correctAnswer && q.correctAnswer === opt && opt !== '') ||
@@ -2493,7 +2891,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                             onClick={() => handleSetCorrectAnswerByIndex(qIndex, optIndex)}
                             className="flex items-center gap-2.5 py-1.5 rounded-lg bg-transparent hover:bg-slate-200/40 transition-colors cursor-pointer group/opt"
                           >
-                            {/* Tick / Letter Circle Button - exactly w-8 h-8 matching question serial badge */}
+                            {/* Tick / Letter Circle Button */}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -2526,31 +2924,49 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                       })}
                     </div>
 
-                    {/* 3. Collapsible Detailed Solutions Section (At least 2 methods, hidden by default, not visible to student during exam) */}
+                    {/* 3. Detailed Step-by-Step Explanation & Multi-Method Solution with Direct Editing */}
                     <div className="pt-2 border-t border-slate-200/70 mt-1 flex flex-col gap-2">
                       <div className="flex items-center justify-between flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => toggleSolution(qIndex)}
-                          className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50/90 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-200/80 transition-all cursor-pointer shadow-2xs"
-                          title="এই প্রশ্নের বিস্তারিত সমাধান ও বিকল্প কৌশল দেখতে ক্লিক করুন"
-                        >
-                          <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                          <span>{expandedSolutions[qIndex] ? 'বিস্তারিত সমাধান লুকান' : 'বিস্তারিত সমাধান দেখুন (২টি পদ্ধতি)'}</span>
-                          <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedSolutions[qIndex] ? 'rotate-180' : ''}`} />
-                        </button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => toggleSolution(qIndex)}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-900 bg-blue-50/90 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-200/80 transition-all cursor-pointer shadow-2xs"
+                            title="এই প্রশ্নের বিস্তারিত সমাধান ও বিকল্প কৌশল দেখতে ক্লিক করুন"
+                          >
+                            <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                            <span>{expandedSolutions[qIndex] ? 'বিস্তারিত সমাধান লুকান' : 'বিস্তারিত সমাধান দেখুন (২টি পদ্ধতি)'}</span>
+                            <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedSolutions[qIndex] ? 'rotate-180' : ''}`} />
+                          </button>
+
+                          {/* Explanation & Steps Edit Mode Toggle Button */}
+                          <button
+                            type="button"
+                            onClick={() => toggleEditSolution(qIndex)}
+                            className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl border transition-all cursor-pointer shadow-2xs ${
+                              isEditingSol
+                                ? 'bg-purple-600 text-white border-purple-700'
+                                : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200'
+                            }`}
+                            title="এই প্রশ্নের তাত্ত্বিক ও গাণিতিক ব্যাখ্যা এবং ২টি সমাধান পদ্ধতি এডিট করুন"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>{isEditingSol ? '✓ এডিট শেষ' : 'ব্যাখ্যা ও পদ্ধতি এডিট'}</span>
+                          </button>
+                        </div>
+
                         <span className="text-[11px] text-slate-500 font-medium italic">
                           (সন্তান পরীক্ষার সময় কোনো সমাধান দেখতে পাবে না)
                         </span>
                       </div>
 
-                      {/* Expanded Solution Content */}
+                      {/* Expanded Solution Content with Interactive Editor */}
                       {expandedSolutions[qIndex] && (
                         <div className="p-3.5 sm:p-4 rounded-xl bg-slate-50/90 border border-slate-200 space-y-3 animate-in fade-in slide-in-from-top-1 text-xs leading-relaxed text-slate-800">
-                          <div className="flex items-center justify-between pb-2 border-b border-slate-200/80">
+                          <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 flex-wrap gap-2">
                             <span className="font-black text-slate-900 flex items-center gap-1.5">
                               <BookOpen className="w-4 h-4 text-blue-600" />
-                              <span>অংকের গাণিতিক সমাধান ও বিকল্প পদ্ধতিসমূহ:</span>
+                              <span>তাত্ত্বিক ও গাণিতিক সমাধান (ব্লুমস স্তর: {bloomMeta.banglaName}):</span>
                             </span>
                             {q.correctAnswer && (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
@@ -2559,7 +2975,27 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                             )}
                           </div>
 
-                          {/* Render the 2+ methods */}
+                          {/* Main Explanation Field (Editable or Static View) */}
+                          <div className="p-3 rounded-xl bg-white border border-slate-200 space-y-1">
+                            <label className="block text-[11px] font-black text-slate-700 uppercase tracking-wide">
+                              মূল তাত্ত্বিক / কনসেপ্ট ব্যাখ্যা:
+                            </label>
+                            {isEditingSol ? (
+                              <textarea
+                                rows={2}
+                                value={q.explanation || ''}
+                                onChange={(e) => handleUpdateExplanation(qIndex, e.target.value)}
+                                placeholder="পাঠ্যবইয়ের সূত্র বা মৌলিক ধারণার ব্যাখ্যা লিখুন..."
+                                className="w-full text-xs font-medium p-2 rounded-lg border border-purple-300 focus:border-purple-600 focus:ring-1 focus:ring-purple-300 outline-none text-slate-900"
+                              />
+                            ) : (
+                              <p className="text-slate-800 font-medium">
+                                {q.explanation || 'সংশ্লিষ্ট পাঠ্যবইয়ের অধ্যায়ভিত্তিক মূলনীতি ও সূত্রানুসারে এই প্রশ্নের সমাধান প্রযোজ্য।'}
+                              </p>
+                            )}
+                          </div>
+
+                          {/* 2 Step-by-Step Methods (Method 1: Formula/Curriculum, Method 2: Shortcut/Alternative) */}
                           {(() => {
                             const solutions = (q.solutions && q.solutions.length >= 2)
                               ? q.solutions
@@ -2588,15 +3024,43 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                                           {isMethod1 ? 'পদ্ধতি ১: বইয়ের নিয়ম ও বিস্তারিত সূত্র প্রয়োগ' : 'পদ্ধতি ২: সহজ শর্টকাট / বিকল্প কৌশল'}
                                         </span>
                                       </div>
-                                      <div className="pl-6.5 text-slate-700 whitespace-pre-line font-medium leading-relaxed">
-                                        {sol}
-                                      </div>
+
+                                      {isEditingSol ? (
+                                        <textarea
+                                          rows={2}
+                                          value={sol}
+                                          onChange={(e) => handleUpdateSolutionMethod(qIndex, sIdx, e.target.value)}
+                                          placeholder={`পদ্ধতি ${toBn(sIdx + 1)} এর বিস্তারিত ধাপ লিখুন...`}
+                                          className={`w-full text-xs font-medium p-2 rounded-lg border outline-none ${
+                                            isMethod1 
+                                              ? 'border-blue-300 focus:border-blue-600 focus:ring-1 focus:ring-blue-300 text-blue-950 bg-white' 
+                                              : 'border-amber-300 focus:border-amber-600 focus:ring-1 focus:ring-amber-300 text-amber-950 bg-white'
+                                          }`}
+                                        />
+                                      ) : (
+                                        <div className="pl-6.5 text-slate-700 whitespace-pre-line font-medium leading-relaxed">
+                                          {sol}
+                                        </div>
+                                      )}
                                     </div>
                                   );
                                 })}
                               </div>
                             );
                           })()}
+
+                          {isEditingSol && (
+                            <div className="flex justify-end pt-1">
+                              <button
+                                type="button"
+                                onClick={() => toggleEditSolution(qIndex)}
+                                className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                                <span>সম্পাদনা সংরক্ষণ করুন</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -2617,27 +3081,39 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 <span>আরও একটি প্রশ্ন যোগ করুন</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleFinalizeExam}
-                className={`w-full sm:w-auto px-8 py-3 rounded-2xl font-bold text-sm sm:text-base shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 ${
-                  isFinalized
-                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200/80 ring-2 ring-emerald-300'
-                    : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-emerald-200/80'
-                }`}
-              >
-                {isFinalized ? (
-                  <>
-                    <Check className="w-5 h-5 stroke-[3] text-emerald-100" />
-                    <span>✓ প্রশ্নপত্র সংরক্ষিত! লিংক প্রস্তুত</span>
-                  </>
-                ) : (
-                  <>
-                    <ArrowRight className="w-5 h-5" />
-                    <span>প্রশ্নপত্র চূড়ান্ত করুন ও ৬-সংখ্যার পিন লিংক পান</span>
-                  </>
-                )}
-              </button>
+              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={handleSaveToLibraryDirect}
+                  className="flex-1 sm:flex-initial px-5 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95"
+                  title="প্রশ্নপত্রটি শিক্ষকের প্রশ্ন লাইব্রেরিতে সংরক্ষণ করুন"
+                >
+                  <Save className="w-4 h-4 text-indigo-200" />
+                  <span>{editingPaperId ? 'পরিবর্তন লাইব্রেরিতে সেভ করুন' : 'লাইব্রেরিতে সংরক্ষণ করুন'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleFinalizeExam}
+                  className={`flex-1 sm:flex-initial px-7 py-3 rounded-2xl font-bold text-xs sm:text-sm shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-95 ${
+                    isFinalized
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200/80 ring-2 ring-emerald-300'
+                      : 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white shadow-emerald-200/80'
+                  }`}
+                >
+                  {isFinalized ? (
+                    <>
+                      <Check className="w-4 h-4 stroke-[3] text-emerald-100" />
+                      <span>✓ প্রশ্নপত্র সংরক্ষিত! লিংক প্রস্তুত</span>
+                    </>
+                  ) : (
+                    <>
+                      <ArrowRight className="w-4 h-4" />
+                      <span>প্রশ্ন চূড়ান্ত করুন ও পিন পান</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -2647,7 +3123,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* ======================================================== */}
       {/* VIEW 2: TESTS LIST & EVALUATION (SUBMITTED EXAMS)        */}
       {/* ======================================================== */}
-      {activeTab !== 'report' && activeTab !== 'games' && activeViewMode === 'tests' && (
+      {activeTab !== 'report' && activeTab !== 'games' && activeTab !== 'library' && activeViewMode === 'tests' && (
         <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
@@ -2973,6 +3449,30 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                         )}
                       </div>
 
+                      {/* 2b. Action Button: A4 প্রিন্ট ও স্কুল ফরম্যাট (দ্বৈত মোড - অফলাইন ক্লাসরুম পরীক্ষা) */}
+                      <button
+                        type="button"
+                        onClick={() => setPrintModalTest(test)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold transition-all shadow-2xs hover:scale-102 cursor-pointer active:scale-95"
+                        title="স্কুলের জন্য অফিসিয়াল ২-কলাম A4 প্রিন্ট ও উত্তরমালা ফরম্যাট খুলুন"
+                      >
+                        <Printer className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>A4 প্রিন্ট</span>
+                      </button>
+
+                      {/* 2c. Action Button: এডিট / সংস্কার */}
+                      {isPending && (
+                        <button
+                          type="button"
+                          onClick={() => handleEditPaperInBuilder(test)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                          title="প্রশ্নপত্রটি পুনরায় এডিট বা পরিবর্তন করুন"
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-indigo-600" />
+                          <span>এডিট</span>
+                        </button>
+                      )}
+
                       {/* 3. Action Button: প্রশ্নপত্র দেখুন (যদি এখনও জমা না দেয় - এর পাশে কোন সময় থাকবে না) */}
                       {isPending && (
                         <button
@@ -3028,7 +3528,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* VIEW 3: INSTITUTION & BOARD PAPERS FULL EXPLORER         */}
       {/* (কোনো পপাপ নয় - সরাসরি ড্যাশবোর্ড ক্যানভাসে উন্মুক্ত ভিউ)  */}
       {/* ======================================================== */}
-      {activeTab !== 'report' && activeTab !== 'games' && activeViewMode === 'institution_papers' && (
+      {activeTab !== 'report' && activeTab !== 'games' && activeTab !== 'library' && activeViewMode === 'institution_papers' && (
         <InstitutionPaperExplorer
           onBack={() => setActiveViewMode('tests')}
           onSelectPaper={handleSelectInstitutionPaper}
@@ -3071,12 +3571,16 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => window.print()}
-                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-300 hover:bg-slate-200 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
-                  title="প্রশ্নপত্র প্রিন্ট বা PDF হিসেবে সংরক্ষণ করুন"
+                  onClick={() => {
+                    const target = previewPaperTest;
+                    setPreviewPaperTest(null);
+                    setPrintModalTest(target);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-blue-400 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+                  title="স্কুলের জন্য অফিসিয়াল ২-কলাম A4 প্রিন্ট ও উত্তরমালা ফরম্যাট খুলুন"
                 >
-                  <Printer className="w-4 h-4" />
-                  <span>প্রিন্ট</span>
+                  <Printer className="w-4 h-4 text-blue-600" />
+                  <span>A4 প্রিন্ট ফরম্যাট</span>
                 </button>
                 <button
                   type="button"
@@ -3090,56 +3594,92 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
             {/* Questions List Body */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-              {(previewPaperTest.questions || []).map((q, idx) => (
-                <div key={q.id || idx} className="bg-slate-50/80 rounded-2xl p-4 sm:p-5 border border-slate-200/90 space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
-                      {toBn(idx + 1)}
-                    </span>
-                    <p className="text-sm font-bold text-slate-900 leading-relaxed">
-                      {q.question}
-                    </p>
-                  </div>
+              {(previewPaperTest.questions || []).map((q, idx) => {
+                const bLevel = q.cognitiveLevel 
+                  ? normalizeBloomLevel(q.cognitiveLevel) 
+                  : inferBloomLevelFromQuestion(q.question, q.explanation);
+                const bMeta = BLOOM_LEVELS[bLevel];
+                const solutions = (q.solutions && q.solutions.length >= 2)
+                  ? q.solutions
+                  : generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation);
 
-                  {/* Options Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-8">
-                    {(q.options || []).map((opt, optIdx) => {
-                      const isCorrect = opt.trim() === q.correctAnswer?.trim();
-                      return (
-                        <div
-                          key={optIdx}
-                          className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-between gap-2 transition-all ${
-                            isCorrect 
-                              ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-bold shadow-2xs' 
-                              : 'bg-white border-slate-200 text-slate-700'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold flex items-center justify-center">
-                              {['ক', 'খ', 'গ', 'ঘ'][optIdx] || optIdx + 1}
-                            </span>
-                            <span>{opt}</span>
-                          </div>
-                          {isCorrect && (
-                            <span className="text-[11px] text-emerald-700 font-black flex items-center gap-1 shrink-0">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                              <span>সঠিক উত্তর</span>
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                return (
+                  <div key={q.id || idx} className="bg-slate-50/80 rounded-2xl p-4 sm:p-5 border border-slate-200/90 space-y-3">
+                    {/* Header: Serials + Bloom's Taxonomy badge */}
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                        <span className="w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                          {toBn(idx + 1)}
+                        </span>
+                        <p className="text-sm font-bold text-slate-900 leading-relaxed">
+                          {q.question}
+                        </p>
+                      </div>
 
-                  {/* Explanation if available */}
-                  {q.explanation && (
-                    <div className="ml-8 mt-2 p-2.5 rounded-xl bg-amber-50/70 border border-amber-200 text-xs text-amber-900 leading-relaxed font-medium">
-                      <span className="font-bold">ব্যাখ্যা: </span>
-                      <span>{q.explanation}</span>
+                      {/* Bloom's Cognitive Badge */}
+                      <span className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold border shrink-0 ${bMeta.badgeBg} ${bMeta.badgeBorder}`}>
+                        {bMeta.icon} {bMeta.banglaName}
+                      </span>
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    {/* Options Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-8">
+                      {(q.options || []).map((opt, optIdx) => {
+                        const isCorrect = opt.trim() === q.correctAnswer?.trim();
+                        return (
+                          <div
+                            key={optIdx}
+                            className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center justify-between gap-2 transition-all ${
+                              isCorrect 
+                                ? 'bg-emerald-50 border-emerald-400 text-emerald-900 font-bold shadow-2xs' 
+                                : 'bg-white border-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-bold flex items-center justify-center">
+                                {['ক', 'খ', 'গ', 'ঘ'][optIdx] || optIdx + 1}
+                              </span>
+                              <span>{opt}</span>
+                            </div>
+                            {isCorrect && (
+                              <span className="text-[11px] text-emerald-700 font-black flex items-center gap-1 shrink-0">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>সঠিক উত্তর</span>
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Step-by-Step Explanation & Methods Guide */}
+                    {(q.explanation || (solutions && solutions.length > 0)) && (
+                      <div className="ml-8 mt-2 p-3 rounded-xl bg-amber-50/70 border border-amber-200/90 text-xs text-amber-950 space-y-2">
+                        {q.explanation && (
+                          <div className="leading-relaxed">
+                            <span className="font-bold text-amber-900">তাত্ত্বিক ব্যাখ্যা: </span>
+                            <span>{q.explanation}</span>
+                          </div>
+                        )}
+
+                        {/* 2 Methods */}
+                        {solutions && solutions.length > 0 && (
+                          <div className="space-y-1.5 pt-1 border-t border-amber-200/60">
+                            {solutions.map((sol, sIdx) => (
+                              <div key={sIdx} className="text-[11px] leading-relaxed">
+                                <strong className="text-amber-900 font-bold">
+                                  {sIdx === 0 ? '• পদ্ধতি ১ (বইয়ের নিয়ম): ' : '• পদ্ধতি ২ (শর্টকাট কৌশল): '}
+                                </strong>
+                                <span className="text-slate-800">{sol}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Modal Footer */}
@@ -3252,15 +3792,60 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 </p>
               </div>
 
+              {/* Dual Mode Choices: Online Live Exam vs Offline School Print */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                {/* Mode A: Online Live Exam */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = createdTestResult;
+                    setCreatedTestResult(null);
+                    onOpenTest(target);
+                  }}
+                  className="p-3.5 rounded-2xl border-2 border-blue-500 bg-blue-50/80 hover:bg-blue-100 text-left transition-all cursor-pointer group shadow-2xs"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-6 h-6 rounded-lg bg-blue-600 text-white flex items-center justify-center">
+                      <Globe className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-black text-xs text-blue-950">১. অনলাইনে লাইভ পরীক্ষা</span>
+                  </div>
+                  <p className="text-[11px] text-blue-800 leading-tight font-medium">
+                    ওয়েবক্যাম প্রক্টরিং, টাইমার ও স্বয়ংক্রিয় খাতা মূল্যায়ন
+                  </p>
+                </button>
+
+                {/* Mode B: Offline Classroom A4 Print */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = createdTestResult;
+                    setCreatedTestResult(null);
+                    setPrintModalTest(target);
+                  }}
+                  className="p-3.5 rounded-2xl border-2 border-emerald-500 bg-emerald-50/80 hover:bg-emerald-100 text-left transition-all cursor-pointer group shadow-2xs"
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center">
+                      <Printer className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="font-black text-xs text-emerald-950">২. অফলাইনে A4 প্রিন্ট</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800 leading-tight font-medium">
+                    স্কুলের জন্য ২-কলাম প্রশ্নপত্র ও শিক্ষকের উত্তরমালা প্রিন্ট
+                  </p>
+                </button>
+              </div>
+
               {/* Direct WhatsApp Share & Dismiss */}
               <div className="flex items-center gap-3 pt-2">
                 <a
                   href={`https://wa.me/?text=${encodeURIComponent(
-                    `তোমার জন্য একটি নতুন অনলাইন পরীক্ষা নির্ধারণ করা হয়েছে: ${createdTestResult.title}\nসরাসরি পরীক্ষা দেওয়ার লিংক:\n${getShareableTestUrl(createdTestResult)}\n\n(অথবা ৬-সংখ্যার পিন: ${createdTestResult.pin})`
+                    `তোমার জন্য একটি নতুন পরীক্ষা নির্ধারণ করা হয়েছে: ${createdTestResult.title}\nসরাসরি পরীক্ষা দেওয়ার লিংক:\n${getShareableTestUrl(createdTestResult)}\n\n(অথবা ৬-সংখ্যার পিন: ${createdTestResult.pin})`
                   )}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-colors"
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-colors"
                 >
                   <Share2 className="w-4 h-4" />
                   <span>হোয়াটসঅ্যাপে পাঠান</span>
@@ -3272,7 +3857,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                     setCreatedTestResult(null);
                     setActiveViewMode('tests');
                   }}
-                  className="py-3 px-5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold transition-colors cursor-pointer"
+                  className="py-2.5 px-5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold transition-colors cursor-pointer"
                 >
                   সম্পন্ন
                 </button>
@@ -3391,8 +3976,17 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             </div>
 
             {/* Questions breakdown */}
-            <div className="max-h-60 overflow-y-auto space-y-3 pr-2">
-              <h4 className="text-xs font-bold text-slate-500">উত্তরপত্র বিস্তারিত:</h4>
+            <div className="max-h-72 overflow-y-auto space-y-3.5 pr-2">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                <h4 className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                  <BookOpen className="w-4 h-4 text-blue-600" />
+                  <span>উত্তরপত্র ও বিস্তারিত সমাধান মূল্যায়ন:</span>
+                </h4>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  ব্লুমস ট্যাক্সোনমি ও ধাপে ধাপে ব্যাখ্যা সহ
+                </span>
+              </div>
+
               {(reviewTest.questions || []).length === 0 ? (
                 <div className="p-4 text-center text-slate-400 bg-slate-50 rounded-xl">
                   কোনো প্রশ্ন পাওয়া যায়নি।
@@ -3400,43 +3994,95 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               ) : (
                 (reviewTest.questions || []).map((q, idx) => {
                   const isCorrect = q.studentAnswer === q.correctAnswer;
+                  const bLevel = q.cognitiveLevel 
+                    ? normalizeBloomLevel(q.cognitiveLevel) 
+                    : inferBloomLevelFromQuestion(q.question, q.explanation);
+                  const bMeta = BLOOM_LEVELS[bLevel];
+                  const solutions = (q.solutions && q.solutions.length >= 2)
+                    ? q.solutions
+                    : generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation);
+
                   return (
-                    <div key={q.id || `rq_${idx}`} className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-bold text-slate-900">
-                        {toBn(idx + 1)}. {q.question}
-                      </span>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {q.responseTimeSeconds !== undefined && (
-                          <span className={`px-2 py-0.5 rounded font-bold text-[10.5px] border ${
-                            q.responseTimeSeconds < 2.2
-                              ? 'bg-rose-50 text-rose-700 border-rose-300 flex items-center gap-1'
-                              : 'bg-slate-100 text-slate-600 border-slate-200'
-                          }`}>
-                            {q.responseTimeSeconds < 2.2 && <Zap className="w-2.5 h-2.5 text-rose-600 animate-pulse" />}
-                            <span>{q.responseTimeSeconds < 2.2 ? 'অতি দ্রুত: ' : 'ব্যয়িত সময়: '}{toBn(q.responseTimeSeconds)} সে.</span>
+                    <div key={q.id || `rq_${idx}`} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start gap-2 flex-1 min-w-0">
+                          <span className="w-5 h-5 rounded-full bg-blue-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0 mt-0.5">
+                            {toBn(idx + 1)}
                           </span>
-                        )}
-                        <span className={`px-2 py-0.5 rounded font-bold text-[11px] ${
-                          isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                        }`}>
-                          {isCorrect ? '✓ সঠিক' : '✗ ভুল'}
-                        </span>
+                          <span className="font-bold text-slate-900 leading-snug">
+                            {q.question}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                          {/* Bloom's Taxonomy Badge */}
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${bMeta.badgeBg} ${bMeta.badgeBorder}`}>
+                            {bMeta.icon} {bMeta.banglaName}
+                          </span>
+
+                          {q.responseTimeSeconds !== undefined && (
+                            <span className={`px-2 py-0.5 rounded font-bold text-[10px] border ${
+                              q.responseTimeSeconds < 2.2
+                                ? 'bg-rose-50 text-rose-700 border-rose-300 flex items-center gap-1'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}>
+                              {q.responseTimeSeconds < 2.2 && <Zap className="w-2.5 h-2.5 text-rose-600 animate-pulse" />}
+                              <span>{q.responseTimeSeconds < 2.2 ? 'অতি দ্রুত: ' : 'সময়: '}{toBn(q.responseTimeSeconds)} সে.</span>
+                            </span>
+                          )}
+
+                          <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10.5px] ${
+                            isCorrect ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : 'bg-rose-100 text-rose-800 border border-rose-200'
+                          }`}>
+                            {isCorrect ? '✓ সঠিক' : '✗ ভুল'}
+                          </span>
+                        </div>
                       </div>
+
+                      {/* Student Answer vs Correct Answer */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200/70 text-[11.5px]">
+                        <div className={`p-2 rounded-xl border ${
+                          isCorrect ? 'bg-emerald-50/70 border-emerald-200 text-emerald-950' : 'bg-rose-50/70 border-rose-200 text-rose-950'
+                        }`}>
+                          <span className="text-slate-500 font-medium block text-[10px]">সন্তানের উত্তর:</span>
+                          <span className="font-bold">{q.studentAnswer || '(উত্তর দেয়নি)'}</span>
+                        </div>
+
+                        <div className="p-2 rounded-xl border bg-emerald-50/70 border-emerald-200 text-emerald-950">
+                          <span className="text-slate-500 font-medium block text-[10px]">সঠিক উত্তর:</span>
+                          <span className="font-bold text-emerald-800">{q.correctAnswer}</span>
+                        </div>
+                      </div>
+
+                      {/* Step-by-Step Explanation & Method 1 + 2 */}
+                      {(q.explanation || (solutions && solutions.length > 0)) && (
+                        <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/80 text-amber-950 text-[11px] leading-relaxed space-y-1.5 mt-1">
+                          {q.explanation && (
+                            <div>
+                              <strong className="text-amber-900 font-bold">তাত্ত্বিক ব্যাখ্যা: </strong>
+                              <span className="text-slate-800">{q.explanation}</span>
+                            </div>
+                          )}
+
+                          {solutions && solutions.length > 0 && (
+                            <div className="space-y-1 pt-1 border-t border-amber-200/60">
+                              {solutions.map((sol, sIdx) => (
+                                <div key={sIdx}>
+                                  <strong className="text-amber-900 font-bold">
+                                    {sIdx === 0 ? '• পদ্ধতি ১ (সূত্র প্রয়োগ): ' : '• পদ্ধতি ২ (শর্টকাট কৌশল): '}
+                                  </strong>
+                                  <span className="text-slate-800">{sol}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-slate-600">
-                      <span>সন্তানের দেওয়া উত্তর: </span>
-                      <span className="font-bold text-slate-800">{q.studentAnswer || 'উত্তর দেয়নি'}</span>
-                    </div>
-                    <div className="text-slate-600">
-                      <span>সঠিক উত্তর: </span>
-                      <span className="font-bold text-emerald-700">{q.correctAnswer}</span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                  );
+                })
+              )}
+            </div>
 
             {/* Parent Feedback & Score Input */}
             <div className="space-y-4 pt-2 border-t border-slate-100">
@@ -3984,6 +4630,15 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Official 2-Column A4 Printable Question Paper Modal (Dual Mode - Classroom & Offline Exam) */}
+      {printModalTest && (
+        <PrintableQuestionPaperModal
+          test={printModalTest}
+          onClose={() => setPrintModalTest(null)}
+          onLaunchOnlineExam={onOpenTest}
+        />
       )}
 
     </div>

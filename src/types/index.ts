@@ -50,6 +50,10 @@ export interface AssignedTest {
   questions: ExamQuestion[];
   submittedAt?: string;
   parentPhone?: string;
+  studentClass?: string;
+  isSavedToLibrary?: boolean;
+  customTags?: string[];
+  lastModifiedAt?: string;
 }
 
 export interface StudentSubmission {

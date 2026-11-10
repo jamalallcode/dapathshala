@@ -18,6 +18,8 @@ import {
 import { AssignedTest, ViolationSnapshot, ExamQuestion } from "../../types";
 import { startAudioMonitoring, AudioProctoringController } from "../../lib/audioProctoringService";
 import { startObjectDetection, ObjectDetectionController, DetectedObjectResult } from "../../lib/objectDetectionService";
+import { BLOOM_LEVELS, BloomLevel, normalizeBloomLevel, inferBloomLevelFromQuestion } from "../../lib/bloomTaxonomy";
+import { generateTwoSolutions } from "../../lib/curriculumQuestions";
 
 interface LiveExamEngineProps {
   test: AssignedTest;
@@ -2017,14 +2019,27 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 )}
 
                 {showGrading && (
-                  <span
-                    className={`text-xs font-bold px-2.5 py-0.5 rounded-full shrink-0 flex items-center gap-1 ${
-                      isCorrect ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
-                    }`}
-                  >
-                    {isCorrect ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                    <span>{isCorrect ? "সঠিক" : "ভুল"}</span>
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                    {(() => {
+                      const bLevel = q.cognitiveLevel 
+                        ? normalizeBloomLevel(q.cognitiveLevel) 
+                        : inferBloomLevelFromQuestion(q.question, q.explanation);
+                      const bMeta = BLOOM_LEVELS[bLevel];
+                      return (
+                        <span className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold border ${bMeta.badgeBg} ${bMeta.badgeBorder}`}>
+                          {bMeta.icon} {bMeta.banglaName}
+                        </span>
+                      );
+                    })()}
+                    <span
+                      className={`text-xs font-bold px-2.5 py-0.5 rounded-full shrink-0 flex items-center gap-1 ${
+                        isCorrect ? "bg-emerald-100 text-emerald-800 border border-emerald-200" : "bg-rose-100 text-rose-800 border border-rose-200"
+                      }`}
+                    >
+                      {isCorrect ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                      <span>{isCorrect ? "সঠিক" : "ভুল"}</span>
+                    </span>
+                  </div>
                 )}
               </div>
 
@@ -2114,11 +2129,65 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 })}
               </div>
 
-              {/* Solution / Explanation on Review */}
-              {showGrading && q.explanation && (
-                <div className="mt-3.5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed">
-                  <span className="font-bold text-slate-800 block mb-0.5">ব্যাখ্যা ও সমাধান:</span>
-                  {q.explanation}
+              {/* Solution / Explanation & Step-by-Step 2 Methods on Review */}
+              {showGrading && (
+                <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-200/80 flex-wrap gap-2">
+                    <span className="font-bold text-slate-900 flex items-center gap-1.5 text-xs sm:text-sm">
+                      <BookOpen className="w-4 h-4 text-blue-600" />
+                      <span>তাত্ত্বিক ও গাণিতিক সমাধান নির্দেশিকা:</span>
+                    </span>
+                    <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      সঠিক উত্তর: {q.correctAnswer}
+                    </span>
+                  </div>
+
+                  {q.explanation && (
+                    <div className="p-3 rounded-xl bg-white border border-slate-200/90 text-slate-800 leading-relaxed">
+                      <span className="font-bold text-slate-900 block mb-1">মূল কনসেপ্ট ও তাত্ত্বিক ভিত্তি:</span>
+                      <p className="font-medium text-slate-700">{q.explanation}</p>
+                    </div>
+                  )}
+
+                  {(() => {
+                    const solutions = (q.solutions && q.solutions.length >= 2)
+                      ? q.solutions
+                      : generateTwoSolutions(q.question, q.options, q.correctAnswer, q.explanation);
+
+                    if (!solutions || solutions.length === 0) return null;
+
+                    return (
+                      <div className="space-y-2 pt-1">
+                        {solutions.map((sol, sIdx) => {
+                          const isMethod1 = sIdx === 0;
+                          return (
+                            <div 
+                              key={sIdx}
+                              className={`p-3 rounded-xl border leading-relaxed ${
+                                isMethod1 
+                                  ? 'bg-blue-50/70 border-blue-200/90 text-blue-950' 
+                                  : 'bg-amber-50/70 border-amber-200/90 text-amber-950'
+                              }`}
+                            >
+                              <div className="flex items-center gap-1.5 font-bold mb-1">
+                                <span className={`w-4.5 h-4.5 rounded-full flex items-center justify-center text-[10px] text-white shrink-0 ${
+                                  isMethod1 ? 'bg-blue-600' : 'bg-amber-600'
+                                }`}>
+                                  {sIdx + 1}
+                                </span>
+                                <span>
+                                  {isMethod1 ? 'পদ্ধতি ১: পাঠ্যবইয়ের নিয়ম ও সূত্র প্রয়োগ' : 'পদ্ধতি ২: সহজ শর্টকাট কৌশল ও বিকল্প নিয়ম'}
+                                </span>
+                              </div>
+                              <div className="pl-6 whitespace-pre-line font-medium text-slate-800">
+                                {sol}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>

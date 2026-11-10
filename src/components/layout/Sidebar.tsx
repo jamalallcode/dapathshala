@@ -20,7 +20,8 @@ import {
   BarChart3,
   Sliders,
   Sparkles,
-  ShieldAlert
+  ShieldAlert,
+  FolderArchive
 } from 'lucide-react';
 import { UserRole, AssignedTest } from '../../types';
 import { getCurrentParent, ParentUser, updateParentProfile } from '../../lib/parentAuth';
@@ -37,8 +38,8 @@ export interface SidebarProps {
   activeView: 'landing' | 'dashboard' | 'exam' | 'review' | 'admin';
   onNavigateHome: () => void;
   onNavigateDashboard: () => void;
-  parentTab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games';
-  onSelectParentTab: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games') => void;
+  parentTab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games' | 'library';
+  onSelectParentTab: (tab: 'overview' | 'assigned' | 'review' | 'proctoring' | 'report' | 'settings' | 'games' | 'library') => void;
   onOpenCreateExam: () => void;
   onOpenSettings?: () => void;
   onDirectStartExam?: (test: AssignedTest) => void;
@@ -431,6 +432,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <PlusCircle className="w-4.5 h-4.5 text-blue-400 shrink-0" />
                     <span className="truncate">প্রশ্নপত্র তৈরি</span>
                   </div>
+                </button>
+              </div>
+
+              {/* Menu: আমার প্রশ্ন লাইব্রেরি */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleLinkClick(() => {
+                      onRoleChange('parent');
+                      onNavigateDashboard();
+                      onSelectParentTab('library');
+                    });
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
+                    parentTab === 'library' && activeView === 'dashboard'
+                      ? 'bg-indigo-600/30 text-white font-bold border-l-2 border-indigo-400'
+                      : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 truncate min-w-0">
+                    <FolderArchive className="w-4.5 h-4.5 text-indigo-400 shrink-0" />
+                    <span className="truncate">আমার প্রশ্ন লাইব্রেরি</span>
+                  </div>
+                  <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                    আর্কাইভ
+                  </span>
                 </button>
               </div>
 
