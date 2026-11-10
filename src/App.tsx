@@ -26,7 +26,7 @@ export function App() {
   const [activeTest, setActiveTest] = useState<AssignedTest | null>(null);
   
   // Admin specific navigation tab
-  const [adminActiveTab, setAdminActiveTab] = useState<'overview' | 'papers' | 'users' | 'exams' | 'proctoring' | 'notice' | 'system'>('overview');
+  const [adminActiveTab, setAdminActiveTab] = useState<'overview' | 'papers' | 'users' | 'exams' | 'proctoring' | 'notice' | 'system' | 'ai-vision'>('overview');
   const [broadcastNotice, setBroadcastNotice] = useState<any>(null);
 
   // Student registration & login modal state
@@ -496,6 +496,8 @@ export function App() {
             />
           ) : activeView === 'admin' ? (
             <AdminDashboard
+              initialTab={adminActiveTab}
+              onTabChange={setAdminActiveTab}
               onExitAdmin={() => {
                 setActiveView('landing');
               }}

@@ -50,25 +50,41 @@ import {
   saveInstitutionPapers 
 } from '../../lib/institutionPapers';
 import { AdminPaperBulkUploadModal } from './AdminPaperBulkUploadModal';
-import { AdminAIVisionQuestionModal } from './AdminAIVisionQuestionModal';
+import { AdminAIVisionQuestionView } from './AdminAIVisionQuestionView';
 
 interface AdminDashboardProps {
   onExitAdmin: () => void;
   onNavigateHome: () => void;
   onOpenTestPreview?: (test: AssignedTest) => void;
   onOpenReviewModal?: (test: AssignedTest) => void;
+  initialTab?: 'overview' | 'papers' | 'users' | 'exams' | 'proctoring' | 'notice' | 'system' | 'ai-vision';
+  onTabChange?: (tab: 'overview' | 'papers' | 'users' | 'exams' | 'proctoring' | 'notice' | 'system' | 'ai-vision') => void;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onExitAdmin,
   onNavigateHome,
   onOpenTestPreview,
-  onOpenReviewModal
+  onOpenReviewModal,
+  initialTab = 'overview',
+  onTabChange
 }) => {
   // Navigation tabs inside Admin Dashboard
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'papers' | 'users' | 'exams' | 'proctoring' | 'notice' | 'system'
-  >('overview');
+    'overview' | 'papers' | 'users' | 'exams' | 'proctoring' | 'notice' | 'system' | 'ai-vision'
+  >(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
+    if (onTabChange) {
+      onTabChange(activeTab);
+    }
+  }, [activeTab, onTabChange]);
 
   // Stats
   const [stats, setStats] = useState({
@@ -99,7 +115,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Modals & Action States
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
-  const [showVisionModal, setShowVisionModal] = useState(false);
   const [selectedExamForInspect, setSelectedExamForInspect] = useState<AssignedTest | null>(null);
   const [inspectMode, setInspectMode] = useState<'questions' | 'submission'>('questions');
   
@@ -842,7 +857,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="flex flex-wrap items-center gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setShowVisionModal(true)}
+                  onClick={() => setActiveTab('ai-vision')}
                   className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white text-xs sm:text-sm font-black flex items-center gap-2 shadow-lg shadow-emerald-900/40 transition-all cursor-pointer"
                 >
                   <Sparkles className="w-4 h-4 text-amber-300" />
@@ -935,6 +950,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
           </div>
+        )}
+
+        {/* ==================================================== */}
+        {/* TAB: AI VISION QUESTION CONVERTER (FULL PAGE VIEW)  */}
+        {/* ==================================================== */}
+        {activeTab === 'ai-vision' && (
+          <AdminAIVisionQuestionView
+            onBack={() => setActiveTab('papers')}
+            onSavedSuccess={() => {
+              setInstitutionPapers(getStoredInstitutionPapers());
+              setActiveTab('papers');
+              showToast('নতুন প্রশ্নপত্র সফলভাবে ডাটাবেজে সংরক্ষিত হয়েছে');
+            }}
+          />
         )}
 
         {/* ==================================================== */}
@@ -1720,20 +1749,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         onClose={() => {
           setShowBulkUploadModal(false);
           setInstitutionPapers(getStoredInstitutionPapers());
-        }}
-      />
-
-      {/* ======================================================== */}
-      {/* AI VISION QUESTION CONVERTER & VERIFICATION MODAL        */}
-      {/* ======================================================== */}
-      <AdminAIVisionQuestionModal
-        isOpen={showVisionModal}
-        onClose={() => {
-          setShowVisionModal(false);
-        }}
-        onSavedSuccess={() => {
-          setInstitutionPapers(getStoredInstitutionPapers());
-          showToast('নতুন প্রশ্নপত্র সফলভাবে ডাটাবেজে সংরক্ষিত হয়েছে');
         }}
       />
 

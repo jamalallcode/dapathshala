@@ -44,8 +44,8 @@ export interface SidebarProps {
   onOpenSettings?: () => void;
   onDirectStartExam?: (test: AssignedTest) => void;
   // Admin Navigation Props
-  adminTab?: 'overview' | 'papers' | 'users' | 'exams' | 'proctoring' | 'notice' | 'system';
-  onSelectAdminTab?: (tab: 'overview' | 'papers' | 'users' | 'exams' | 'proctoring' | 'notice' | 'system') => void;
+  adminTab?: 'overview' | 'papers' | 'users' | 'exams' | 'proctoring' | 'notice' | 'system' | 'ai-vision';
+  onSelectAdminTab?: (tab: 'overview' | 'papers' | 'users' | 'exams' | 'proctoring' | 'notice' | 'system' | 'ai-vision') => void;
   onOpenAdminDashboard?: () => void;
 }
 
@@ -344,7 +344,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onMouseLeave={handleItemMouseLeave}
                 title="কেন্দ্রীয় প্রশ্নব্যাংক"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
-                  adminTab === 'papers'
+                  adminTab === 'papers' || adminTab === 'ai-vision'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
                     : 'hover:bg-slate-800/60 text-slate-300 hover:text-white'
                 }`}
