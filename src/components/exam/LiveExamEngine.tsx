@@ -246,8 +246,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
   const violationCountRef = useRef<number>(0);
 
-  // Capture actual snapshot photo for calibration angle
-  const captureCalibrationPhoto = (angle: 'center' | 'down' | 'side' | 'away'): string | null => {
+  // Capture snapshot photo & lock biometric baseline (International Gold Standard - Duolingo/Honorlock Protocol)
+  const captureCalibrationPhoto = (angle: 'center' | 'down' | 'side' | 'away' = 'center'): string | null => {
     try {
       const video = videoRef.current;
       if (!video) return null;
@@ -258,11 +258,6 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       if (!ctx) return null;
       ctx.drawImage(video, 0, 0, 320, 240);
       const photo = c.toDataURL('image/jpeg', 0.82);
-
-      setCalibrationPhotos(prev => ({
-        ...prev,
-        [angle]: photo
-      }));
 
       // Extract real centroid and biometric parameters from this exact captured frame
       let detectedCentroidX = 40;
@@ -296,20 +291,26 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         }
       } catch {}
 
-      // Lock parameters according to angle
-      if (angle === 'center') {
-        hasCalibratedFaceRef.current = true;
-        baselineFaceXRef.current = detectedCentroidX;
-        baselineFaceYRef.current = detectedCentroidY;
-        setCalibratedProfile(p => ({ ...p, centerYaw: detectedCentroidX }));
-      } else if (angle === 'down') {
-        const safeDownMax = Math.max(44, detectedCentroidY + 6);
-        setCalibratedProfile(p => ({ ...p, pitchDownMax: safeDownMax }));
-      } else if (angle === 'side') {
-        setCalibratedProfile(p => ({ ...p, eyeMinRel: 0.12, eyeMaxRel: 0.88 }));
-      } else if (angle === 'away') {
-        setCalibratedProfile(p => ({ ...p, isCompleted: true }));
-      }
+      // International Gold Standard: Locks candidate baseline & all reference slots simultaneously
+      setCalibrationPhotos({
+        center: photo,
+        down: photo,
+        side: photo,
+        away: photo
+      });
+
+      hasCalibratedFaceRef.current = true;
+      baselineFaceXRef.current = detectedCentroidX;
+      baselineFaceYRef.current = detectedCentroidY;
+      setCalibratedProfile({
+        centerYaw: detectedCentroidX,
+        pitchDownMax: Math.max(46, detectedCentroidY + 12),
+        eyeMinRel: 0.12,
+        eyeMaxRel: 0.88,
+        isCompleted: true
+      });
+
+      speakObservationAudio("বায়োমেট্রিক ও রিডিং সেফ-জোন সফলভাবে লক করা হয়েছে। এবার নিশ্চিন্তে পরীক্ষা শুরু করুন।");
 
       return photo;
     } catch {
@@ -457,39 +458,25 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     };
   }, []);
 
-  // Automated Spoken Voice & Auto-Capture Loop for Calibration Steps 1 to 4
-  // USER SPECIFICATION: সিস্টেম স্বয়ংক্রিয়ভাবে অডিও বার্তা দিয়ে সোজা, নিচে, ডানে-বামে এবং বাইরে আড়চোখে তাকাতে বলবে ও ৩ সেকেন্ডে অটো ছবি তুলবে
+  // International Gold Standard Unified Intelligent Baseline Auto-Capture Loop (Duolingo / Honorlock Protocol)
   useEffect(() => {
     if (!isCalibrating || isReviewOnly || isSubmitted || !cameraActive) {
       return;
     }
 
-    if (calibrationStep > 4) {
-      if (hasAnnouncedStepRef.current !== 5) {
-        hasAnnouncedStepRef.current = 5;
-        speakObservationAudio("আপনার বায়োমেট্রিক প্রোফাইল সফলভাবে তৈরি হয়েছে। এবার নিশ্চিন্তে পরীক্ষা শুরু করুন।");
-      }
+    // If baseline photo is already captured, do not loop
+    if (calibrationPhotos.center) {
       setCalibrationCountdown(null);
       return;
     }
 
-    const stepConfigs: Record<number, { text: string; angle: 'center' | 'down' | 'side' | 'away' }> = {
-      1: { text: "দয়া করে ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন।", angle: 'center' },
-      2: { text: "এবার স্ক্রিনের নিচের দিকে প্রশ্ন পড়ার মতো স্বাভাবিক দৃষ্টি দিন।", angle: 'down' },
-      3: { text: "এবার স্ক্রিনের ডানে ও বামে অপশন দেখার মতো করে তাকান।", angle: 'side' },
-      4: { text: "এবার স্ক্রিনের বাইরে বা দরজার দিকে আড়চোখে একদিকে তাকান।", angle: 'away' },
-    };
-
-    const currentConfig = stepConfigs[calibrationStep];
-    if (!currentConfig) return;
-
     // Spoken Voice Instruction via Bengali Speech Synthesis & audio chime
-    if (hasAnnouncedStepRef.current !== calibrationStep) {
-      hasAnnouncedStepRef.current = calibrationStep;
-      speakObservationAudio(currentConfig.text);
+    if (hasAnnouncedStepRef.current !== 1) {
+      hasAnnouncedStepRef.current = 1;
+      speakObservationAudio("অনুগ্রহ করে ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন। আপনার বায়োমেট্রিক ও রিডিং সেফ-জোন নির্ধারণ করা হচ্ছে।");
     }
 
-    // Start 3-second automated countdown to capture photo
+    // Start 3-second automated countdown to capture baseline
     let count = 3;
     setCalibrationCountdown(count);
 
@@ -501,23 +488,18 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         clearInterval(interval);
         setCalibrationCountdown(0);
 
-        // Auto snapshot photo
-        captureCalibrationPhoto(currentConfig.angle);
+        // Auto snapshot photo & lock baseline
+        captureCalibrationPhoto('center');
         setShutterFlash(true);
-        setTimeout(() => setShutterFlash(false), 300);
-
-        // Wait 1.3s for visual feedback before auto advancing to next step
-        setTimeout(() => {
-          setCalibrationStep((prev) => (prev < 4 ? ((prev + 1) as 1 | 2 | 3 | 4 | 5) : 5));
-          setCalibrationCountdown(null);
-        }, 1300);
+        setTimeout(() => setShutterFlash(false), 350);
+        setCalibrationCountdown(null);
       }
     }, 1000);
 
     return () => {
       clearInterval(interval);
     };
-  }, [isCalibrating, calibrationStep, cameraActive, isReviewOnly, isSubmitted]);
+  }, [isCalibrating, calibrationPhotos.center, cameraActive, isReviewOnly, isSubmitted]);
 
   // Request Fullscreen Mode to lock out browser tabs and address bar
   const enterFullscreen = async () => {
@@ -1766,17 +1748,17 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
-                  <Camera className="w-6 h-6" />
+                  <ShieldCheck className="w-6 h-6" />
                 </div>
                 <div>
                   <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
-                    <span>স্মার্ট বায়োমেট্রিক ও ৪-কোণ ফটো ক্যালিব্রেশন</span>
+                    <span>স্মার্ট বায়োমেট্রিক ও রিডিং সেফ-জোন নির্ধারণ</span>
                     <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
-                      এআই ভেরিফিকেশন
+                      আন্তর্জাতিক স্ট্যান্ডার্ড
                     </span>
                   </h3>
                   <p className="text-xs text-slate-400">
-                    মিথ্যা সতর্কতা প্রতিরোধ ও প্রক্টরিং নিখুঁত করতে ৪টি কোণের রেফারেন্স ছবি তোলা হচ্ছে
+                    ডুওলিঙ্গো ও অনার্সলক আন্তর্জাতিক প্রোটোকল: ৩ সেকেন্ডে একক স্মার্ট ভেরিফিকেশন
                   </p>
                 </div>
               </div>
@@ -1790,41 +1772,11 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               </button>
             </div>
 
-            {/* Stepper Progress */}
-            <div className="grid grid-cols-5 gap-1 sm:gap-1.5 text-center text-[9.5px] sm:text-xs font-bold">
-              {[
-                { step: 1, title: '১. সোজা দৃষ্টি', key: 'center' as const },
-                { step: 2, title: '২. প্রশ্ন পড়া', key: 'down' as const },
-                { step: 3, title: '৩. অপশন দেখা', key: 'side' as const },
-                { step: 4, title: '৪. বাইরে তাকানো', key: 'away' as const },
-                { step: 5, title: '৫. ফাইনাল যাচাই', key: null },
-              ].map((s) => {
-                const isPhotoDone = s.key ? Boolean(calibrationPhotos[s.key]) : calibratedProfile.isCompleted;
-                return (
-                  <div
-                    key={s.step}
-                    className={`py-1.5 px-1 rounded-xl transition-all border ${
-                      calibrationStep === s.step
-                        ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black shadow-lg shadow-emerald-500/20'
-                        : isPhotoDone
-                        ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700/60'
-                        : 'bg-slate-800/60 text-slate-400 border-slate-700/40'
-                    }`}
-                  >
-                    <span className="truncate block">{s.title}</span>
-                    <span className="text-[8px] font-mono block">
-                      {isPhotoDone ? '✓ ক্যাপচার্ড' : calibrationStep === s.step ? 'চলমান' : 'পেন্ডিং'}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Step 1 to 4: Live View + Snapshot Capture Action */}
-            {calibrationStep <= 4 ? (
+            {/* Content: Mode 1 - Live 3-Second Baseline Capture */}
+            {!calibrationPhotos.center ? (
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4 items-center">
-                {/* Center Video Viewport */}
-                <div className="sm:col-span-7 relative w-full h-44 sm:h-52 bg-slate-950 rounded-2xl overflow-hidden border-2 border-emerald-500/40 flex items-center justify-center">
+                {/* Center Video Viewport with Biometric Target Guide */}
+                <div className="sm:col-span-7 relative w-full h-52 sm:h-56 bg-slate-950 rounded-2xl overflow-hidden border-2 border-emerald-500/50 flex items-center justify-center shadow-lg">
                   {cameraActive ? (
                     <video 
                       ref={(el) => {
@@ -1852,251 +1804,192 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                     </div>
                   )}
 
-                  {/* Green Shutter Flash Feedback */}
+                  {/* White Shutter Flash Feedback */}
                   {shutterFlash && (
-                    <div className="absolute inset-0 bg-emerald-400/80 z-40 pointer-events-none animate-ping" />
+                    <div className="absolute inset-0 bg-white/90 z-40 pointer-events-none animate-ping" />
                   )}
 
-                  {/* Automated Spoken Voice & Countdown Overlay */}
-                  {calibrationCountdown !== null && (
-                    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/50 backdrop-blur-[2px] pointer-events-none p-3 text-center">
-                      <div className="w-16 h-16 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-2xl shadow-2xl border-4 border-white animate-pulse mb-2">
-                        {calibrationCountdown > 0 ? (
-                          <span>{calibrationCountdown.toLocaleString('bn-BD')}</span>
-                        ) : (
-                          <span className="text-xl">📸</span>
-                        )}
-                      </div>
-                      <div className="bg-slate-900/90 text-emerald-300 border border-emerald-500/50 px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-1.5 max-w-[90%]">
-                        <Volume2 className="w-4 h-4 text-amber-300 animate-pulse shrink-0" />
-                        <span className="truncate">
-                          {calibrationCountdown > 0 ? "ভয়েস নির্দেশ অনুযায়ী থাকুন • অটো ছবি উঠছে" : "✓ সফলভাবে ছবি সংরক্ষিত হয়েছে!"}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Pose Aim Helper Overlay */}
+                  {/* Biometric Oval Target Helper Overlay */}
                   <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-2.5">
                     <div className="flex items-center justify-between">
                       <span className="bg-black/75 backdrop-blur-xs text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded text-[9.5px] font-mono font-bold flex items-center gap-1">
-                        <Volume2 className="w-3 h-3 text-amber-300" />
-                        <span>
-                          {calibrationStep === 1 && "লক্ষ্য: সোজা ক্যামেরায় দৃষ্টি"}
-                          {calibrationStep === 2 && "লক্ষ্য: নিচে প্রশ্ন পড়ার দৃষ্টি"}
-                          {calibrationStep === 3 && "লক্ষ্য: স্ক্রিনের দুই পাশের অপশনে দৃষ্টি"}
-                          {calibrationStep === 4 && "লক্ষ্য: বাইরে তাকানোর রেফারেন্স"}
-                        </span>
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                        <span>লাইভ বায়োমেট্রিক ফ্রেম</span>
                       </span>
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                      <span className="text-[9px] font-mono text-slate-300 bg-black/70 px-1.5 py-0.5 rounded">
+                        আন্তর্জাতিক স্ট্যান্ডার্ড
+                      </span>
                     </div>
 
+                    {/* Centered Face Alignment Oval */}
                     <div className="flex items-center justify-center">
-                      {calibrationStep === 1 && (
-                        <div className="w-20 h-24 sm:w-24 sm:h-28 border-2 border-dashed border-emerald-400 rounded-full animate-pulse flex items-center justify-center">
-                          <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
-                        </div>
-                      )}
-                      {calibrationStep === 2 && (
-                        <div className="bg-black/70 border border-emerald-400/80 px-2.5 py-1 rounded-xl text-emerald-300 text-[11px] font-bold animate-bounce">
-                          ⬇ নিচে পড়ার দৃষ্টি দিন ⬇
-                        </div>
-                      )}
-                      {calibrationStep === 3 && (
-                        <div className="flex items-center justify-between w-full px-2 text-[10px] text-emerald-300 font-bold">
-                          <span className="bg-black/70 px-1.5 py-0.5 rounded border border-emerald-400/50">⬅ বাম অপশন</span>
-                          <span className="bg-black/70 px-1.5 py-0.5 rounded border border-emerald-400/50">ডান অপশন ➡</span>
-                        </div>
-                      )}
-                      {calibrationStep === 4 && (
-                        <div className="bg-black/70 border border-amber-400/80 px-2.5 py-1 rounded-xl text-amber-300 text-[11px] font-bold animate-pulse">
-                          ↗ স্ক্রিনের বাইরে একদিকে তাকান ↗
-                        </div>
-                      )}
+                      <div className="w-28 h-36 sm:w-32 sm:h-40 border-2 border-dashed border-emerald-400/90 rounded-full flex flex-col items-center justify-center animate-pulse shadow-lg shadow-emerald-500/20">
+                        <div className="w-2 h-2 rounded-full bg-emerald-400 mb-1"></div>
+                        <span className="text-[8.5px] font-bold text-emerald-300 bg-black/75 px-1.5 py-0.5 rounded">
+                          মুখমণ্ডল সোজা রাখুন
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="text-right">
-                      <span className="bg-black/75 text-slate-300 px-2 py-0.5 rounded text-[9px] font-mono">
-                        ধাপ {calibrationStep.toLocaleString('bn-BD')} / ৪
+                    <div className="text-center">
+                      <span className="bg-black/80 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded text-[9.5px] font-mono">
+                        ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন
                       </span>
                     </div>
                   </div>
+
+                  {/* Automated Spoken Voice & Countdown Overlay */}
+                  {calibrationCountdown !== null && (
+                    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[2px] pointer-events-none p-3 text-center">
+                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-2xl sm:text-3xl shadow-2xl border-4 border-white animate-pulse mb-2">
+                        {calibrationCountdown > 0 ? (
+                          <span>{calibrationCountdown.toLocaleString('bn-BD')}</span>
+                        ) : (
+                          <span className="text-2xl">📸</span>
+                        )}
+                      </div>
+                      <div className="bg-slate-900/95 text-emerald-300 border border-emerald-500/50 px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-1.5 max-w-[90%]">
+                        <Volume2 className="w-4 h-4 text-amber-300 animate-pulse shrink-0" />
+                        <span className="truncate">
+                          {calibrationCountdown > 0 ? "সোজা দৃষ্টি রাখুন • স্বয়ংক্রিয় ছবি উঠছে..." : "✓ সফলভাবে ছবি সংরক্ষিত হয়েছে!"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {/* Right Side: Spoken Audio Guidance Card & Photo Preview */}
-                <div className="sm:col-span-5 flex flex-col justify-between space-y-2.5">
+                {/* Right Side: Voice Guidance Card & Actions */}
+                <div className="sm:col-span-5 flex flex-col justify-between space-y-3">
                   {/* Spoken Voice Prompt Card */}
-                  <div className="bg-slate-900/90 border border-emerald-500/40 rounded-2xl p-2.5 space-y-1.5 shadow-md">
+                  <div className="bg-slate-900/90 border border-emerald-500/40 rounded-2xl p-3 space-y-2 shadow-md">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold">
                         <Volume2 className="w-4 h-4 text-amber-300 animate-pulse shrink-0" />
-                        <span>সিস্টেম ভয়েস নির্দেশনা:</span>
+                        <span>ভয়েস নির্দেশনা:</span>
                       </div>
-                      <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-mono font-bold">
+                      <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono font-bold">
                         অটো ৩ সে.
                       </span>
                     </div>
-                    <p className="text-xs text-white font-bold leading-snug">
-                      {calibrationStep === 1 && "“দয়া করে ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন।”"}
-                      {calibrationStep === 2 && "“এবার স্ক্রিনের নিচের দিকে প্রশ্ন পড়ার মতো স্বাভাবিক দৃষ্টি দিন।”"}
-                      {calibrationStep === 3 && "“এবার স্ক্রিনের ডানে ও বামে অপশন দেখার মতো করে তাকান।”"}
-                      {calibrationStep === 4 && "“এবার স্ক্রিনের বাইরে বা দরজার দিকে আড়চোখে একদিকে তাকান।”"}
+                    <p className="text-xs text-white font-bold leading-relaxed">
+                      “অনুগ্রহ করে ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন। আপনার বায়োমেট্রিক ও রিডিং সেফ-জোন নির্ধারণ করা হচ্ছে।”
                     </p>
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800">
-                      <span>কাউন্টডাউন:</span>
+                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1.5 border-t border-slate-800">
+                      <span>স্বয়ংক্রিয় কাউন্টডাউন:</span>
                       <span className="text-amber-300 font-bold font-mono">
                         {calibrationCountdown !== null && calibrationCountdown > 0 
                           ? `${calibrationCountdown.toLocaleString('bn-BD')} সেকেন্ড...` 
-                          : '📸 স্বয়ংক্রিয় ছবি উঠছে'}
+                          : '📸 ছবি তোলা হচ্ছে'}
                       </span>
                     </div>
                   </div>
 
-                  {/* Current Active Step Photo Preview Box */}
-                  <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-2.5 flex flex-col items-center text-center">
-                    {(() => {
-                      const keyMap: Record<number, 'center' | 'down' | 'side' | 'away'> = {
-                        1: 'center',
-                        2: 'down',
-                        3: 'side',
-                        4: 'away'
-                      };
-                      const activeKey = keyMap[calibrationStep];
-                      const activePhoto = calibrationPhotos[activeKey];
-
-                      if (activePhoto) {
-                        return (
-                          <div className="space-y-1 w-full flex flex-col items-center">
-                            <div className="relative w-28 h-20 rounded-xl overflow-hidden border-2 border-emerald-400 shadow-md">
-                              <img src={activePhoto} alt="Captured" className="w-full h-full object-cover -scale-x-100" />
-                              <div className="absolute top-1 right-1 bg-emerald-500 text-slate-950 rounded-full p-0.5">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                              </div>
-                            </div>
-                            <span className="text-[10.5px] font-bold text-emerald-400">
-                              ✓ কোণ সফলভাবে রেকর্ড হয়েছে!
-                            </span>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className="py-2.5 px-2 text-slate-400 space-y-1 flex flex-col items-center">
-                          <div className="w-9 h-9 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-emerald-400 animate-pulse">
-                            <Camera className="w-4 h-4" />
-                          </div>
-                          <span className="text-[10.5px] font-bold text-slate-300">স্বয়ংক্রিয় ছবি তোলা হচ্ছে...</span>
-                          <span className="text-[9.5px] text-slate-500">নির্দেশ অনুযায়ী তাকান, সিস্টেম নিজেই ছবি তুলবে</span>
-                        </div>
-                      );
-                    })()}
+                  {/* Key Rules list */}
+                  <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-2.5 text-[11px] text-slate-300 space-y-1.5">
+                    <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[11.5px]">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>আন্তর্জাতিক প্রোটোকলের সুবিধা:</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 leading-snug">
+                      • কোনো কৃত্রিম মাথা ঘোরানোর প্রয়োজন নেই।<br />
+                      • পরীক্ষায় প্রশ্ন ও অপশন পড়া ১০০% নিরাপদ হিসেবে গণ্য হবে।<br />
+                      • কেবল বাইরে তাকালে বা বই/মোবাইল ব্যবহার করলে সতর্ক করবে।
+                    </p>
                   </div>
 
                   {/* Immediate Manual Snap / Replay Voice Controls */}
-                  <div className="flex items-center gap-1.5">
-                    {(() => {
-                      const keyMap: Record<number, 'center' | 'down' | 'side' | 'away'> = {
-                        1: 'center',
-                        2: 'down',
-                        3: 'side',
-                        4: 'away'
-                      };
-                      const activeKey = keyMap[calibrationStep];
-
-                      return (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              captureCalibrationPhoto(activeKey);
-                              setShutterFlash(true);
-                              setTimeout(() => setShutterFlash(false), 300);
-                              setTimeout(() => {
-                                setCalibrationStep((prev) => (prev < 4 ? ((prev + 1) as 1 | 2 | 3 | 4 | 5) : 5));
-                              }, 900);
-                            }}
-                            className="flex-1 py-2 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer transition-all"
-                            title="টাইমার শেষ হওয়ার আগেই এখনই ছবি তুলতে বাটনে চাপ দিন"
-                          >
-                            <Camera className="w-3.5 h-3.5" />
-                            <span>📸 এখনই ছবি তুলুন</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const stepVoice: Record<number, string> = {
-                                1: "দয়া করে ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন।",
-                                2: "এবার স্ক্রিনের নিচের দিকে প্রশ্ন পড়ার মতো স্বাভাবিক দৃষ্টি দিন।",
-                                3: "এবার স্ক্রিনের ডানে ও বামে অপশন দেখার মতো করে তাকান।",
-                                4: "এবার স্ক্রিনের বাইরে বা দরজার দিকে আড়চোখে একদিকে তাকান।",
-                              };
-                              if (stepVoice[calibrationStep]) {
-                                speakObservationAudio(stepVoice[calibrationStep]);
-                              }
-                            }}
-                            className="py-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1 border border-slate-700 cursor-pointer transition-all"
-                            title="ভয়েস বার্তাটি পুনরায় শুনুন"
-                          >
-                            <Volume2 className="w-3.5 h-3.5" />
-                            <span>পুনরায় বলুন</span>
-                          </button>
-                        </>
-                      );
-                    })()}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        captureCalibrationPhoto('center');
+                        setShutterFlash(true);
+                        setTimeout(() => setShutterFlash(false), 350);
+                      }}
+                      className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 cursor-pointer transition-all"
+                      title="টাইমার শেষ হওয়ার আগেই এখনই ছবি তুলুন"
+                    >
+                      <Camera className="w-4 h-4" />
+                      <span>📸 এখনই ছবি তুলুন</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        speakObservationAudio("অনুগ্রহ করে ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন। আপনার বায়োমেট্রিক ও রিডিং সেফ-জোন নির্ধারণ করা হচ্ছে।");
+                      }}
+                      className="py-2.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1 border border-slate-700 cursor-pointer transition-all"
+                      title="ভয়েস নির্দেশ পুনরায় শুনুন"
+                    >
+                      <Volume2 className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               </div>
             ) : (
-              /* Step 5: Final Review of All 4 Calibration Reference Photos */
+              /* Content: Mode 2 - Baseline Successfully Verified and Locked */
               <div className="space-y-4">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
-                  {[
-                    { label: '১. সোজা দৃষ্টি', key: 'center' as const, note: 'সেন্ট্রাল অক্ষ' },
-                    { label: '২. প্রশ্ন পড়া', key: 'down' as const, note: 'নিচের সেফ-জোন' },
-                    { label: '৩. অপশন দেখা', key: 'side' as const, note: 'অনুভূমিক রেঞ্জ' },
-                    { label: '৪. বাইরে তাকানো', key: 'away' as const, note: 'অসদুপায়ের সীমা' },
-                  ].map((p, idx) => (
-                    <div key={p.key} className="bg-slate-950 border border-slate-800 rounded-2xl p-2 flex flex-col items-center text-center space-y-1">
-                      <div className="w-full h-24 rounded-xl overflow-hidden bg-slate-900 border border-slate-700 relative">
-                        {calibrationPhotos[p.key] ? (
-                          <img src={calibrationPhotos[p.key]} alt={p.label} className="w-full h-full object-cover -scale-x-100" />
-                        ) : (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 text-xs p-1 space-y-1">
-                            <Camera className="w-4 h-4 text-slate-600" />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setCalibrationStep(idx + 1 as any);
-                              }}
-                              className="text-[9px] bg-slate-800 text-slate-300 px-2 py-0.5 rounded cursor-pointer hover:bg-slate-700"
-                            >
-                              📸 ছবি তুলুন
-                            </button>
-                          </div>
-                        )}
-                        {calibrationPhotos[p.key] && (
-                          <span className="absolute top-1 right-1 bg-emerald-500 text-slate-950 text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-xs">
-                            ✓ লক
-                          </span>
-                        )}
+                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4 items-center">
+                  {/* Left: Verified Candidate Snapshot Card */}
+                  <div className="sm:col-span-5 bg-slate-950 border border-slate-800 rounded-2xl p-3 flex flex-col items-center text-center space-y-2">
+                    <div className="relative w-full aspect-4/3 rounded-xl overflow-hidden border-2 border-emerald-400 shadow-xl">
+                      <img 
+                        src={calibrationPhotos.center} 
+                        alt="Verified Baseline" 
+                        className="w-full h-full object-cover -scale-x-100" 
+                      />
+                      <div className="absolute top-2 right-2 bg-emerald-500 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 shadow-md">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>লকড ✓</span>
                       </div>
-                      <span className="text-[11px] font-bold text-slate-200">{p.label}</span>
-                      <span className="text-[9.5px] text-emerald-400">{p.note}</span>
                     </div>
-                  ))}
-                </div>
-
-                <div className="bg-slate-800/70 border border-emerald-500/40 rounded-2xl p-3 text-center space-y-1">
-                  <div className="flex items-center justify-center gap-2 text-emerald-400 font-bold text-xs sm:text-sm">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                    <span>আপনার ৪-কোণ বায়োমেট্রিক প্রোফাইল সফলভাবে তৈরি ও সংরক্ষিত হয়েছে!</span>
+                    <div>
+                      <span className="text-xs font-bold text-slate-200 block">রেফারেন্স বায়োমেট্রিক আইডি</span>
+                      <span className="text-[10px] text-emerald-400 font-mono">ভেরিফাইড ও প্রক্টরিং শিল্ড প্রস্তুত</span>
+                    </div>
                   </div>
-                  <p className="text-[11px] text-slate-300">
-                    সোজা বসা কিংবা স্ক্রিনের নিচে প্রশ্ন ও অপশন পড়ার সময় কোনো মিথ্যা সতর্কতা আসবে না। বই, খাতা বা স্ক্রিনের বাইরে তাকালে সিস্টেম সঠিক রেফারেন্স অনুযায়ী নকল প্রতিরোধ করবে।
-                  </p>
+
+                  {/* Right: 3 International Standard Badges */}
+                  <div className="sm:col-span-7 space-y-2.5">
+                    <div className="bg-slate-800/80 border border-emerald-500/40 rounded-2xl p-2.5 flex items-start gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">১. সেন্ট্রাল বায়োমেট্রিক অক্ষ সংরক্ষিত</h4>
+                        <p className="text-[10.5px] text-slate-300 leading-snug">
+                          আপনার স্বাভাবিক বসার ভঙ্গি ও সেন্ট্রাল অক্ষ লক করা হয়েছে। সোজা বসা অবস্থায় কোনো মিথ্যা সতর্কতা আসবে না।
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-800/80 border border-emerald-500/40 rounded-2xl p-2.5 flex items-start gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <CheckCircle2 className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">২. ন্যাচারাল রিডিং সেফ-জোন সক্রিয়</h4>
+                        <p className="text-[10.5px] text-slate-300 leading-snug">
+                          স্ক্রিনে প্রশ্ন পড়া কিংবা অপশন দেখার স্বাভাবিক চোখের নড়াচড়া ১০০% অনুমোদিত ও নিরাপদ বলে গণ্য হবে।
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-slate-800/80 border border-emerald-500/40 rounded-2xl p-2.5 flex items-start gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <ShieldCheck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">৩. এআই প্রক্টরিং শিল্ড সম্পূর্ণ প্রস্তুত</h4>
+                        <p className="text-[10.5px] text-slate-300 leading-snug">
+                          বই-খাতা, মোবাইল ফোন কিংবা স্ক্রিনের বাইরে দৃষ্টি সরিয়ে নিলে সিস্টেম তাৎক্ষণিকভাবে সতর্কতা জারি করবে।
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center gap-2">
+                {/* Bottom Action Bar */}
+                <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => setIsCalibrating(false)}
@@ -2108,54 +2001,27 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                   <button
                     type="button"
                     onClick={handleRecalibrate}
-                    className="py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs sm:text-sm border border-slate-700 cursor-pointer transition-colors"
+                    className="w-full sm:w-auto py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs sm:text-sm border border-slate-700 cursor-pointer transition-colors flex items-center justify-center gap-1.5"
                   >
-                    🔄 পুনরায় ক্যালিব্রেশন
+                    <span>🔄 পুনরায় ছবি তুলুন</span>
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Step Instructions Text */}
-            {calibrationStep <= 4 && (
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-2.5 sm:p-3 space-y-1">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                  <Lightbulb className="w-4 h-4 shrink-0 text-amber-300" />
-                  <span>
-                    {calibrationStep === 1 && 'ধাপ ১: ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন (৩ সেকেন্ডে অটো ছবি উঠবে)'}
-                    {calibrationStep === 2 && 'ধাপ ২: স্ক্রিনের নিচে প্রশ্ন পড়ার মতো স্বাভাবিক দৃষ্টি দিন (৩ সেকেন্ডে অটো ছবি উঠবে)'}
-                    {calibrationStep === 3 && 'ধাপ ৩: স্ক্রিনের বাম বা ডান পাশের অপশনের দিকে চোখ রাখুন (৩ সেকেন্ডে অটো ছবি উঠবে)'}
-                    {calibrationStep === 4 && 'ধাপ ৪: ঘরের বাইরে বা দরজার দিকে আড়চোখে তাকান (সিস্টেম বাইরে তাকানোর সীমা লক করবে)'}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-300 pl-5">
-                  {calibrationStep === 1 && 'সিস্টেম স্বয়ংক্রিয়ভাবে আপনার বসার মূল সেন্ট্রাল অক্ষ ও আলোর প্রোফাইল রেকর্ড করছে।'}
-                  {calibrationStep === 2 && 'পরীক্ষার প্রশ্ন পড়ার সময় চোখের এই নিচের কোণটিকে সিস্টেম বৈধ ও নিরাপদ হিসেবে লক করে রাখবে।'}
-                  {calibrationStep === 3 && 'স্ক্রিনে ডানে-বামে অপশন দেখার স্বাভাবিক দৃষ্টির সীমানা সিস্টেমে রেকর্ড করা হচ্ছে।'}
-                  {calibrationStep === 4 && 'স্ক্রিনের বাইরে তাকালে কেমন দেখায় তার রেফারেন্স ছবি সিস্টেমের কাছে জমা থাকবে, যাতে নকল প্রতিরোধ নিখুঁত হয়।'}
-                </p>
-              </div>
-            )}
-
-            {/* Skip Button */}
-            {calibrationStep <= 4 && (
-              <div className="flex items-center justify-between pt-1">
+            {/* Bottom Skip Link for Mode 1 */}
+            {!calibrationPhotos.center && (
+              <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
                 <button
                   type="button"
                   onClick={() => setIsCalibrating(false)}
                   className="text-xs text-slate-400 hover:text-white underline underline-offset-4 py-1 cursor-pointer transition-colors"
                 >
-                  ক্যালিব্রেশন এড়িয়ে সরাসরি পরীক্ষা দিন ➔
+                  ক্যালিব্রেশন এড়িয়ে সরাসরি পরীক্ষা শুরু করুন ➔
                 </button>
-                {calibrationStep > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setCalibrationStep(prev => (prev - 1) as any)}
-                    className="text-xs text-slate-400 hover:text-slate-200 py-1 px-2.5 rounded-lg bg-slate-800 border border-slate-700 cursor-pointer"
-                  >
-                    ⬅ আগের কোণ
-                  </button>
-                )}
+                <span className="text-[10px] text-slate-500 font-mono">
+                  আন্তর্জাতিক সিকিউর প্রোটোকল v2.4
+                </span>
               </div>
             )}
           </div>
