@@ -1347,31 +1347,26 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         );
 
         let isHeadTurned = false;
-        let isSideGlance = false;
 
-        if (!isStraightGaze) {
-          // Candidate turned head sideways (ডানে বা বামে আড়চোখে বা সম্পূর্ণ ঘাড় ঘুরিয়ে তাকানো)
-          const isTurnedSideways = (
-            headYawShift > 0.068 ||
-            (cheekAsymmetry > 0.36 && horizDisplacement > 3.8) ||
-            horizDisplacement > 5.5 ||
-            (faceAspectRatio < 0.60 && (headYawShift > 0.055 || horizDisplacement > 3.2))
-          );
-          const isTurnedBackwards = upperDarkHairCount > 130 && headSkinCount < 20;
+        // Candidate turned head sideways or backwards (ডানে বা বামে ঘাড় ঘুরিয়ে অন্যদিকে তাকানো)
+        const isTurnedSideways = (
+          headYawShift > 0.080 ||
+          (cheekAsymmetry > 0.42 && horizDisplacement > 4.2) ||
+          horizDisplacement > 6.5 ||
+          (faceAspectRatio < 0.55 && headYawShift > 0.062)
+        );
+        const isTurnedBackwards = upperDarkHairCount > 130 && headSkinCount < 20;
 
-          if (isTurnedSideways || isTurnedBackwards) {
-            isHeadTurned = true;
-          } else if (centroidX < 24 || centroidX > 56 || horizDisplacement > 4.2) {
-            isSideGlance = true;
-          }
+        if (isTurnedSideways || isTurnedBackwards) {
+          isHeadTurned = true;
         }
 
         // Candidate Looking Down towards desk, phone or notes (নিচে তাকানো সনাক্তকরণ)
         let isLookingDown = false;
         const maxPitchAllowed = calibratedProfileRef.current?.isCompleted 
-          ? Math.max(34, calibratedProfileRef.current.pitchDownMax)
-          : 33;
-        if (vertDisplacement > 4.5 || centroidY > maxPitchAllowed) {
+          ? Math.max(36, calibratedProfileRef.current.pitchDownMax)
+          : 35;
+        if (vertDisplacement > 5.2 || centroidY > maxPitchAllowed) {
           isLookingDown = true;
         }
 
@@ -1417,34 +1412,13 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               handleGazeAway('নিচে বা খাতা/ফোনে দৃষ্টি সনাক্ত হয়েছে');
             }
           }
-        } else if (isSideGlance) {
-          sideGlanceConsecutiveRef.current++;
-          headTurnConsecutiveRef.current = 0;
-          lookDownConsecutiveRef.current = 0;
-          setHeadStatus('forward');
-          setGazeStatus('side_glance');
-
-          if (sideGlanceConsecutiveRef.current >= proctorConfig.consecutiveRequired) {
-            const isNewTurn = !isViolatingRef.current;
-            isViolatingRef.current = true;
-            if (warningTimeoutRef.current) {
-              clearTimeout(warningTimeoutRef.current);
-              warningTimeoutRef.current = null;
-            }
-            const currentStrike = (violationCountRef.current || violationCount) + (isNewTurn ? 1 : 0);
-            setLastWarning(`⚠️ দৃষ্টি স্ক্রিনের বাইরে / আড় চোখ সনাক্ত হয়েছে! সতর্কতা: ${currentStrike}/৫০ (অনুগ্রহ করে প্রশ্নপত্রে দৃষ্টি রাখুন)`);
-            if (isNewTurn || now - lastViolationTimeRef.current > 3200) {
-              lastViolationTimeRef.current = now;
-              handleGazeAway('দৃষ্টি স্ক্রিনের বাইরে / আড় চোখ সনাক্ত হয়েছে');
-            }
-          }
         } else {
           // Normal screen gaze / reading questions (স্ক্রিনে প্রশ্ন ও অপশন পড়ার স্বাভাবিক দৃষ্টি)
           headTurnConsecutiveRef.current = Math.max(0, headTurnConsecutiveRef.current - 1);
-          sideGlanceConsecutiveRef.current = Math.max(0, sideGlanceConsecutiveRef.current - 1);
+          sideGlanceConsecutiveRef.current = 0;
           lookDownConsecutiveRef.current = Math.max(0, lookDownConsecutiveRef.current - 1);
 
-          if (headTurnConsecutiveRef.current === 0 && sideGlanceConsecutiveRef.current === 0 && lookDownConsecutiveRef.current === 0) {
+          if (headTurnConsecutiveRef.current === 0 && lookDownConsecutiveRef.current === 0) {
             if (isViolatingRef.current) {
               isViolatingRef.current = false;
               if (warningTimeoutRef.current) {
