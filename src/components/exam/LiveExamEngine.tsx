@@ -1328,64 +1328,35 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           return;
         }
 
-        // Candidate Face & Eye Orientation Check (Bi-Ocular Centering Rule)
-        const hasBothEyes = (leftEyeDarkCount >= 2 && rightEyeDarkCount >= 2);
-        let avgEyeRel = 0.50;
-        if (hasBothEyes) {
-          const leftEyeCenter = leftEyeDarkX / leftEyeDarkCount;
-          const rightEyeCenter = rightEyeDarkX / rightEyeDarkCount;
-          const leftEyeRel = (leftEyeCenter - headMinX) / headW;
-          const rightEyeRel = (rightEyeCenter - headMinX) / headW;
-          avgEyeRel = (leftEyeRel + rightEyeRel) / 2;
-        }
+        // Candidate Frontal Screen Presence (মৌলিক জ্যামিতিক যাচাই)
+        const faceAspectRatio = faceW / Math.max(faceH, 1);
+        const isCenteredFrontal = (
+          centroidX >= 22 && centroidX <= 58 &&
+          centroidY >= 14 && centroidY <= 40 &&
+          faceAspectRatio >= 0.65
+        );
 
-        // When both eyes are clearly visible and positioned symmetrically in the screen reading zone:
-        // The candidate is UNAMBIGUOUSLY looking at the screen (snapshots #2 - #8).
-        // Room lighting/shadows on one cheek CANNOT override centered ocular alignment!
-        const isLookingStraightAtScreen = hasBothEyes && (avgEyeRel >= 0.32 && avgEyeRel <= 0.68);
-
-        // 1. Lateral Glance (ডানে বা বামে আড় চোখে স্ক্রিনের বাইরে তাকানো)
+        // 1. Lateral Glance / Leaning completely off screen (স্ক্রিনের বাইরে সরে যাওয়া)
         let isSideGlance = false;
-        if (!isLookingStraightAtScreen) {
-          if (hasBothEyes && (avgEyeRel < 0.28 || avgEyeRel > 0.72)) {
-            // Both eyes have shifted off screen
-            isSideGlance = true;
-          } else if ((leftEyeDarkCount >= 3 && rightEyeDarkCount === 0) || (rightEyeDarkCount >= 3 && leftEyeDarkCount === 0)) {
-            // Strong unilateral eye visibility indicates side glance / turning away
-            isSideGlance = true;
-          }
+        if (centroidX < 20 || centroidX > 60) {
+          isSideGlance = true;
         }
 
         // 2. Vertical Head Pitch / Looking Down towards desk, phone or notes (নিচে তাকানো সনাক্তকরণ)
         let isLookingDown = false;
-        // Natural reading of screen questions causes only 1-2.5px downward shift.
-        // Tilting head down to inspect notes or phone on lap/desk causes > 5.5px drop!
-        if (centroidY > (baseY + 5.5) || (calibratedProfileRef.current.isCompleted && centroidY > (calibratedProfileRef.current.pitchDownMax + 3.0))) {
+        if (centroidY > 43) {
           isLookingDown = true;
         }
 
-        // 3. Head Profile Hair vs Face Yaw (True 90-degree profile turn)
-        let isProfileHairYaw = false;
-        if (headHairCount > 20 && headSkinCount > 20 && headW > 15) {
-          const hairCenterX = headHairWeightedX / headHairCount;
-          const hairLateralSeparation = Math.abs(headCentroidX - hairCenterX) / headW;
-          if (hairLateralSeparation > 0.34 && skinAsymmetry > 0.45 && featureSkew > 0.22) {
-            isProfileHairYaw = true;
-          }
-        }
-
-        // 4. Head Turned completely Sideways / Profile (snapshot #1)
+        // 3. Head Turned completely Sideways / Profile (মাথা সম্পূর্ণ অন্যদিকে ঘোরানো)
         let isHeadTurned = false;
-        if (!isLookingStraightAtScreen) {
-          const lateralShift = Math.abs(headCentroidX - baseX) / headW;
-          const isTurnedBackwards = upperDarkHairCount > 130 && headSkinCount < 24;
-          // One eye hidden due to turning away (like snapshot #1)
-          const isEyeTurnedAway = (leftEyeDarkCount >= 3 && rightEyeDarkCount === 0) || (rightEyeDarkCount >= 3 && leftEyeDarkCount === 0);
-          // Feature skew + asymmetric cheek shadow must occur TOGETHER with lateral shift
-          const isCompositeTurn = (featureSkew > proctorConfig.featureSkewThreshold && skinAsymmetry > proctorConfig.skinAsymmetryThreshold) ||
-                                  (lateralShift > proctorConfig.lateralShiftThreshold && featureSkew > 0.16);
+        const isProfileTurn = faceAspectRatio < 0.58 && Math.abs(centroidX - baseX) > 8;
+        const isTurnedBackwards = upperDarkHairCount > 130 && headSkinCount < 20;
 
-          isHeadTurned = isEyeTurnedAway || isCompositeTurn || isProfileHairYaw || isTurnedBackwards;
+        if (!isCenteredFrontal) {
+          if (isProfileTurn || isTurnedBackwards) {
+            isHeadTurned = true;
+          }
         }
 
         if (isHeadTurned) {
