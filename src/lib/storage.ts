@@ -755,3 +755,81 @@ export function generateFallbackTestForPin(pin: string): AssignedTest {
     }))
   };
 }
+
+/**
+ * Purge all proctoring photos and calibration snapshots from storage (localStorage, Supabase, Express Server)
+ * Once the parent reviews the student's answer sheet, no photos are retained in the database.
+ */
+export async function purgePhotosForTest(testIdOrPin: string): Promise<void> {
+  const q = String(testIdOrPin || '').trim();
+  if (!q) return;
+
+  // 1. Update localStorage
+  try {
+    const local = getStoredTests();
+    const updated = local.map(t => {
+      if (String(t.id).trim() === q || String(t.pin).trim() === q) {
+        const cleanedSnapshots = (t.violationSnapshots || []).map(s => ({
+          ...s,
+          photo: ''
+        }));
+        const copy = { ...t };
+        delete copy.calibrationPhotos;
+        return {
+          ...copy,
+          violationSnapshots: cleanedSnapshots,
+          photosPurged: true
+        };
+      }
+      return t;
+    });
+    saveStoredTests(updated);
+  } catch {}
+
+  // 2. Call server purge API
+  try {
+    await fetch(`/api/tests/${encodeURIComponent(q)}/purge-photos`, {
+      method: 'POST'
+    });
+  } catch {}
+
+  // 3. Update Supabase if connected
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('assigned_tests')
+        .select('*')
+        .or(`pin.eq.${q},id.eq.${q}`)
+        .limit(1);
+
+      if (data && data.length > 0) {
+        const row = data[0];
+        const payload = row.payload || {};
+        delete payload.calibrationPhotos;
+        if (Array.isArray(payload.violationSnapshots)) {
+          payload.violationSnapshots = payload.violationSnapshots.map((s: any) => ({ ...s, photo: '' }));
+        }
+        payload.photosPurged = true;
+
+        await supabase
+          .from('assigned_tests')
+          .update({
+            payload,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', row.id);
+
+        if (row.pin) {
+          await supabase
+            .from('exam_submissions')
+            .update({
+              payload,
+              updated_at: new Date().toISOString()
+            })
+            .eq('pin', row.pin);
+        }
+      }
+    } catch {}
+  }
+}
+

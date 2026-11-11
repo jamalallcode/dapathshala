@@ -191,6 +191,13 @@ app.post('/api/tests', (req, res) => {
     test.proctoringFlags = existing.proctoringFlags || test.proctoringFlags;
     test.submittedAt = existing.submittedAt || test.submittedAt;
   }
+  if (test.status === 'reviewed' || test.photosPurged) {
+    delete test.calibrationPhotos;
+    if (Array.isArray(test.violationSnapshots)) {
+      test.violationSnapshots = test.violationSnapshots.map((s: any) => ({ ...s, photo: '' }));
+    }
+    test.photosPurged = true;
+  }
   if (pinKey) testsStore[pinKey] = test;
   if (idKey) testsStore[idKey] = test;
   saveJson(TESTS_FILE, testsStore);
@@ -256,6 +263,48 @@ app.delete('/api/tests/:pinOrId', (req, res) => {
     saveJson(SUBMISSIONS_FILE, submissionsStore);
   }
   res.json({ success: true, message: 'Test deleted successfully' });
+});
+
+// API: Purge all proctoring photos from storage (database, file, memory) after parent views answer sheet
+app.post('/api/tests/:pinOrId/purge-photos', (req, res) => {
+  const pinOrId = String(req.params.pinOrId).trim();
+  const tests = getMergedTests();
+  const subs = getMergedSubmissions();
+  let purged = false;
+
+  const purgeRecordPhotos = (record: any) => {
+    if (!record) return;
+    delete record.calibrationPhotos;
+    if (Array.isArray(record.violationSnapshots)) {
+      // Clear the heavy base64 photo strings while preserving the audit strike log
+      record.violationSnapshots = record.violationSnapshots.map((s: any) => ({
+        ...s,
+        photo: ''
+      }));
+    }
+    record.photosPurged = true;
+    purged = true;
+  };
+
+  const test = findRecord(tests, pinOrId);
+  if (test) {
+    purgeRecordPhotos(test);
+    if (test.pin) testsStore[String(test.pin).trim()] = test;
+    if (test.id) testsStore[String(test.id).trim()] = test;
+  }
+  const sub = findRecord(subs, pinOrId);
+  if (sub) {
+    purgeRecordPhotos(sub);
+    if (sub.pin) submissionsStore[String(sub.pin).trim()] = sub;
+    if (sub.id) submissionsStore[String(sub.id).trim()] = sub;
+  }
+
+  if (purged) {
+    saveJson(TESTS_FILE, testsStore);
+    saveJson(SUBMISSIONS_FILE, submissionsStore);
+    console.log(`[Photos Purged] Removed proctoring photos for test: ${pinOrId}`);
+  }
+  res.json({ success: true, message: 'All photos successfully purged from storage' });
 });
 
 // API: Save Student Submission (updates both submissionsStore and testsStore with "submitted" status)

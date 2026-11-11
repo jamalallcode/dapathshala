@@ -5,7 +5,7 @@ import {
   TrendingUp, Award, BookOpen, Sparkles, RefreshCw, Edit3, X,
   Save, AlertCircle, Camera, ExternalLink, HelpCircle, GraduationCap, ArrowRight, ArrowLeft,
   RotateCcw, MessageCircle, Lightbulb, ChevronDown, Printer, Settings,
-  Brain, Trophy, Target, Zap, Landmark, School, Lock, Globe, FolderArchive
+  Brain, Trophy, Target, Zap, Landmark, School, Lock, Globe, FolderArchive, ShieldCheck
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { AssignedTest, StudentSubmission, ExamQuestion, ViolationSnapshot } from '../../types';
@@ -24,7 +24,8 @@ import {
   fetchTestFromServer,
   fetchSubmissionFromServer,
   fetchAllTestsFromServer,
-  syncSubmissionToServer
+  syncSubmissionToServer,
+  purgePhotosForTest
 } from '../../lib/storage';
 import { 
   CHAPTER_QUESTION_BANK, 
@@ -209,10 +210,30 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   // যদি কোনো অভিভাবক কোনো প্রশ্ন তৈরি করে না থাকে তবে কোনো অটোমেটিক প্রশ্ন দেখাবে না
   const loadTests = () => {
     const list = getStoredTests();
+    // Auto-clean any already-reviewed tests that might still carry photo data
+    let hasCleaned = false;
+    const sanitizedList = list.map(t => {
+      if (t.status === 'reviewed' && (t.calibrationPhotos || (t.violationSnapshots && t.violationSnapshots.some(s => s.photo)))) {
+        hasCleaned = true;
+        const copy = { ...t };
+        delete copy.calibrationPhotos;
+        if (copy.violationSnapshots) {
+          copy.violationSnapshots = copy.violationSnapshots.map(s => ({ ...s, photo: '' }));
+        }
+        copy.photosPurged = true;
+        purgePhotosForTest(t.id || t.pin);
+        return copy;
+      }
+      return t;
+    });
+    if (hasCleaned) {
+      saveStoredTests(sanitizedList);
+    }
+
     const parent = getCurrentParent();
     if (parent?.phone) {
       // STRICT FILTER: Only tests explicitly created by this parent!
-      const filtered = list.filter(t => t.parentPhone && t.parentPhone === parent.phone);
+      const filtered = sanitizedList.filter(t => t.parentPhone && t.parentPhone === parent.phone);
       setTests(filtered);
     } else {
       setTests([]);
@@ -1262,18 +1283,51 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
     setApprovedScore(test.score !== undefined ? test.score : 80);
   };
 
+  // Close Review Modal and Auto-Purge photos (অভিভাবক একবার খাতা দেখে ফেলার পর ছবি অটো ডিলিট)
+  const handleCloseReviewModal = () => {
+    if (reviewTest) {
+      const targetId = reviewTest.id || reviewTest.pin;
+      if (targetId) {
+        purgePhotosForTest(targetId);
+      }
+      setTests(prev => prev.map(t => {
+        if (t.id === reviewTest.id || t.pin === reviewTest.pin) {
+          const copy = { ...t };
+          delete copy.calibrationPhotos;
+          if (Array.isArray(copy.violationSnapshots)) {
+            copy.violationSnapshots = copy.violationSnapshots.map(s => ({ ...s, photo: '' }));
+          }
+          return { ...copy, photosPurged: true };
+        }
+        return t;
+      }));
+    }
+    setReviewTest(null);
+  };
+
   // Approve and publish evaluated test with parent feedback
   const handleSaveEvaluation = () => {
     if (!reviewTest) return;
 
+    // Auto-delete proctoring photos once parent has reviewed & approved the answer sheet
+    const targetId = reviewTest.id || reviewTest.pin;
+    if (targetId) {
+      purgePhotosForTest(targetId);
+    }
+
     const updated = tests.map(t => {
       if (t.id === reviewTest.id) {
+        const copy = { ...t };
+        delete copy.calibrationPhotos;
+        const cleanedSnapshots = (copy.violationSnapshots || []).map(s => ({ ...s, photo: '' }));
         return {
-          ...t,
+          ...copy,
           status: 'reviewed' as const,
           score: approvedScore,
           parentComment: parentComment.trim(),
-          isPublished: true
+          isPublished: true,
+          violationSnapshots: cleanedSnapshots,
+          photosPurged: true
         };
       }
       return t;
@@ -3908,7 +3962,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               </div>
               <button
                 type="button"
-                onClick={() => setReviewTest(null)}
+                onClick={handleCloseReviewModal}
                 className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 shrink-0 cursor-pointer"
                 title="বন্ধ করুন"
               >
@@ -3948,6 +4002,56 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 </div>
               )}
 
+              {/* Privacy Notice: Auto-Purge of Photos after Parent Review */}
+              {reviewTest.photosPurged || (!reviewTest.calibrationPhotos && (!reviewTest.violationSnapshots || reviewTest.violationSnapshots.every(s => !s.photo))) ? (
+                <div className="p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200 text-xs text-emerald-950 flex flex-wrap items-center justify-between gap-2 animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span className="font-medium text-emerald-900">
+                      <strong>গোপনীয়তা ও ডাটাবেজ সুরক্ষা:</strong> অভিভাবক কর্তৃক উত্তরপত্র একবার যাচাই হওয়ার পর ডাটাবেজ ক্লিন রাখতে সকল প্রক্টরিং ফটো প্রমাণ স্বয়ংক্রিয়ভাবে স্থায়ীভাবে মুছে ফেলা হয়েছে।
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300 shrink-0">
+                    ডাটাবেজে কোনো ছবি নেই ✓
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between text-[11px] bg-amber-50 text-amber-900 border border-amber-200 rounded-xl px-3 py-2 font-medium">
+                  <span className="flex items-center gap-1.5">
+                    <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>সুরক্ষা নীতি: উত্তরপত্র যাচাই শেষে খাতা বন্ধ বা অনুমোদন করলেই স্বয়ংক্রিয়ভাবে ডাটাবেজ থেকে সব ছবি মুছে যাবে।</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetId = reviewTest.id || reviewTest.pin;
+                      if (targetId) purgePhotosForTest(targetId);
+                      setReviewTest(prev => prev ? {
+                        ...prev,
+                        calibrationPhotos: undefined,
+                        violationSnapshots: (prev.violationSnapshots || []).map(s => ({ ...s, photo: '' })),
+                        photosPurged: true
+                      } : null);
+                      setTests(prev => prev.map(t => {
+                        if (t.id === reviewTest.id || t.pin === reviewTest.pin) {
+                          const copy = { ...t };
+                          delete copy.calibrationPhotos;
+                          if (copy.violationSnapshots) {
+                            copy.violationSnapshots = copy.violationSnapshots.map(s => ({ ...s, photo: '' }));
+                          }
+                          return { ...copy, photosPurged: true };
+                        }
+                        return t;
+                      }));
+                      showToast('✓ প্রক্টরিং এর সকল ছবি তাৎক্ষণিকভাবে ডাটাবেজ থেকে মুছে দেওয়া হয়েছে!');
+                    }}
+                    className="text-[10px] font-bold bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1 rounded-lg transition-colors cursor-pointer shrink-0 shadow-2xs"
+                  >
+                    এখনই ছবি মুছুন
+                  </button>
+                </div>
+              )}
+
               {/* 4-Angle Verified Calibration Baseline Photos */}
               {reviewTest.calibrationPhotos && (
                 <div className="p-3.5 rounded-2xl bg-emerald-50/90 border border-emerald-200 text-xs space-y-2 animate-in fade-in">
@@ -3984,12 +4088,12 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               )}
 
               {/* Feature 1: Photographic Violation Snapshot Proofs Gallery */}
-              {reviewTest.violationSnapshots && reviewTest.violationSnapshots.length > 0 && (
+              {reviewTest.violationSnapshots && reviewTest.violationSnapshots.some(s => s.photo) && (
                 <div className="p-3.5 rounded-2xl bg-rose-50/90 border border-rose-200 text-xs space-y-2.5 animate-in fade-in">
                   <div className="flex items-center justify-between">
                     <div className="font-bold text-rose-950 flex items-center gap-1.5">
                       <Camera className="w-4 h-4 text-rose-600 shrink-0" />
-                      <span>সন্দেহজনক মুহূর্তের স্বয়ংক্রিয় ফটো স্ন্যাপশট প্রমাণ ({toBn(reviewTest.violationSnapshots.length)}টি সংরক্ষিত):</span>
+                      <span>সন্দেহজনক মুহূর্তের স্বয়ংক্রিয় ফটো স্ন্যাপশট প্রমাণ ({toBn(reviewTest.violationSnapshots.filter(s => s.photo).length)}টি সংরক্ষিত):</span>
                     </div>
                     <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full border border-rose-300">
                       ক্লিক করে বড় ছবি দেখুন ⤢
@@ -3997,7 +4101,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 max-h-48 overflow-y-auto pr-1">
-                    {reviewTest.violationSnapshots.map((snap, sIdx) => (
+                    {reviewTest.violationSnapshots.filter(s => s.photo).map((snap, sIdx) => (
                       <div
                         key={snap.id || sIdx}
                         onClick={() => setSelectedSnapshot(snap)}
@@ -4169,10 +4273,10 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setReviewTest(null)}
+                  onClick={handleCloseReviewModal}
                   className="px-4 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
                 >
-                  বাতিল
+                  বন্ধ করুন
                 </button>
                 <button
                   type="button"

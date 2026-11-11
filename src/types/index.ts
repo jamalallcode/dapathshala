@@ -60,6 +60,7 @@ export interface AssignedTest {
     side?: string;
     away?: string;
   };
+  photosPurged?: boolean;
 }
 
 export interface StudentSubmission {
@@ -83,6 +84,7 @@ export interface StudentSubmission {
     side?: string;
     away?: string;
   };
+  photosPurged?: boolean;
 }
 
 export interface AppNotification {
