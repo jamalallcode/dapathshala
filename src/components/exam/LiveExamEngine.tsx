@@ -155,6 +155,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const baselineFaceYRef = useRef<number | null>(null);
   const baselineFaceXRef = useRef<number | null>(null);
   const calibrationSamplesCountRef = useRef<number>(0);
+  const hasShownOneTimeWarningRef = useRef<boolean>(false);
 
   // Feature 1: Automated Photographic Violation Snapshot Proofs
   const [violationSnapshots, setViolationSnapshots] = useState<ViolationSnapshot[]>(() => test.violationSnapshots || []);
@@ -1162,6 +1163,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         let headHairWeightedX = 0;
         let headSkinLumSum = 0;
 
+        // Symmetrical Upper and Lower face bands for Head Tilt (Roll / ঘাড় কাত হওয়া)
+        const topBandMaxY = faceMinY + faceH * 0.40;
+        const bottomBandMinY = faceMinY + faceH * 0.60;
+        let topFaceSkinCount = 0;
+        let topFaceWeightedX = 0;
+        let bottomFaceSkinCount = 0;
+        let bottomFaceWeightedX = 0;
+
         for (let y = Math.max(0, faceMinY - 8); y <= headMaxY; y++) {
           for (let x = 0; x < 80; x++) {
             const idx = (y * 80 + x) * 4;
@@ -1184,6 +1193,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               if (x > headMaxX) headMaxX = x;
               if (x < 40) headLeftSkin++;
               else headRightSkin++;
+
+              if (y <= topBandMaxY) {
+                topFaceSkinCount++;
+                topFaceWeightedX += x;
+              } else if (y >= bottomBandMinY) {
+                bottomFaceSkinCount++;
+                bottomFaceWeightedX += x;
+              }
             } else if (!isSkin && (lum < 68 || (r < 65 && g < 65 && b < 70))) {
               headHairCount++;
               headHairWeightedX += x;
@@ -1251,7 +1268,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
         // Cheek skin distribution asymmetry (inside the isolated head)
         const totalHeadCheek = leftCheekSkin + rightCheekSkin;
-        const skinAsymmetry = totalHeadCheek > 15
+        const skinAsymmetry = totalHeadCheek > 16
           ? Math.abs(leftCheekSkin - rightCheekSkin) / totalHeadCheek
           : 0;
 
@@ -1332,29 +1349,37 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         const faceAspectRatio = faceW / Math.max(faceH, 1);
         const headYawShift = Math.abs(headCentroidX - headMidX) / Math.max(headW, 1);
         const totalCheek = leftCheekSkin + rightCheekSkin;
-        const cheekAsymmetry = totalCheek > 20 ? Math.abs(leftCheekSkin - rightCheekSkin) / totalCheek : 0;
+        const cheekAsymmetry = totalCheek > 16 ? Math.abs(leftCheekSkin - rightCheekSkin) / totalCheek : 0;
         const vertDisplacement = centroidY - baseY;
         const horizDisplacement = Math.abs(headCentroidX - baseX);
 
-        // Frontal Screen Gaze Check (সোজা প্রশ্নপত্রে দৃষ্টি রাখা নিশ্চিতকরণ)
-        const isStraightGaze = (
-          headYawShift < 0.055 &&
-          cheekAsymmetry < 0.30 &&
-          horizDisplacement < 4.8 &&
-          vertDisplacement < 4.2 &&
-          centroidY >= 14 && centroidY <= 34 &&
-          centroidX >= 24 && centroidX <= 56
+        // 1. Symmetrical Head Tilt (Roll - ঘাড় ডানে বা বামে কাত বা বাঁকা হওয়া)
+        const topFaceX = topFaceSkinCount > 2 ? (topFaceWeightedX / topFaceSkinCount) : centroidX;
+        const bottomFaceX = bottomFaceSkinCount > 2 ? (bottomFaceWeightedX / bottomFaceSkinCount) : centroidX;
+        const headTiltDelta = topFaceX - bottomFaceX;
+        const headTiltAbs = Math.abs(headTiltDelta);
+        const headTiltRatio = headTiltAbs / Math.max(headW, 10);
+        // Symmetrical: Tilt of 2.4+ pixels or ratio > 0.12 catches neck tilt in BOTH right and left directions
+        const isHeadTilted = headTiltAbs >= 2.4 || headTiltRatio > 0.12;
+
+        // 2. Symmetrical Lateral Body / Head Shift (ডানে বা বামে শরীর বা মুখ সরে যাওয়া - ফ্রেমের প্রস্থ ৮০, কেন্দ্র ৪০)
+        const isHeadShifted = (
+          horizDisplacement > 5.0 ||
+          headCentroidX < 27 || headCentroidX > 53 ||
+          centroidX < 27 || centroidX > 53
+        );
+
+        // 3. Symmetrical Head Turned Sideways (Yaw - ডানে বা বামে ঘাড় ঘুরিয়ে অন্যদিকে তাকানো)
+        const isHeadTurnedYaw = (
+          headYawShift > 0.070 ||
+          (cheekAsymmetry > 0.38 && horizDisplacement > 3.6) ||
+          (faceAspectRatio < 0.55 && headYawShift > 0.055)
         );
 
         let isHeadTurned = false;
 
-        // Candidate turned head sideways or backwards (ডানে বা বামে ঘাড় ঘুরিয়ে অন্যদিকে তাকানো)
-        const isTurnedSideways = (
-          headYawShift > 0.080 ||
-          (cheekAsymmetry > 0.42 && horizDisplacement > 4.2) ||
-          horizDisplacement > 6.5 ||
-          (faceAspectRatio < 0.55 && headYawShift > 0.062)
-        );
+        // Candidate turned head sideways, tilted neck, leaned away, or turned backwards (উভয় ডানে ও বামে সমান সংবেদনশীল)
+        const isTurnedSideways = isHeadTilted || isHeadShifted || isHeadTurnedYaw;
         const isTurnedBackwards = upperDarkHairCount > 130 && headSkinCount < 20;
 
         if (isTurnedSideways || isTurnedBackwards) {
@@ -1380,15 +1405,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           if (headTurnConsecutiveRef.current >= proctorConfig.consecutiveRequired) {
             const isNewTurn = !isViolatingRef.current;
             isViolatingRef.current = true;
-            if (warningTimeoutRef.current) {
-              clearTimeout(warningTimeoutRef.current);
-              warningTimeoutRef.current = null;
-            }
-            const currentStrike = (violationCountRef.current || violationCount) + (isNewTurn ? 1 : 0);
-            setLastWarning(`⚠️ মাথা ও দৃষ্টি অন্যদিকে ঘোরানো সনাক্ত হয়েছে! সতর্কতা: ${currentStrike}/৫০ (অনুগ্রহ করে প্রশ্নপত্রে দৃষ্টি রাখুন)`);
-            if (isNewTurn || now - lastViolationTimeRef.current > 3200) {
+            if (isNewTurn || now - lastViolationTimeRef.current > 2800) {
               lastViolationTimeRef.current = now;
-              handleGazeAway('মাথা ও দৃষ্টি অন্যদিকে ঘোরানো সনাক্ত হয়েছে');
+              const reasonLabel = isHeadTilted
+                ? 'ডানে/বামে ঘাড় কাত বা বাঁকা করা সনাক্ত'
+                : isHeadShifted
+                ? 'ক্যামেরা ফ্রেমের ডানে/বামে সরে যাওয়া সনাক্ত'
+                : 'মাথা ও দৃষ্টি অন্যদিকে ঘোরানো সনাক্ত';
+              handleGazeAway(reasonLabel);
             }
           }
         } else if (isLookingDown) {
@@ -1401,15 +1425,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           if (lookDownConsecutiveRef.current >= proctorConfig.consecutiveRequired) {
             const isNewTurn = !isViolatingRef.current;
             isViolatingRef.current = true;
-            if (warningTimeoutRef.current) {
-              clearTimeout(warningTimeoutRef.current);
-              warningTimeoutRef.current = null;
-            }
-            const currentStrike = (violationCountRef.current || violationCount) + (isNewTurn ? 1 : 0);
-            setLastWarning(`⚠️ নিচে বা খাতা/ফোনে দৃষ্টি সনাক্ত হয়েছে! সতর্কতা: ${currentStrike}/৫০ (অনুগ্রহ করে প্রশ্নপত্রে দৃষ্টি রাখুন)`);
-            if (isNewTurn || now - lastViolationTimeRef.current > 3200) {
+            if (isNewTurn || now - lastViolationTimeRef.current > 2800) {
               lastViolationTimeRef.current = now;
-              handleGazeAway('নিচে বা খাতা/ফোনে দৃষ্টি সনাক্ত হয়েছে');
+              handleGazeAway('নিচে বা খাতা/ফোনে দৃষ্টি সনাক্ত');
             }
           }
         } else {
@@ -1421,15 +1439,6 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           if (headTurnConsecutiveRef.current === 0 && lookDownConsecutiveRef.current === 0) {
             if (isViolatingRef.current) {
               isViolatingRef.current = false;
-              if (warningTimeoutRef.current) {
-                clearTimeout(warningTimeoutRef.current);
-              }
-              warningTimeoutRef.current = setTimeout(() => {
-                if (!isViolatingRef.current) {
-                  setLastWarning(null);
-                }
-                warningTimeoutRef.current = null;
-              }, 1200);
             }
             setHeadStatus('forward');
             setGazeStatus('normal');
@@ -1454,9 +1463,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
   // Handle when candidate turns head or removes gaze from screen:
   // USER SPECIFICATION:
-  // 1. Immediately warn on looking away (no silent grace delays).
-  // 2. Instead of sound, show message: “প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।”
-  // 3. This serious message modal appears periodically after every 3 warnings (warning 3, 6, 9, 12, ...).
+  // 1. শিক্ষার্থীকে ঘন ঘন বা বারবার পপআপ দিয়ে সতর্ক করা হবে না।
+  // 2. প্রথমবার শুধুমাত্র একবার স্পষ্ট সতর্কবার্তা দেওয়া হবে: “আপনি ডানে-বামে যে দিকেই তাকান না কেন বা আপনাকে কেউ সহায়তা করলে সব রেকর্ড হচ্ছে!”
+  // 3. পরবর্তীতে ডানে/বামে তাকালে স্ক্রিনে কোনো বিরক্তিকর সতর্কবার্তা পপআপ ভাসবে না, কিন্তু ব্যাকগ্রাউন্ডে নীরবে ডিজিটাল প্রমাণ হিসেবে ছবি (স্ন্যাপশট) তুলে রাখা হবে।
   // 4. Strict requirement: minimum 50 warnings before auto-termination!
   const handleGazeAway = (reason: string) => {
     const next = gazeAwayCountRef.current + 1;
@@ -1466,15 +1475,15 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     setViolationCount(next);
 
     const nowTime = new Date().toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const logEntry = `[${nowTime}] ${reason} (সতর্কতা: ${next} বার)`;
+    const logEntry = `[${nowTime}] ${reason} (ছবি রেকর্ড #${next})`;
     
     proctorLogsRef.current = [...proctorLogsRef.current, logEntry];
     setProctorLogs([...proctorLogsRef.current]);
 
-    // Feature 1: Capture photographic snapshot proof of the violation
+    // Feature 1: ALWAYS capture photographic snapshot proof silently into audit archive
     const snap = captureViolationSnapshot(reason, next);
     if (snap) {
-      const updatedSnaps = [...violationSnapshotsRef.current, snap].slice(-25);
+      const updatedSnaps = [...violationSnapshotsRef.current, snap].slice(-50);
       violationSnapshotsRef.current = updatedSnaps;
       setViolationSnapshots(updatedSnaps);
     }
@@ -1488,33 +1497,24 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       return;
     }
 
-    // Every 3 warnings (3rd, 6th, 9th, 12th...), trigger voice audio announcement without blocking modal
-    if (next % 3 === 0) {
-      setLastWarning(`“প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।” (সতর্কতা: ${next}/৫০)`);
-      speakObservationAudio("প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।");
+    // USER SPECIFICATION: শুধুমাত্র একবার সতর্ক করা হবে। পরবর্তীতে কোনো পপআপ বা শব্দ ছাড়াই ব্যাকগ্রাউন্ডে ছবি তোলা হবে।
+    if (!hasShownOneTimeWarningRef.current) {
+      hasShownOneTimeWarningRef.current = true;
+      const oneTimeWarningText = "⚠️ আপনি ডানে-বামে যে দিকেই তাকান না কেন বা আপনাকে কেউ সহায়তা করলে সব রেকর্ড হচ্ছে! অনুগ্রহ করে সততার সাথে পরীক্ষা দিন।";
+      setLastWarning(oneTimeWarningText);
+      speakObservationAudio("আপনি ডানে বামে যে দিকেই তাকান না কেন বা আপনাকে কেউ সহায়তা করলে সব রেকর্ড হচ্ছে।");
+
       if (warningTimeoutRef.current) {
         clearTimeout(warningTimeoutRef.current);
         warningTimeoutRef.current = null;
       }
       warningTimeoutRef.current = setTimeout(() => {
-        if (!isViolatingRef.current) {
-          setLastWarning(null);
-        }
+        setLastWarning(null);
         warningTimeoutRef.current = null;
       }, 5500);
     } else {
-      // Immediate floating warning banner on other warnings (1, 2, 4, 5, 7, 8...)
-      setLastWarning(`⚠️ ${reason}! সতর্কতা: ${next}/৫০ (অনুগ্রহ করে প্রশ্নপত্রে দৃষ্টি রাখুন)`);
-      if (warningTimeoutRef.current) {
-        clearTimeout(warningTimeoutRef.current);
-        warningTimeoutRef.current = null;
-      }
-      warningTimeoutRef.current = setTimeout(() => {
-        if (!isViolatingRef.current) {
-          setLastWarning(null);
-        }
-        warningTimeoutRef.current = null;
-      }, 3500);
+      // পরবর্তী ২য়, ৩য়, ৪র্থ... বারের ক্ষেত্রে স্ক্রিনে কোনো পপআপ দেখানো হবে না এবং কোনো শব্দও করা হবে না।
+      // শিক্ষার্থী শান্তভাবে পরীক্ষা দিতে থাকবে এবং তার প্রতিটি সন্দেহজনক মুহূর্তের ছবি ও প্রমাণ স্বয়ংক্রিয়ভাবে রেকর্ড হতে থাকবে।
     }
   };
 
@@ -2229,10 +2229,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
               <div className="text-[7px] sm:text-[7.5px] text-slate-400 font-mono bg-slate-950/80 px-1.5 py-0.5 rounded border border-slate-800 flex items-center justify-between">
                 <span className="truncate">মাত্রা: {proctorConfig.name}</span>
-                <span className="shrink-0 text-amber-300 font-bold">প্রতি ৩ বারে অডিও বার্তা 🔊</span>
+                <span className="shrink-0 text-emerald-400 font-bold">নীরব ছবি অডিট সক্রিয় 📸</span>
               </div>
 
-              {/* Recalibrate, Audio Test & Reset Controls */}
               {/* Recalibrate & Audio Test Controls */}
               <div className="flex items-center gap-1 pt-0.5">
                 <button
@@ -2246,7 +2245,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => speakObservationAudio("প্লিজ প্রশ্নপত্র ব্যতিত অন্যকোন দিকে তাকাবেন না। আপনার সব কিছু পর্যবেক্ষন করা হচ্ছে।")}
+                  onClick={() => speakObservationAudio("আপনি ডানে বামে যে দিকেই তাকান না কেন বা আপনাকে কেউ সহায়তা করলে সব রেকর্ড হচ্ছে।")}
                   className="py-1 px-1.5 rounded bg-amber-950/80 hover:bg-amber-900 active:bg-amber-950 text-amber-300 hover:text-white text-[7.5px] sm:text-[8px] font-bold cursor-pointer border border-amber-800/60 transition-colors flex items-center gap-0.5"
                   title="বাংলা কণ্ঠস্বরে অডিও বার্তাটি পরীক্ষা করে শুনুন"
                 >
@@ -2259,9 +2258,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               <div className="w-full mt-1.5 p-1.5 rounded-xl bg-gradient-to-br from-amber-950/95 via-rose-950/90 to-amber-950/95 border border-amber-500/70 text-amber-200 text-[7.5px] sm:text-[8px] font-bold leading-relaxed text-center shadow-xs">
                 <div className="flex items-center justify-center gap-1 text-[7px] text-amber-400 font-black mb-0.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
-                  <span className="uppercase tracking-wider">সার্বক্ষণিক প্রক্টরিং নির্দেশনা</span>
+                  <span className="uppercase tracking-wider">সার্বক্ষণিক প্রক্টরিং অডিট</span>
                 </div>
-                “দয়া করে নকল করার কোন চেষ্টা করবেন না। যদি করেন তাহলে সেটি রেকর্ড করা হবে এবং আপনার অভিভাবকের নিকট তা পাঠিয়ে দেওয়া হবে।”
+                “আপনি ডানে-বামে যে দিকেই তাকান না কেন বা আপনাকে কেউ সহায়তা করলে সব রেকর্ড হচ্ছে এবং সন্দেহজনক মুহূর্তের ছবি তোলা হচ্ছে।”
               </div>
 
               {!cameraActive && (
