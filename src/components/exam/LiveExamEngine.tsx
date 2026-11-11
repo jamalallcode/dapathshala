@@ -4,7 +4,8 @@ import {
   ArrowLeft, Clock, CircleAlert, CircleCheck, Check, CheckCircle2,
   FileCheck, Send, ShieldCheck, ShieldAlert, X, FileText, Camera, 
   AlertTriangle, Eye, EyeOff, Maximize, MessageSquare, Copy,
-  Volume2, VolumeX, Play, Mic, MicOff, Smartphone, BookOpen, Shuffle, Lock, Timer, Zap, Users
+  Volume2, VolumeX, Play, Mic, MicOff, Smartphone, BookOpen, Shuffle, Lock, Timer, Zap, Users,
+  Lightbulb, ArrowRight
 } from "lucide-react";
 import { 
   getStoredTests, 
@@ -209,6 +210,30 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }
   };
 
+  // -------------------------------------------------------------
+  // INTERACTIVE GAZE & POSTURE CALIBRATION (ইন্টারেক্টিভ বায়োমেট্রিক ও গেইজ ক্যালিব্রেশন)
+  // -------------------------------------------------------------
+  const [isCalibrating, setIsCalibrating] = useState<boolean>(!isReviewOnly && !isSubmitted);
+  const [calibrationStep, setCalibrationStep] = useState<1 | 2 | 3 | 4>(1); // 1: সোজা, 2: নিচে প্রশ্ন, 3: ডানে-বামে অপশন, 4: সম্পন্ন
+  const [calibrationProgress, setCalibrationProgress] = useState<number>(0);
+  const [calibratedProfile, setCalibratedProfile] = useState<{
+    centerYaw: number;
+    pitchDownMax: number;
+    eyeMinRel: number;
+    eyeMaxRel: number;
+    isCompleted: boolean;
+  }>({
+    centerYaw: 40,
+    pitchDownMax: 36,
+    eyeMinRel: 0.16,
+    eyeMaxRel: 0.84,
+    isCompleted: false
+  });
+  const calibratedProfileRef = useRef(calibratedProfile);
+  useEffect(() => {
+    calibratedProfileRef.current = calibratedProfile;
+  }, [calibratedProfile]);
+
   // 4 Proctoring Strictness Levels (অভিভাবক কর্তৃক নির্বাচিত ৪টি মাত্রা)
   const effectiveProctoringLevel: 1 | 2 | 3 | 4 = (
     test.proctoringLevel ||
@@ -217,62 +242,62 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   ) as 1 | 2 | 3 | 4;
 
   // 4 Proctoring Strictness Levels (আন্তর্জাতিক অনলাইন পরীক্ষা স্ট্যান্ডার্ড - Pearson VUE / Mettl গাইডলাইন)
-  // প্রাকৃতিক মানবিক নড়াচড়ায় যেন কোনো মিথ্যা সতর্কবার্তা না আসে, এবং কেবল একটানা সচেতন অন্যদিকে তাকালে সতর্ক করা হয়
+  // প্রাকৃতিক মানবিক নড়াচড়া ও স্ক্রিন পড়ার দৃষ্টিকে স্বাভাবিক গণ্য করে, এবং কেবল একটানা সচেতন অন্যদিকে তাকালে সতর্ক করা হয়
   const proctorConfig = {
     1: {
       levelNum: 1,
       name: 'লেভেল ১ (মৃদু)',
       tag: 'সহনশীল',
-      featureSkewThreshold: 0.20,
-      skinAsymmetryThreshold: 0.38,
-      yawCentroidThreshold: 10.0,
-      pitchDownThreshold: 12.0,
-      sideGlanceDev: 0.28,
-      consecutiveRequired: 5, // ~700ms sustained look-away
+      featureSkewThreshold: 0.28,
+      skinAsymmetryThreshold: 0.45,
+      yawCentroidThreshold: 13.0,
+      pitchDownThreshold: 16.0,
+      sideGlanceDev: 0.36,
+      consecutiveRequired: 18, // ~2.5s sustained look-away
     },
     2: {
       levelNum: 2,
       name: 'লেভেল ২ (মাঝারি)',
       tag: 'স্ট্যান্ডার্ড',
-      featureSkewThreshold: 0.17,
-      skinAsymmetryThreshold: 0.32,
-      yawCentroidThreshold: 8.5,
-      pitchDownThreshold: 10.0,
-      sideGlanceDev: 0.25,
-      consecutiveRequired: 4, // ~560ms sustained look-away
+      featureSkewThreshold: 0.24,
+      skinAsymmetryThreshold: 0.40,
+      yawCentroidThreshold: 11.0,
+      pitchDownThreshold: 14.0,
+      sideGlanceDev: 0.32,
+      consecutiveRequired: 14, // ~2.0s sustained look-away
     },
     3: {
       levelNum: 3,
       name: 'লেভেল ৩ (কঠোর)',
       tag: 'কঠোর',
-      featureSkewThreshold: 0.14,
-      skinAsymmetryThreshold: 0.28,
-      yawCentroidThreshold: 7.5,
-      pitchDownThreshold: 8.5,
-      sideGlanceDev: 0.22,
-      consecutiveRequired: 3, // ~420ms sustained look-away
+      featureSkewThreshold: 0.20,
+      skinAsymmetryThreshold: 0.35,
+      yawCentroidThreshold: 9.5,
+      pitchDownThreshold: 12.0,
+      sideGlanceDev: 0.28,
+      consecutiveRequired: 10, // ~1.4s sustained look-away
     },
     4: {
       levelNum: 4,
       name: 'লেভেল ৪ (সর্বোচ্চ কঠোর - আন্তর্জাতিক প্রোটোকল)',
       tag: 'অতি-সংবেদনশীল',
-      featureSkewThreshold: 0.12,
-      skinAsymmetryThreshold: 0.24,
-      yawCentroidThreshold: 6.5,
-      pitchDownThreshold: 7.5,
-      sideGlanceDev: 0.19,
-      consecutiveRequired: 2, // ~280ms sustained look-away
+      featureSkewThreshold: 0.17,
+      skinAsymmetryThreshold: 0.30,
+      yawCentroidThreshold: 8.0,
+      pitchDownThreshold: 10.0,
+      sideGlanceDev: 0.24,
+      consecutiveRequired: 7, // ~1.0s sustained look-away
     },
   }[effectiveProctoringLevel] || {
     levelNum: 2,
     name: 'লেভেল ২ (মাঝারি)',
     tag: 'স্ট্যান্ডার্ড',
-    featureSkewThreshold: 0.17,
-    skinAsymmetryThreshold: 0.32,
-    yawCentroidThreshold: 8.5,
-    pitchDownThreshold: 10.0,
-    sideGlanceDev: 0.25,
-    consecutiveRequired: 4,
+    featureSkewThreshold: 0.24,
+    skinAsymmetryThreshold: 0.40,
+    yawCentroidThreshold: 11.0,
+    pitchDownThreshold: 14.0,
+    sideGlanceDev: 0.32,
+    consecutiveRequired: 14,
   };
 
   // Spoken Voice Audio Alert (বাংলা কণ্ঠস্বরে অডিও আকারে সতর্কবার্তা)
@@ -1115,7 +1140,74 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           featureSkew = Math.abs(featureCenterX - headMidX) / headW;
         }
 
-        // Lateral Glance (আড় চোখে এদিক-সেদিক তাকানো)
+        // If in Interactive Calibration Mode, record biometric and gaze samples for active step
+        if (isCalibrating) {
+          if (calibrationStep === 1) {
+            // Step 1: Center Forward Look (সোজা তাকানো)
+            if (centroidX > 20 && centroidX < 60 && centroidY > 10 && centroidY < 50) {
+              baselineFaceXRef.current = baselineFaceXRef.current === null ? centroidX : (baselineFaceXRef.current * 0.75 + centroidX * 0.25);
+              baselineFaceYRef.current = baselineFaceYRef.current === null ? centroidY : (baselineFaceYRef.current * 0.75 + centroidY * 0.25);
+              hasCalibratedFaceRef.current = true;
+              setCalibratedProfile(prev => ({
+                ...prev,
+                centerYaw: Math.round(centroidX)
+              }));
+              setCalibrationProgress(prev => {
+                const next = Math.min(prev + 12, 100);
+                if (next >= 100) {
+                  setTimeout(() => {
+                    setCalibrationStep(2);
+                    setCalibrationProgress(0);
+                  }, 400);
+                }
+                return next;
+              });
+            }
+          } else if (calibrationStep === 2) {
+            // Step 2: Downward Screen Reading Look (স্ক্রিনের নিচে প্রশ্ন পড়ার স্বাভাবিক কোণ)
+            setCalibratedProfile(prev => ({
+              ...prev,
+              pitchDownMax: Math.max(prev.pitchDownMax, Math.round(centroidY + 6))
+            }));
+            setCalibrationProgress(prev => {
+              const next = Math.min(prev + 12, 100);
+              if (next >= 100) {
+                setTimeout(() => {
+                  setCalibrationStep(3);
+                  setCalibrationProgress(0);
+                }, 400);
+              }
+              return next;
+            });
+          } else if (calibrationStep === 3) {
+            // Step 3: Horizontal Reading Range (স্ক্রিনের ডানে ও বামে অপশন পড়ার সীমানা)
+            if (leftEyeDarkCount >= 2 || rightEyeDarkCount >= 2) {
+              const leftEyeCenter = leftEyeDarkCount > 0 ? (leftEyeDarkX / leftEyeDarkCount) : headMidX;
+              const rightEyeCenter = rightEyeDarkCount > 0 ? (rightEyeDarkX / rightEyeDarkCount) : headMidX;
+              const avgEyeRel = (((leftEyeCenter - headMinX) / headW) + ((rightEyeCenter - headMinX) / headW)) / 2;
+              setCalibratedProfile(prev => ({
+                ...prev,
+                eyeMinRel: Math.min(prev.eyeMinRel, Math.max(0.12, avgEyeRel - 0.16)),
+                eyeMaxRel: Math.max(prev.eyeMaxRel, Math.min(0.88, avgEyeRel + 0.16))
+              }));
+            }
+            setCalibrationProgress(prev => {
+              const next = Math.min(prev + 12, 100);
+              if (next >= 100) {
+                setTimeout(() => {
+                  setCalibratedProfile(p => ({ ...p, isCompleted: true }));
+                  setCalibrationStep(4);
+                  setCalibrationProgress(100);
+                }, 400);
+              }
+              return next;
+            });
+          }
+          return;
+        }
+
+        // Lateral Glance (আড় চোখে স্ক্রিনের বাইরে তাকানো)
+        // Uses calibrated safe reading boundaries when available
         let isSideGlance = false;
         if (leftEyeDarkCount >= 2 && rightEyeDarkCount >= 2) {
           const leftEyeCenter = leftEyeDarkX / leftEyeDarkCount;
@@ -1124,37 +1216,43 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           const rightEyeRel = (rightEyeCenter - headMinX) / headW;
           const avgEyeRel = (leftEyeRel + rightEyeRel) / 2;
           
-          if (avgEyeRel < (0.5 - proctorConfig.sideGlanceDev) || avgEyeRel > (0.5 + proctorConfig.sideGlanceDev)) {
+          const safeMin = calibratedProfileRef.current.isCompleted
+            ? Math.max(0.10, calibratedProfileRef.current.eyeMinRel - 0.08)
+            : (0.5 - proctorConfig.sideGlanceDev);
+          const safeMax = calibratedProfileRef.current.isCompleted
+            ? Math.min(0.90, calibratedProfileRef.current.eyeMaxRel + 0.08)
+            : (0.5 + proctorConfig.sideGlanceDev);
+
+          if (avgEyeRel < safeMin || avgEyeRel > safeMax) {
             isSideGlance = true;
           }
-        } else if ((leftEyeDarkCount >= 3 && rightEyeDarkCount === 0) || (rightEyeDarkCount >= 3 && leftEyeDarkCount === 0)) {
-          isSideGlance = true;
         }
+        // NOTE: Single-eye lighting variations (e.g. shadow from one side) are NEVER flagged as side glance!
 
         // Head Profile Hair vs Face Yaw (In profile view, face skin and hair are on opposite horizontal sides)
         let isProfileHairYaw = false;
-        if (headHairCount > 12 && headSkinCount > 20) {
+        if (headHairCount > 14 && headSkinCount > 24) {
           const hairCenterX = headHairWeightedX / headHairCount;
-          if (Math.abs(headCentroidX - hairCenterX) > 6.5) {
+          if (Math.abs(headCentroidX - hairCenterX) > 7.5) {
             isProfileHairYaw = true;
           }
         }
 
         // Head Screen Side Shift (head skin concentrated almost entirely on one side of frame)
-        const headScreenAsymmetry = headSkinCount > 20
+        const headScreenAsymmetry = headSkinCount > 24
           ? Math.abs(headLeftSkin - headRightSkin) / headSkinCount
           : 0;
 
         // Head Centroid lateral shift away from forward baseline
         const headCentroidShift = Math.abs(headCentroidX - baseX);
 
-        // Head Turned Sideways, Profile or Backwards
+        // Head Turned completely Sideways, Profile or Backwards
         const isStrongFeatureTurn = featureSkew > proctorConfig.featureSkewThreshold;
-        const isCombinedTurn = (featureSkew > (proctorConfig.featureSkewThreshold * 0.70)) && (skinAsymmetry > (proctorConfig.skinAsymmetryThreshold * 0.70));
-        const isExtremeAsymmetryTurn = (skinAsymmetry > 0.38);
+        const isCombinedTurn = (featureSkew > (proctorConfig.featureSkewThreshold * 0.75)) && (skinAsymmetry > (proctorConfig.skinAsymmetryThreshold * 0.75));
+        const isExtremeAsymmetryTurn = (skinAsymmetry > 0.42);
         const isTurnedByCentroidShift = headCentroidShift > proctorConfig.yawCentroidThreshold;
-        const isTurnedByScreenShift = headScreenAsymmetry > 0.46;
-        const isTurnedBackwards = upperDarkHairCount > 110 && headSkinCount < 30;
+        const isTurnedByScreenShift = headScreenAsymmetry > 0.50;
+        const isTurnedBackwards = upperDarkHairCount > 125 && headSkinCount < 26;
 
         const isHeadTurned = isStrongFeatureTurn || isCombinedTurn || isExtremeAsymmetryTurn || isTurnedByCentroidShift || isTurnedByScreenShift || isProfileHairYaw || isTurnedBackwards;
 
@@ -1266,9 +1364,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     handleGazeAway(reason);
   };
 
-  // Timer countdown & Auto-submit
+  // Timer countdown & Auto-submit (ক্যালিব্রেশন চলাকালীন টাইমার পজ থাকবে)
   useEffect(() => {
-    if (isReviewOnly || isSubmitted) return;
+    if (isReviewOnly || isSubmitted || isCalibrating) return;
 
     if (timeLeft <= 0) {
       handleSubmitExam(false);
@@ -1280,7 +1378,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timeLeft, isReviewOnly, isSubmitted]);
+  }, [timeLeft, isReviewOnly, isSubmitted, isCalibrating]);
 
   // Feature 3: Per-Question Expiration Handler
   const handleQuestionTimeExpired = (index: number) => {
@@ -1304,7 +1402,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
   // Feature 3: Dedicated Per-Question Countdown Timer Loop
   useEffect(() => {
-    if (isReviewOnly || isSubmitted) return;
+    if (isReviewOnly || isSubmitted || isCalibrating) return;
 
     const interval = setInterval(() => {
       setQuestionTimeLeft((prev) => {
@@ -1317,7 +1415,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [activeQuestionIndex, isReviewOnly, isSubmitted, perQuestionDuration, activeQuestions.length]);
+  }, [activeQuestionIndex, isReviewOnly, isSubmitted, perQuestionDuration, activeQuestions.length, isCalibrating]);
 
   // Handle Option Select with Auto-advance to Next Question & Backtrack Locking
   const handleSelectOption = (questionId: string, option: string, index: number) => {
@@ -1470,6 +1568,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     lookDownConsecutiveRef.current = 0;
     setGazeStatus('normal');
     setHeadStatus('forward');
+    setCalibrationStep(1);
+    setCalibrationProgress(0);
+    setIsCalibrating(true);
   };
 
   const answeredCount = Object.keys(answers).length;
@@ -1482,6 +1583,214 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     >
       
 
+
+      {/* ------------------------------------------------------------- */}
+      {/* INTERACTIVE GAZE & POSTURE CALIBRATION ONBOARDING MODAL       */}
+      {/* ------------------------------------------------------------- */}
+      {isCalibrating && !isReviewOnly && !isSubmitted && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
+          <div className="bg-slate-900 border-2 border-emerald-500/80 rounded-3xl max-w-xl w-full p-4 sm:p-6 shadow-2xl text-white space-y-4 sm:space-y-5 my-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                    <span>স্মার্ট দৃষ্টি ও বায়োমেট্রিক ক্যালিব্রেশন</span>
+                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                      এআই অনবোর্ডিং
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    পরীক্ষায় অযাচিত বা মিথ্যা সতর্কবার্তা প্রতিরোধে আপনার স্বাভাবিক দৃষ্টিসীমা রেকর্ড করা হচ্ছে
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCalibrating(false)}
+                className="text-slate-400 hover:text-slate-200 text-xs px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors border border-slate-700 cursor-pointer shrink-0"
+                title="ক্যালিব্রেশন বন্ধ করে সরাসরি পরীক্ষা শুরু করুন"
+              >
+                এড়িয়ে যান ✕
+              </button>
+            </div>
+
+            {/* Stepper Progress */}
+            <div className="grid grid-cols-4 gap-1.5 sm:gap-2 text-center text-[10px] sm:text-xs font-bold">
+              {[
+                { step: 1, title: '১. সোজা দৃষ্টি' },
+                { step: 2, title: '২. নিচে প্রশ্ন পড়া' },
+                { step: 3, title: '৩. ডানে-বামে অপশন' },
+                { step: 4, title: '৪. সম্পন্ন' },
+              ].map((s) => (
+                <div
+                  key={s.step}
+                  className={`py-1.5 px-1 rounded-xl transition-all border ${
+                    calibrationStep === s.step
+                      ? 'bg-emerald-500 text-slate-950 border-emerald-400 font-black shadow-lg shadow-emerald-500/20'
+                      : calibrationStep > s.step
+                      ? 'bg-emerald-950/70 text-emerald-300 border-emerald-700/60'
+                      : 'bg-slate-800/60 text-slate-400 border-slate-700/40'
+                  }`}
+                >
+                  <span className="truncate block">{s.title}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Center Video Viewport with Live Visual Calibration Target */}
+            <div className="relative w-full h-44 sm:h-56 bg-slate-950 rounded-2xl overflow-hidden border-2 border-emerald-500/40 flex items-center justify-center">
+              {cameraActive ? (
+                <video 
+                  ref={(el) => {
+                    videoRef.current = el;
+                    if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
+                      attachStream(mediaStreamRef.current);
+                    }
+                  }}
+                  autoPlay 
+                  playsInline 
+                  muted 
+                  className="w-full h-full object-cover -scale-x-100"
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center text-center p-4 text-slate-400">
+                  <Camera className="w-8 h-8 mb-2 text-emerald-400 animate-pulse" />
+                  <span className="text-xs font-bold">ক্যামেরা চালু হচ্ছে...</span>
+                  <button
+                    type="button"
+                    onClick={requestWebcamAccess}
+                    className="mt-2 text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer shadow-md"
+                  >
+                    ক্যামেরা অনুমতি দিন
+                  </button>
+                </div>
+              )}
+
+              {/* Dynamic Step Crosshair & Guide Overlay */}
+              <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-3">
+                <div className="flex items-center justify-between">
+                  <span className="bg-black/75 backdrop-blur-xs text-emerald-300 border border-emerald-500/40 px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-mono font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    <span>
+                      {calibrationStep === 1 && "লক্ষ্য: সোজা ক্যামেরার দিকে দৃষ্টি"}
+                      {calibrationStep === 2 && "লক্ষ্য: নিচে স্ক্রিনে প্রশ্ন পড়ার দৃষ্টি"}
+                      {calibrationStep === 3 && "লক্ষ্য: স্ক্রিনের বাম ও ডান পাশের দৃষ্টি"}
+                      {calibrationStep === 4 && "✓ ক্যালিব্রেশন সফল"}
+                    </span>
+                  </span>
+                  <span className="bg-black/75 text-slate-300 px-2 py-0.5 rounded text-[10px] font-mono">
+                    নমুনা গ্রহণ: {Math.min(calibrationProgress, 100)}%
+                  </span>
+                </div>
+
+                {/* Visual Guides according to Step */}
+                <div className="flex items-center justify-center">
+                  {calibrationStep === 1 && (
+                    <div className="w-24 h-28 sm:w-28 sm:h-32 border-2 border-dashed border-emerald-400/90 rounded-full animate-pulse flex items-center justify-center">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+                    </div>
+                  )}
+                  {calibrationStep === 2 && (
+                    <div className="flex flex-col items-center gap-1 bg-black/60 px-3 py-1.5 rounded-xl border border-emerald-500/40 animate-bounce">
+                      <span className="text-emerald-300 text-xs font-bold">⬇ নিচে স্ক্রিনে পড়ার মতো তাকান ⬇</span>
+                    </div>
+                  )}
+                  {calibrationStep === 3 && (
+                    <div className="flex items-center justify-between w-full px-4 animate-pulse">
+                      <span className="text-emerald-300 text-xs font-bold bg-black/60 px-2 py-1 rounded-lg border border-emerald-500/40">⬅ বামের অপশন</span>
+                      <span className="text-emerald-300 text-xs font-bold bg-black/60 px-2 py-1 rounded-lg border border-emerald-500/40">ডানের অপশন ➡</span>
+                    </div>
+                  )}
+                  {calibrationStep === 4 && (
+                    <div className="bg-emerald-500/90 text-slate-950 px-4 py-2 rounded-2xl font-black text-sm sm:text-base flex items-center gap-2 shadow-2xl animate-bounce">
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span>ক্যালিব্রেশন সফলভাবে সম্পন্ন!</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Mini progress bar */}
+                <div className="w-full bg-slate-800/80 rounded-full h-1.5 overflow-hidden">
+                  <div 
+                    className="bg-emerald-400 h-full transition-all duration-300 rounded-full"
+                    style={{ width: `${calibrationStep === 4 ? 100 : calibrationProgress}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Step Instructions Text */}
+            <div className="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-3 sm:p-3.5 space-y-1">
+              <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-emerald-400">
+                <Lightbulb className="w-4 h-4 shrink-0 text-amber-300" />
+                <span>
+                  {calibrationStep === 1 && 'ধাপ ১: ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন'}
+                  {calibrationStep === 2 && 'ধাপ ২: স্ক্রিনের নিচের দিকে প্রশ্ন পড়ার মতো করে স্বাভাবিকভাবে তাকান'}
+                  {calibrationStep === 3 && 'ধাপ ৩: স্ক্রিনের বাম ও ডান পাশের অপশনগুলোর দিকে চোখ বুলিয়ে নিন'}
+                  {calibrationStep === 4 && 'ধাপ ৪: আপনার স্বাভাবিক দৃষ্টিসীমা সিস্টেমে রেকর্ড করা হয়েছে!'}
+                </span>
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-300 leading-relaxed pl-5">
+                {calibrationStep === 1 && 'সিস্টেম আপনার বসার মূল অবস্থান (Center Baseline) পরিমাপ করছে। কোনো অতিরিক্ত নড়াচড়া করবেন না।'}
+                {calibrationStep === 2 && 'পরীক্ষার সময় নিচে প্রশ্ন পড়ার স্বাভাবিক কোণটি সিস্টেমে সংরক্ষিত হচ্ছে। ফলে প্রশ্ন পড়ার সময় সিস্টেম ভুলবশত আড় চোখ ভাববে না।'}
+                {calibrationStep === 3 && 'মাথা অতিরিক্ত না ঘুরিয়ে শুধু চোখ দিয়ে স্ক্রিনের দুই পাশের অপশনগুলো লক্ষ্য করুন। এতে স্বাভাবিক আই-স্প্যান সংরক্ষিত হবে।'}
+                {calibrationStep === 4 && 'অভিনন্দন! আপনার জন্য কাস্টম সেফ-জোন সক্রিয় করা হয়েছে। এখন নিশ্চিন্তে ও মনোযোগ দিয়ে পরীক্ষা দিন।'}
+              </p>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsCalibrating(false)}
+                className="w-full sm:w-auto text-xs text-slate-400 hover:text-white underline underline-offset-4 py-1.5 px-2 cursor-pointer transition-colors"
+              >
+                ক্যালিব্রেশন এড়িয়ে সরাসরি পরীক্ষা দিন ➔
+              </button>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {calibrationStep < 4 ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (calibrationStep === 1) {
+                        setCalibrationStep(2);
+                        setCalibrationProgress(0);
+                      } else if (calibrationStep === 2) {
+                        setCalibrationStep(3);
+                        setCalibrationProgress(0);
+                      } else if (calibrationStep === 3) {
+                        setCalibratedProfile(p => ({ ...p, isCompleted: true }));
+                        setCalibrationStep(4);
+                        setCalibrationProgress(100);
+                      }
+                    }}
+                    className="w-full sm:w-auto px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 cursor-pointer transition-all active:scale-95"
+                  >
+                    <span>পরবর্তী ধাপ</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCalibrating(false);
+                    }}
+                    className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-xl shadow-emerald-500/30 cursor-pointer transition-all active:scale-95 animate-pulse"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>নিশ্চিন্তে পরীক্ষা শুরু করুন ➔</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Realtime Anti-Cheating Floating Warning (Non-blocking notification bar at top) */}
       {lastWarning && (
