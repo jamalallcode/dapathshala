@@ -227,18 +227,48 @@ export function startObjectDetection(
               break;
             }
 
-            if (cls === 'person' && score > 0.78) {
+            if (cls === 'person' && score > 0.76) {
               personCount++;
             }
           }
 
           if (!detectedResult && personCount > 1) {
-            detectedResult = {
-              detected: true,
-              type: 'second_person',
-              label: 'অতিরিক্ত মানুষের উপস্থিতি',
-              confidence: 0.90
-            };
+            const personBoxes = predictions.filter(
+              (p: any) => (p.class || '').toLowerCase() === 'person' && (p.score || 0) > 0.76 && p.bbox
+            );
+
+            if (personBoxes.length >= 2) {
+              const p1 = personBoxes[0].bbox; // [x, y, w, h]
+              const p2 = personBoxes[1].bbox;
+              const vw = videoElement.videoWidth || 320;
+
+              // Centers
+              const c1X = p1[0] + p1[2] / 2;
+              const c2X = p2[0] + p2[2] / 2;
+
+              // Overlap & containment check (filters duplicate boxes of same candidate)
+              const xOverlap = Math.max(0, Math.min(p1[0] + p1[2], p2[0] + p2[2]) - Math.max(p1[0], p2[0]));
+              const yOverlap = Math.max(0, Math.min(p1[1] + p1[3], p2[1] + p2[3]) - Math.max(p1[1], p2[1]));
+              const intersection = xOverlap * yOverlap;
+              const minArea = Math.min(p1[2] * p1[3], p2[2] * p2[3]);
+              const containment = minArea > 0 ? intersection / minArea : 0;
+
+              // Must be distinctly separated individuals in the frame
+              const isDistinctSecondPerson =
+                Math.abs(c1X - c2X) > (vw * 0.22) &&
+                containment < 0.28 &&
+                p1[2] > (vw * 0.12) &&
+                p2[2] > (vw * 0.12);
+
+              if (isDistinctSecondPerson) {
+                detectedResult = {
+                  detected: true,
+                  type: 'second_person',
+                  label: 'অতিরিক্ত মানুষের উপস্থিতি',
+                  confidence: 0.92
+                };
+              }
+            }
           }
         }
       } catch (err) {}

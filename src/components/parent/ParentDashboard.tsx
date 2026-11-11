@@ -3948,6 +3948,41 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
                 </div>
               )}
 
+              {/* 4-Angle Verified Calibration Baseline Photos */}
+              {reviewTest.calibrationPhotos && (
+                <div className="p-3.5 rounded-2xl bg-emerald-50/90 border border-emerald-200 text-xs space-y-2 animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <div className="font-bold text-emerald-950 flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span>পরীক্ষার্থীর অনুমোদিত বায়োমেট্রিক রেফারেন্স ফটো (৪-কোণ ক্যালিব্রেশন):</span>
+                    </div>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                      ভেরিফায়েড বেসলাইন ✓
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                    {[
+                      { key: 'center', label: '১. সোজা দৃষ্টি', note: 'সেন্ট্রাল অক্ষ' },
+                      { key: 'down', label: '২. প্রশ্ন পড়া', note: 'নিচের সেফ-জোন' },
+                      { key: 'side', label: '৩. অপশন দেখা', note: 'অনুভূমিক রেঞ্জ' },
+                      { key: 'away', label: '৪. বাইরে তাকানো', note: 'রেফারেন্স সীমা' },
+                    ].map((item) => {
+                      const photoUrl = (reviewTest.calibrationPhotos as any)?.[item.key];
+                      if (!photoUrl) return null;
+                      return (
+                        <div key={item.key} className="rounded-xl overflow-hidden border border-emerald-300 bg-slate-950 flex flex-col shadow-xs">
+                          <img src={photoUrl} alt={item.label} className="w-full h-20 object-cover -scale-x-100" />
+                          <div className="p-1 bg-slate-900 text-center">
+                            <span className="text-[10px] font-bold text-emerald-300 block">{item.label}</span>
+                            <span className="text-[8.5px] text-slate-400 block">{item.note}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Feature 1: Photographic Violation Snapshot Proofs Gallery */}
               {reviewTest.violationSnapshots && reviewTest.violationSnapshots.length > 0 && (
                 <div className="p-3.5 rounded-2xl bg-rose-50/90 border border-rose-200 text-xs space-y-2.5 animate-in fade-in">

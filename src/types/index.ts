@@ -54,6 +54,12 @@ export interface AssignedTest {
   isSavedToLibrary?: boolean;
   customTags?: string[];
   lastModifiedAt?: string;
+  calibrationPhotos?: {
+    center?: string;
+    down?: string;
+    side?: string;
+    away?: string;
+  };
 }
 
 export interface StudentSubmission {
@@ -71,6 +77,12 @@ export interface StudentSubmission {
   isPublished: boolean;
   parentComment?: string;
   aiFeedback?: string;
+  calibrationPhotos?: {
+    center?: string;
+    down?: string;
+    side?: string;
+    away?: string;
+  };
 }
 
 export interface AppNotification {
