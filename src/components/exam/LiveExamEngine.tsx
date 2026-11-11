@@ -332,51 +332,51 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       levelNum: 1,
       name: 'লেভেল ১ (মৃদু)',
       tag: 'সহনশীল',
-      featureSkewThreshold: 0.15,
-      lateralShiftThreshold: 0.16,
-      skinAsymmetryThreshold: 0.30,
+      featureSkewThreshold: 0.18,
+      lateralShiftThreshold: 0.24,
+      skinAsymmetryThreshold: 0.45,
       sideGlanceDev: 0.20,
-      consecutiveRequired: 4, // ~0.56s sustained look-away
+      consecutiveRequired: 6, // ~0.84s sustained look-away
     },
     2: {
       levelNum: 2,
       name: 'লেভেল ২ (মাঝারি)',
       tag: 'স্ট্যান্ডার্ড',
-      featureSkewThreshold: 0.11,
-      lateralShiftThreshold: 0.13,
-      skinAsymmetryThreshold: 0.22,
-      sideGlanceDev: 0.16,
-      consecutiveRequired: 3, // ~0.42s sustained look-away
+      featureSkewThreshold: 0.16,
+      lateralShiftThreshold: 0.20,
+      skinAsymmetryThreshold: 0.40,
+      sideGlanceDev: 0.18,
+      consecutiveRequired: 5, // ~0.70s sustained look-away
     },
     3: {
       levelNum: 3,
       name: 'লেভেল ৩ (কঠোর)',
       tag: 'কঠোর',
-      featureSkewThreshold: 0.09,
-      lateralShiftThreshold: 0.10,
-      skinAsymmetryThreshold: 0.17,
-      sideGlanceDev: 0.13,
-      consecutiveRequired: 2, // ~0.28s sustained look-away
+      featureSkewThreshold: 0.13,
+      lateralShiftThreshold: 0.17,
+      skinAsymmetryThreshold: 0.35,
+      sideGlanceDev: 0.15,
+      consecutiveRequired: 4, // ~0.56s sustained look-away
     },
     4: {
       levelNum: 4,
       name: 'লেভেল ৪ (সর্বোচ্চ কঠোর - আন্তর্জাতিক প্রোটোকল)',
       tag: 'অতি-সংবেদনশীল',
-      featureSkewThreshold: 0.07,
-      lateralShiftThreshold: 0.08,
-      skinAsymmetryThreshold: 0.13,
-      sideGlanceDev: 0.10,
-      consecutiveRequired: 2, // ~0.28s sustained look-away
+      featureSkewThreshold: 0.10,
+      lateralShiftThreshold: 0.14,
+      skinAsymmetryThreshold: 0.30,
+      sideGlanceDev: 0.12,
+      consecutiveRequired: 3, // ~0.42s sustained look-away
     },
   }[effectiveProctoringLevel] || {
     levelNum: 2,
     name: 'লেভেল ২ (মাঝারি)',
     tag: 'স্ট্যান্ডার্ড',
-    featureSkewThreshold: 0.11,
-    lateralShiftThreshold: 0.13,
-    skinAsymmetryThreshold: 0.22,
-    sideGlanceDev: 0.16,
-    consecutiveRequired: 3,
+    featureSkewThreshold: 0.16,
+    lateralShiftThreshold: 0.20,
+    skinAsymmetryThreshold: 0.40,
+    sideGlanceDev: 0.18,
+    consecutiveRequired: 5,
   };
 
   // Spoken Voice Audio Alert (বাংলা কণ্ঠস্বরে অডিও আকারে সতর্কবার্তা)
@@ -1328,51 +1328,65 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           return;
         }
 
-        // 1. Lateral Glance (ডানে বা বামে আড় চোখে তাকানো)
-        let isSideGlance = false;
-        if (leftEyeDarkCount >= 2 && rightEyeDarkCount >= 2) {
+        // Candidate Face & Eye Orientation Check (Bi-Ocular Centering Rule)
+        const hasBothEyes = (leftEyeDarkCount >= 2 && rightEyeDarkCount >= 2);
+        let avgEyeRel = 0.50;
+        if (hasBothEyes) {
           const leftEyeCenter = leftEyeDarkX / leftEyeDarkCount;
           const rightEyeCenter = rightEyeDarkX / rightEyeDarkCount;
           const leftEyeRel = (leftEyeCenter - headMinX) / headW;
           const rightEyeRel = (rightEyeCenter - headMinX) / headW;
-          const avgEyeRel = (leftEyeRel + rightEyeRel) / 2;
-          
-          // Reading safe zone on screen is between 0.30 and 0.70
-          if (avgEyeRel < 0.30 || avgEyeRel > 0.70) {
+          avgEyeRel = (leftEyeRel + rightEyeRel) / 2;
+        }
+
+        // When both eyes are clearly visible and positioned symmetrically in the screen reading zone:
+        // The candidate is UNAMBIGUOUSLY looking at the screen (snapshots #2 - #8).
+        // Room lighting/shadows on one cheek CANNOT override centered ocular alignment!
+        const isLookingStraightAtScreen = hasBothEyes && (avgEyeRel >= 0.32 && avgEyeRel <= 0.68);
+
+        // 1. Lateral Glance (ডানে বা বামে আড় চোখে স্ক্রিনের বাইরে তাকানো)
+        let isSideGlance = false;
+        if (!isLookingStraightAtScreen) {
+          if (hasBothEyes && (avgEyeRel < 0.28 || avgEyeRel > 0.72)) {
+            // Both eyes have shifted off screen
+            isSideGlance = true;
+          } else if ((leftEyeDarkCount >= 3 && rightEyeDarkCount === 0) || (rightEyeDarkCount >= 3 && leftEyeDarkCount === 0)) {
+            // Strong unilateral eye visibility indicates side glance / turning away
             isSideGlance = true;
           }
-        } else if ((leftEyeDarkCount >= 2 && rightEyeDarkCount === 0) || (rightEyeDarkCount >= 2 && leftEyeDarkCount === 0)) {
-          // Strong unilateral eye visibility indicates side glance / turning away
-          isSideGlance = true;
         }
 
         // 2. Vertical Head Pitch / Looking Down towards desk, phone or notes (নিচে তাকানো সনাক্তকরণ)
         let isLookingDown = false;
-        const pitchDownLimit = calibratedProfileRef.current.isCompleted
-          ? calibratedProfileRef.current.pitchDownMax
-          : (baseY + 4);
-        if (centroidY > pitchDownLimit || (centroidY - baseY) > 4.0) {
+        // Natural reading of screen questions causes only 1-2.5px downward shift.
+        // Tilting head down to inspect notes or phone on lap/desk causes > 5.5px drop!
+        if (centroidY > (baseY + 5.5) || (calibratedProfileRef.current.isCompleted && centroidY > (calibratedProfileRef.current.pitchDownMax + 3.0))) {
           isLookingDown = true;
         }
 
-        // 3. Head Profile Hair vs Face Yaw
+        // 3. Head Profile Hair vs Face Yaw (True 90-degree profile turn)
         let isProfileHairYaw = false;
         if (headHairCount > 20 && headSkinCount > 20 && headW > 15) {
           const hairCenterX = headHairWeightedX / headHairCount;
           const hairLateralSeparation = Math.abs(headCentroidX - hairCenterX) / headW;
-          if (hairLateralSeparation > 0.30 && skinAsymmetry > 0.35 && featureSkew > 0.18) {
+          if (hairLateralSeparation > 0.34 && skinAsymmetry > 0.45 && featureSkew > 0.22) {
             isProfileHairYaw = true;
           }
         }
 
-        // 4. Lateral Shift & Head Turned completely Sideways / Profile
-        const lateralShift = Math.abs(headCentroidX - baseX) / headW;
-        const isLateralShiftTurn = lateralShift > proctorConfig.lateralShiftThreshold;
-        const isStrongFeatureTurn = featureSkew > proctorConfig.featureSkewThreshold;
-        const isSkinAsymmetricTurn = skinAsymmetry > proctorConfig.skinAsymmetryThreshold;
-        const isTurnedBackwards = upperDarkHairCount > 130 && headSkinCount < 24;
+        // 4. Head Turned completely Sideways / Profile (snapshot #1)
+        let isHeadTurned = false;
+        if (!isLookingStraightAtScreen) {
+          const lateralShift = Math.abs(headCentroidX - baseX) / headW;
+          const isTurnedBackwards = upperDarkHairCount > 130 && headSkinCount < 24;
+          // One eye hidden due to turning away (like snapshot #1)
+          const isEyeTurnedAway = (leftEyeDarkCount >= 3 && rightEyeDarkCount === 0) || (rightEyeDarkCount >= 3 && leftEyeDarkCount === 0);
+          // Feature skew + asymmetric cheek shadow must occur TOGETHER with lateral shift
+          const isCompositeTurn = (featureSkew > proctorConfig.featureSkewThreshold && skinAsymmetry > proctorConfig.skinAsymmetryThreshold) ||
+                                  (lateralShift > proctorConfig.lateralShiftThreshold && featureSkew > 0.16);
 
-        const isHeadTurned = isStrongFeatureTurn || isLateralShiftTurn || isSkinAsymmetricTurn || isProfileHairYaw || isTurnedBackwards;
+          isHeadTurned = isEyeTurnedAway || isCompositeTurn || isProfileHairYaw || isTurnedBackwards;
+        }
 
         if (isHeadTurned) {
           headTurnConsecutiveRef.current++;
