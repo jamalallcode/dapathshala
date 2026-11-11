@@ -336,7 +336,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       lateralShiftThreshold: 0.24,
       skinAsymmetryThreshold: 0.45,
       sideGlanceDev: 0.20,
-      consecutiveRequired: 6, // ~0.84s sustained look-away
+      consecutiveRequired: 4, // ~0.56s sustained look-away
     },
     2: {
       levelNum: 2,
@@ -346,7 +346,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       lateralShiftThreshold: 0.20,
       skinAsymmetryThreshold: 0.40,
       sideGlanceDev: 0.18,
-      consecutiveRequired: 5, // ~0.70s sustained look-away
+      consecutiveRequired: 3, // ~0.42s sustained look-away
     },
     3: {
       levelNum: 3,
@@ -356,7 +356,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       lateralShiftThreshold: 0.17,
       skinAsymmetryThreshold: 0.35,
       sideGlanceDev: 0.15,
-      consecutiveRequired: 4, // ~0.56s sustained look-away
+      consecutiveRequired: 2, // ~0.28s sustained look-away
     },
     4: {
       levelNum: 4,
@@ -366,7 +366,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       lateralShiftThreshold: 0.14,
       skinAsymmetryThreshold: 0.30,
       sideGlanceDev: 0.12,
-      consecutiveRequired: 3, // ~0.42s sustained look-away
+      consecutiveRequired: 2, // ~0.28s sustained look-away
     },
   }[effectiveProctoringLevel] || {
     levelNum: 2,
@@ -376,7 +376,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     lateralShiftThreshold: 0.20,
     skinAsymmetryThreshold: 0.40,
     sideGlanceDev: 0.18,
-    consecutiveRequired: 5,
+    consecutiveRequired: 3,
   };
 
   // Spoken Voice Audio Alert (বাংলা কণ্ঠস্বরে অডিও আকারে সতর্কবার্তা)
@@ -1328,35 +1328,51 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           return;
         }
 
-        // Candidate Frontal Screen Presence (মৌলিক জ্যামিতিক যাচাই)
+        // Candidate Differential Head Pose & Yaw Analysis (মাথা ও দৃষ্টি যাচাই)
         const faceAspectRatio = faceW / Math.max(faceH, 1);
-        const isCenteredFrontal = (
-          centroidX >= 22 && centroidX <= 58 &&
-          centroidY >= 14 && centroidY <= 40 &&
-          faceAspectRatio >= 0.65
+        const headYawShift = Math.abs(headCentroidX - headMidX) / Math.max(headW, 1);
+        const totalCheek = leftCheekSkin + rightCheekSkin;
+        const cheekAsymmetry = totalCheek > 20 ? Math.abs(leftCheekSkin - rightCheekSkin) / totalCheek : 0;
+        const vertDisplacement = centroidY - baseY;
+        const horizDisplacement = Math.abs(headCentroidX - baseX);
+
+        // Frontal Screen Gaze Check (সোজা প্রশ্নপত্রে দৃষ্টি রাখা নিশ্চিতকরণ)
+        const isStraightGaze = (
+          headYawShift < 0.055 &&
+          cheekAsymmetry < 0.30 &&
+          horizDisplacement < 4.8 &&
+          vertDisplacement < 4.2 &&
+          centroidY >= 14 && centroidY <= 34 &&
+          centroidX >= 24 && centroidX <= 56
         );
 
-        // 1. Lateral Glance / Leaning completely off screen (স্ক্রিনের বাইরে সরে যাওয়া)
-        let isSideGlance = false;
-        if (centroidX < 20 || centroidX > 60) {
-          isSideGlance = true;
-        }
-
-        // 2. Vertical Head Pitch / Looking Down towards desk, phone or notes (নিচে তাকানো সনাক্তকরণ)
-        let isLookingDown = false;
-        if (centroidY > 43) {
-          isLookingDown = true;
-        }
-
-        // 3. Head Turned completely Sideways / Profile (মাথা সম্পূর্ণ অন্যদিকে ঘোরানো)
         let isHeadTurned = false;
-        const isProfileTurn = faceAspectRatio < 0.58 && Math.abs(centroidX - baseX) > 8;
-        const isTurnedBackwards = upperDarkHairCount > 130 && headSkinCount < 20;
+        let isSideGlance = false;
 
-        if (!isCenteredFrontal) {
-          if (isProfileTurn || isTurnedBackwards) {
+        if (!isStraightGaze) {
+          // Candidate turned head sideways (ডানে বা বামে আড়চোখে বা সম্পূর্ণ ঘাড় ঘুরিয়ে তাকানো)
+          const isTurnedSideways = (
+            headYawShift > 0.068 ||
+            (cheekAsymmetry > 0.36 && horizDisplacement > 3.8) ||
+            horizDisplacement > 5.5 ||
+            (faceAspectRatio < 0.60 && (headYawShift > 0.055 || horizDisplacement > 3.2))
+          );
+          const isTurnedBackwards = upperDarkHairCount > 130 && headSkinCount < 20;
+
+          if (isTurnedSideways || isTurnedBackwards) {
             isHeadTurned = true;
+          } else if (centroidX < 24 || centroidX > 56 || horizDisplacement > 4.2) {
+            isSideGlance = true;
           }
+        }
+
+        // Candidate Looking Down towards desk, phone or notes (নিচে তাকানো সনাক্তকরণ)
+        let isLookingDown = false;
+        const maxPitchAllowed = calibratedProfileRef.current?.isCompleted 
+          ? Math.max(34, calibratedProfileRef.current.pitchDownMax)
+          : 33;
+        if (vertDisplacement > 4.5 || centroidY > maxPitchAllowed) {
+          isLookingDown = true;
         }
 
         if (isHeadTurned) {

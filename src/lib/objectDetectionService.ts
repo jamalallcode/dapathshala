@@ -108,47 +108,25 @@ function scanFrameForObjects(video: HTMLVideoElement, scanCanvas: HTMLCanvasElem
           if (y < paperMinY) paperMinY = y;
           if (y > paperMaxY) paperMaxY = y;
         }
-
-        // 2. Mobile Phone Rectangular Dark Glass / Lit Screen Slab in front of body
-        // When held in hand, a smartphone is a high-contrast slab (width 12-28px, height 20-45px, ratio ~1.6 - 2.4)
-        if (y > 22 && (lum < 40 || (r > 215 && g > 215 && b > 230 && lum > 220))) {
-          darkSlabPixels++;
-          if (x < phoneMinX) phoneMinX = x;
-          if (x > phoneMaxX) phoneMaxX = x;
-          if (y < phoneMinY) phoneMinY = y;
-          if (y > phoneMaxY) phoneMaxY = y;
-        }
       }
     }
 
-    // Evaluate Book Detection:
-    // If a rectangular sheet of white paper covering > 160 pixels is held up
+    // NOTE: Crude pixel luminance (lum < 40) is NEVER used to guess mobile phones,
+    // as it falsely flags student dark/checkered shirts as phones.
+    // Genuine mobile phone detection is handled strictly by the trained AI neural model (COCO-SSD).
+
+    // Evaluate Book / Sheet Detection:
+    // Only if a distinct high-reflectivity bright white sheet/page is held up directly in front of camera
     const paperW = paperMaxX - paperMinX;
     const paperH = paperMaxY - paperMinY;
-    if (brightPaperPixels > 175 && paperW > 18 && paperH > 14) {
+    if (brightPaperPixels > 240 && paperW > 24 && paperH > 18) {
       const fillRatio = brightPaperPixels / (paperW * paperH);
-      if (fillRatio > 0.45) {
+      if (fillRatio > 0.55) {
         return {
           detected: true,
           type: 'book',
           label: 'বই বা খাতা',
-          confidence: Math.min(0.92, 0.65 + (brightPaperPixels / 400))
-        };
-      }
-    }
-
-    // Evaluate Mobile Phone Detection:
-    // Smartphone vertical rectangular slab aspect ratio
-    const phoneW = phoneMaxX - phoneMinX;
-    const phoneH = phoneMaxY - phoneMinY;
-    if (darkSlabPixels > 110 && phoneW >= 10 && phoneH >= 16) {
-      const ratio = phoneH / Math.max(phoneW, 1);
-      if (ratio >= 1.4 && ratio <= 2.6 && (phoneW < w * 0.6)) {
-        return {
-          detected: true,
-          type: 'cell_phone',
-          label: 'মোবাইল ফোন',
-          confidence: 0.85
+          confidence: Math.min(0.92, 0.70 + (brightPaperPixels / 500))
         };
       }
     }
@@ -197,7 +175,7 @@ export function startObjectDetection(
             const cls = (pred.class || '').toLowerCase();
             const score = pred.score || 0;
 
-            if (cls === 'cell phone' && score > 0.48) {
+            if (cls === 'cell phone' && score > 0.60) {
               detectedResult = {
                 detected: true,
                 type: 'cell_phone',
@@ -207,7 +185,7 @@ export function startObjectDetection(
               break;
             }
 
-            if (cls === 'book' && score > 0.45) {
+            if (cls === 'book' && score > 0.58) {
               detectedResult = {
                 detected: true,
                 type: 'book',
