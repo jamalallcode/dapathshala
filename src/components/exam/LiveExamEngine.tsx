@@ -304,9 +304,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       baselineFaceYRef.current = detectedCentroidY;
       setCalibratedProfile({
         centerYaw: detectedCentroidX,
-        pitchDownMax: Math.max(46, detectedCentroidY + 12),
-        eyeMinRel: 0.12,
-        eyeMaxRel: 0.88,
+        pitchDownMax: Math.min(33, detectedCentroidY + 4),
+        eyeMinRel: 0.30,
+        eyeMaxRel: 0.70,
         isCompleted: true
       });
 
@@ -326,52 +326,57 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   ) as 1 | 2 | 3 | 4;
 
   // 4 Proctoring Strictness Levels (আন্তর্জাতিক অনলাইন পরীক্ষা স্ট্যান্ডার্ড)
-  // দ্রুত এবং নির্ভুল ডিটেকশন নিশ্চিত করা হয়েছে যাতে বাইরে তাকালে সঙ্গে সঙ্গে সতর্ক করে, কিন্তু সোজা বসলে কখনো ভুল অ্যালার্ম না দেয়
+  // দ্রুত এবং নির্ভুল ডিটেকশন নিশ্চিত করা হয়েছে যাতে ডানে/বামে/নিচে তাকালে সঙ্গে সঙ্গে সতর্ক করে, কিন্তু সোজা বসলে কখনো ভুল অ্যালার্ম না দেয়
   const proctorConfig = {
     1: {
       levelNum: 1,
       name: 'লেভেল ১ (মৃদু)',
       tag: 'সহনশীল',
-      featureSkewThreshold: 0.26,
-      skinAsymmetryThreshold: 0.46,
-      sideGlanceDev: 0.32,
-      consecutiveRequired: 8, // ~1.1s sustained look-away
+      featureSkewThreshold: 0.15,
+      lateralShiftThreshold: 0.16,
+      skinAsymmetryThreshold: 0.30,
+      sideGlanceDev: 0.20,
+      consecutiveRequired: 4, // ~0.56s sustained look-away
     },
     2: {
       levelNum: 2,
       name: 'লেভেল ২ (মাঝারি)',
       tag: 'স্ট্যান্ডার্ড',
-      featureSkewThreshold: 0.22,
-      skinAsymmetryThreshold: 0.40,
-      sideGlanceDev: 0.28,
-      consecutiveRequired: 6, // ~0.84s sustained look-away
+      featureSkewThreshold: 0.11,
+      lateralShiftThreshold: 0.13,
+      skinAsymmetryThreshold: 0.22,
+      sideGlanceDev: 0.16,
+      consecutiveRequired: 3, // ~0.42s sustained look-away
     },
     3: {
       levelNum: 3,
       name: 'লেভেল ৩ (কঠোর)',
       tag: 'কঠোর',
-      featureSkewThreshold: 0.18,
-      skinAsymmetryThreshold: 0.35,
-      sideGlanceDev: 0.24,
-      consecutiveRequired: 4, // ~0.56s sustained look-away
+      featureSkewThreshold: 0.09,
+      lateralShiftThreshold: 0.10,
+      skinAsymmetryThreshold: 0.17,
+      sideGlanceDev: 0.13,
+      consecutiveRequired: 2, // ~0.28s sustained look-away
     },
     4: {
       levelNum: 4,
       name: 'লেভেল ৪ (সর্বোচ্চ কঠোর - আন্তর্জাতিক প্রোটোকল)',
       tag: 'অতি-সংবেদনশীল',
-      featureSkewThreshold: 0.15,
-      skinAsymmetryThreshold: 0.30,
-      sideGlanceDev: 0.20,
-      consecutiveRequired: 3, // ~0.42s sustained look-away
+      featureSkewThreshold: 0.07,
+      lateralShiftThreshold: 0.08,
+      skinAsymmetryThreshold: 0.13,
+      sideGlanceDev: 0.10,
+      consecutiveRequired: 2, // ~0.28s sustained look-away
     },
   }[effectiveProctoringLevel] || {
     levelNum: 2,
     name: 'লেভেল ২ (মাঝারি)',
     tag: 'স্ট্যান্ডার্ড',
-    featureSkewThreshold: 0.22,
-    skinAsymmetryThreshold: 0.40,
-    sideGlanceDev: 0.28,
-    consecutiveRequired: 6,
+    featureSkewThreshold: 0.11,
+    lateralShiftThreshold: 0.13,
+    skinAsymmetryThreshold: 0.22,
+    sideGlanceDev: 0.16,
+    consecutiveRequired: 3,
   };
 
   // Spoken Voice Audio Alert (বাংলা কণ্ঠস্বরে অডিও আকারে সতর্কবার্তা)
@@ -1323,8 +1328,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           return;
         }
 
-        // Lateral Glance (আড় চোখে স্ক্রিনের বাইরে তাকানো)
-        // Uses calibrated safe reading boundaries when available
+        // 1. Lateral Glance (ডানে বা বামে আড় চোখে তাকানো)
         let isSideGlance = false;
         if (leftEyeDarkCount >= 2 && rightEyeDarkCount >= 2) {
           const leftEyeCenter = leftEyeDarkX / leftEyeDarkCount;
@@ -1333,37 +1337,42 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           const rightEyeRel = (rightEyeCenter - headMinX) / headW;
           const avgEyeRel = (leftEyeRel + rightEyeRel) / 2;
           
-          const safeMin = calibratedProfileRef.current.isCompleted
-            ? Math.max(0.10, calibratedProfileRef.current.eyeMinRel - 0.08)
-            : (0.5 - proctorConfig.sideGlanceDev);
-          const safeMax = calibratedProfileRef.current.isCompleted
-            ? Math.min(0.90, calibratedProfileRef.current.eyeMaxRel + 0.08)
-            : (0.5 + proctorConfig.sideGlanceDev);
-
-          if (avgEyeRel < safeMin || avgEyeRel > safeMax) {
+          // Reading safe zone on screen is between 0.30 and 0.70
+          if (avgEyeRel < 0.30 || avgEyeRel > 0.70) {
             isSideGlance = true;
           }
+        } else if ((leftEyeDarkCount >= 2 && rightEyeDarkCount === 0) || (rightEyeDarkCount >= 2 && leftEyeDarkCount === 0)) {
+          // Strong unilateral eye visibility indicates side glance / turning away
+          isSideGlance = true;
         }
-        // NOTE: Single-eye lighting variations (e.g. shadow from one side) are NEVER flagged as side glance!
 
-        // Head Profile Hair vs Face Yaw
-        // In a true 90-degree profile turn, hair is on one side, face is on the other,
-        // and cheek skin is heavily asymmetric. (Single-side lighting or normal hair part is NEVER flagged!)
+        // 2. Vertical Head Pitch / Looking Down towards desk, phone or notes (নিচে তাকানো সনাক্তকরণ)
+        let isLookingDown = false;
+        const pitchDownLimit = calibratedProfileRef.current.isCompleted
+          ? calibratedProfileRef.current.pitchDownMax
+          : (baseY + 4);
+        if (centroidY > pitchDownLimit || (centroidY - baseY) > 4.0) {
+          isLookingDown = true;
+        }
+
+        // 3. Head Profile Hair vs Face Yaw
         let isProfileHairYaw = false;
         if (headHairCount > 20 && headSkinCount > 20 && headW > 15) {
           const hairCenterX = headHairWeightedX / headHairCount;
           const hairLateralSeparation = Math.abs(headCentroidX - hairCenterX) / headW;
-          if (hairLateralSeparation > 0.38 && skinAsymmetry > 0.55 && featureSkew > 0.30) {
+          if (hairLateralSeparation > 0.30 && skinAsymmetry > 0.35 && featureSkew > 0.18) {
             isProfileHairYaw = true;
           }
         }
 
-        // Head Turned completely Sideways, Profile or Backwards
-        // Centroid position on chair or room lighting is NEVER counted as head turn!
+        // 4. Lateral Shift & Head Turned completely Sideways / Profile
+        const lateralShift = Math.abs(headCentroidX - baseX) / headW;
+        const isLateralShiftTurn = lateralShift > proctorConfig.lateralShiftThreshold;
         const isStrongFeatureTurn = featureSkew > proctorConfig.featureSkewThreshold;
+        const isSkinAsymmetricTurn = skinAsymmetry > proctorConfig.skinAsymmetryThreshold;
         const isTurnedBackwards = upperDarkHairCount > 130 && headSkinCount < 24;
 
-        const isHeadTurned = isStrongFeatureTurn || isProfileHairYaw || isTurnedBackwards;
+        const isHeadTurned = isStrongFeatureTurn || isLateralShiftTurn || isSkinAsymmetricTurn || isProfileHairYaw || isTurnedBackwards;
 
         if (isHeadTurned) {
           headTurnConsecutiveRef.current++;
@@ -1384,6 +1393,27 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             if (isNewTurn || now - lastViolationTimeRef.current > 3200) {
               lastViolationTimeRef.current = now;
               handleGazeAway('মাথা ও দৃষ্টি অন্যদিকে ঘোরানো সনাক্ত হয়েছে');
+            }
+          }
+        } else if (isLookingDown) {
+          lookDownConsecutiveRef.current++;
+          headTurnConsecutiveRef.current = 0;
+          sideGlanceConsecutiveRef.current = 0;
+          setHeadStatus('forward');
+          setGazeStatus('looking_down');
+
+          if (lookDownConsecutiveRef.current >= proctorConfig.consecutiveRequired) {
+            const isNewTurn = !isViolatingRef.current;
+            isViolatingRef.current = true;
+            if (warningTimeoutRef.current) {
+              clearTimeout(warningTimeoutRef.current);
+              warningTimeoutRef.current = null;
+            }
+            const currentStrike = (violationCountRef.current || violationCount) + (isNewTurn ? 1 : 0);
+            setLastWarning(`⚠️ নিচে বা খাতা/ফোনে দৃষ্টি সনাক্ত হয়েছে! সতর্কতা: ${currentStrike}/৫০ (অনুগ্রহ করে প্রশ্নপত্রে দৃষ্টি রাখুন)`);
+            if (isNewTurn || now - lastViolationTimeRef.current > 3200) {
+              lastViolationTimeRef.current = now;
+              handleGazeAway('নিচে বা খাতা/ফোনে দৃষ্টি সনাক্ত হয়েছে');
             }
           }
         } else if (isSideGlance) {
@@ -1409,28 +1439,31 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
           }
         } else {
           // Normal screen gaze / reading questions (স্ক্রিনে প্রশ্ন ও অপশন পড়ার স্বাভাবিক দৃষ্টি)
-          headTurnConsecutiveRef.current = 0;
-          sideGlanceConsecutiveRef.current = 0;
-          lookDownConsecutiveRef.current = 0;
-          if (isViolatingRef.current) {
-            isViolatingRef.current = false;
-            if (warningTimeoutRef.current) {
-              clearTimeout(warningTimeoutRef.current);
-            }
-            warningTimeoutRef.current = setTimeout(() => {
-              if (!isViolatingRef.current) {
-                setLastWarning(null);
-              }
-              warningTimeoutRef.current = null;
-            }, 1200);
-          }
-          setHeadStatus('forward');
-          setGazeStatus('normal');
+          headTurnConsecutiveRef.current = Math.max(0, headTurnConsecutiveRef.current - 1);
+          sideGlanceConsecutiveRef.current = Math.max(0, sideGlanceConsecutiveRef.current - 1);
+          lookDownConsecutiveRef.current = Math.max(0, lookDownConsecutiveRef.current - 1);
 
-          // International Standard: Continuous smooth adaptive baseline
-          if (hasCalibratedFaceRef.current && centroidX > 20 && centroidX < 60 && centroidY > 10 && centroidY < 50) {
-            baselineFaceXRef.current = (baselineFaceXRef.current! * 0.985) + (centroidX * 0.015);
-            baselineFaceYRef.current = (baselineFaceYRef.current! * 0.985) + (centroidY * 0.015);
+          if (headTurnConsecutiveRef.current === 0 && sideGlanceConsecutiveRef.current === 0 && lookDownConsecutiveRef.current === 0) {
+            if (isViolatingRef.current) {
+              isViolatingRef.current = false;
+              if (warningTimeoutRef.current) {
+                clearTimeout(warningTimeoutRef.current);
+              }
+              warningTimeoutRef.current = setTimeout(() => {
+                if (!isViolatingRef.current) {
+                  setLastWarning(null);
+                }
+                warningTimeoutRef.current = null;
+              }, 1200);
+            }
+            setHeadStatus('forward');
+            setGazeStatus('normal');
+
+            // Smooth adaptive baseline ONLY when strictly frontal & calm
+            if (hasCalibratedFaceRef.current && Math.abs(centroidX - baseX) < 3 && Math.abs(centroidY - baseY) < 2.5) {
+              baselineFaceXRef.current = (baselineFaceXRef.current! * 0.99) + (centroidX * 0.01);
+              baselineFaceYRef.current = (baselineFaceYRef.current! * 0.99) + (centroidY * 0.01);
+            }
           }
         }
 
@@ -2099,22 +2132,20 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
               {/* Live AI Proctor Bounding Box & Motion/Gaze Tracking HUD */}
               <div className={`absolute inset-1.5 rounded-lg border-2 pointer-events-none transition-colors duration-200 flex flex-col justify-between p-1.5 ${
-                headStatus === 'turned' || gazeStatus === 'looking_away' || gazeStatus === 'side_glance' || motionStatus === 'excessive' || gazeStatus === 'face_missing'
+                headStatus === 'turned' || gazeStatus === 'looking_away' || gazeStatus === 'side_glance' || gazeStatus === 'looking_down' || motionStatus === 'excessive' || gazeStatus === 'face_missing'
                   ? 'border-rose-500 bg-rose-500/15 animate-pulse'
                   : 'border-emerald-400/80'
               }`}>
                 <div className="flex items-center justify-between">
                   <span className={`text-[8px] sm:text-[8.5px] font-black px-1 sm:px-1.5 py-0.5 rounded shadow-sm transition-all ${
-                    gazeStatus === 'side_glance'
-                      ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
-                      : headStatus === 'turned' || gazeStatus === 'looking_away'
-                      ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
-                      : gazeStatus === 'face_missing'
+                    gazeStatus === 'side_glance' || gazeStatus === 'looking_down' || headStatus === 'turned' || gazeStatus === 'looking_away' || gazeStatus === 'face_missing'
                       ? 'bg-rose-950/95 text-rose-200 border border-rose-500 animate-bounce'
                       : 'bg-emerald-950/85 text-emerald-300 border border-emerald-500/40'
                   }`}>
                     {gazeStatus === 'side_glance'
                       ? '⚠️ আড় চোখে তাকানো!'
+                      : gazeStatus === 'looking_down'
+                      ? '⚠️ নিচে তাকানো!'
                       : headStatus === 'turned' || gazeStatus === 'looking_away'
                       ? '⚠️ দৃষ্টি অন্যদিকে!'
                       : gazeStatus === 'face_missing'
@@ -2153,7 +2184,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
             <div className="w-full px-0.5 pt-1.5 flex flex-col gap-1 text-center">
               <div className="grid grid-cols-2 gap-1 text-[7.5px] sm:text-[8px] font-mono">
                 <div className={`py-1 px-0.5 rounded transition-colors ${
-                  gazeStatus === 'side_glance' || gazeStatus === 'looking_away' || gazeStatus === 'face_missing' || headStatus === 'turned'
+                  gazeStatus === 'side_glance' || gazeStatus === 'looking_down' || gazeStatus === 'looking_away' || gazeStatus === 'face_missing' || headStatus === 'turned'
                     ? 'bg-rose-950 text-rose-300 border border-rose-600 font-bold animate-pulse' 
                     : 'bg-slate-800 text-slate-300 border border-slate-700/60'
                 }`}>
@@ -2161,6 +2192,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                   <span className="truncate block">
                     {gazeStatus === 'side_glance'
                       ? 'আড় চোখ ⚠️'
+                      : gazeStatus === 'looking_down'
+                      ? 'নিচে তাকানো ⚠️'
                       : gazeStatus === 'looking_away' || headStatus === 'turned'
                       ? 'স্ক্রিনের বাইরে ⚠️'
                       : gazeStatus === 'face_missing'
