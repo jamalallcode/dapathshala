@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  PlusCircle,
   Award, 
   Brain, 
   X,
@@ -21,8 +20,7 @@ import {
   Sliders,
   Sparkles,
   ShieldAlert,
-  FolderArchive,
-  Home
+  FolderArchive
 } from 'lucide-react';
 import { UserRole, AssignedTest } from '../../types';
 import { getCurrentParent, ParentUser, updateParentProfile } from '../../lib/parentAuth';
@@ -78,11 +76,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleItemMouseEnter = (text: string, e: React.MouseEvent) => {
-    setCursorTooltip({
-      text,
-      x: e.clientX,
-      y: e.clientY + 18
-    });
+    const currentTarget = e.currentTarget as HTMLElement;
+    const textSpan = currentTarget.querySelector('.truncate') as HTMLElement | null;
+    const targetToCheck = textSpan || currentTarget;
+    
+    // Only display tooltip if text is genuinely truncated with ellipsis (...)
+    if (targetToCheck && targetToCheck.scrollWidth > targetToCheck.clientWidth) {
+      setCursorTooltip({
+        text,
+        x: e.clientX,
+        y: e.clientY + 18
+      });
+    } else {
+      setCursorTooltip(null);
+    }
   };
 
   const handleItemMouseMove = (e: React.MouseEvent) => {
@@ -187,29 +194,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* ======================================================== */}
         {/* 1. TOP HEADER: Brand Logo & Title                        */}
         {/* ======================================================== */}
-        <div className="h-14 border-b border-slate-800/90 flex items-center justify-between px-3 bg-[#090e1a] shrink-0">
+        <div className="h-14 border-b border-slate-800/90 flex items-center justify-between px-3.5 bg-[#090e1a] shrink-0">
           <div 
             onClick={() => handleLinkClick(onNavigateHome)}
-            className="flex items-center gap-2.5 overflow-hidden min-w-0 cursor-pointer group"
-            title="দাপাঠশালা - মূল হোম / ল্যান্ডিং পেজে যান"
+            className="flex items-center overflow-hidden min-w-0 cursor-pointer group"
           >
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-md ${
-              activeView === 'admin' 
-                ? 'bg-gradient-to-tr from-amber-500 to-purple-600 text-white' 
-                : currentRole === 'student'
-                ? 'bg-gradient-to-tr from-emerald-500 to-teal-600 text-white'
-                : 'bg-gradient-to-tr from-blue-600 to-indigo-600 text-white'
-            }`}>
-              {activeView === 'admin' ? (
-                <Crown className="w-4.5 h-4.5 text-amber-200" />
-              ) : currentRole === 'student' ? (
-                <GraduationCap className="w-4.5 h-4.5 text-white" />
-              ) : (
-                <Sparkles className="w-4.5 h-4.5 text-white" />
-              )}
-            </div>
             <div className="truncate min-w-0">
-              <span className="font-black text-white text-sm tracking-tight block truncate group-hover:text-blue-300 transition-colors">
+              <span className="font-black text-white text-base tracking-tight block truncate group-hover:text-blue-300 transition-colors">
                 দাপাঠশালা
               </span>
               <span className="text-[10px] text-slate-400 font-bold block truncate">
@@ -265,7 +256,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onMouseEnter={(e) => handleItemMouseEnter('মাস্টার ওভারভিউ', e)}
                 onMouseMove={handleItemMouseMove}
                 onMouseLeave={handleItemMouseLeave}
-                title="মাস্টার ওভারভিউ"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'overview'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -285,7 +275,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onMouseEnter={(e) => handleItemMouseEnter('কেন্দ্রীয় প্রশ্নব্যাংক', e)}
                 onMouseMove={handleItemMouseMove}
                 onMouseLeave={handleItemMouseLeave}
-                title="কেন্দ্রীয় প্রশ্নব্যাংক"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'papers' || adminTab === 'ai-vision'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -305,7 +294,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onMouseEnter={(e) => handleItemMouseEnter('ব্যবহারকারী ও একাউন্ট', e)}
                 onMouseMove={handleItemMouseMove}
                 onMouseLeave={handleItemMouseLeave}
-                title="ব্যবহারকারী ও একাউন্ট"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'users'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -325,7 +313,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onMouseEnter={(e) => handleItemMouseEnter('গ্লোবাল পরীক্ষা ও খাতা', e)}
                 onMouseMove={handleItemMouseMove}
                 onMouseLeave={handleItemMouseLeave}
-                title="গ্লোবাল পরীক্ষা ও খাতা"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'exams'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -345,7 +332,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onMouseEnter={(e) => handleItemMouseEnter('প্রক্টরিং সিকিউরিটি', e)}
                 onMouseMove={handleItemMouseMove}
                 onMouseLeave={handleItemMouseLeave}
-                title="প্রক্টরিং সিকিউরিটি"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'proctoring'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -365,7 +351,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onMouseEnter={(e) => handleItemMouseEnter('নোটিশ ব্রডকাস্ট', e)}
                 onMouseMove={handleItemMouseMove}
                 onMouseLeave={handleItemMouseLeave}
-                title="নোটিশ ব্রডকাস্ট"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'notice'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -385,7 +370,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onMouseEnter={(e) => handleItemMouseEnter('সিস্টেম ও ব্যাকআপ', e)}
                 onMouseMove={handleItemMouseMove}
                 onMouseLeave={handleItemMouseLeave}
-                title="সিস্টেম ও ব্যাকআপ"
                 className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                   adminTab === 'system'
                     ? 'bg-purple-600/30 text-white font-bold border-l-2 border-purple-500'
@@ -415,7 +399,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onMouseEnter={(e) => handleItemMouseEnter('প্রশ্নপত্র তৈরি', e)}
                   onMouseMove={handleItemMouseMove}
                   onMouseLeave={handleItemMouseLeave}
-                  title="প্রশ্নপত্র তৈরি"
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                     parentTab === 'assigned' && activeView === 'dashboard'
                       ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
@@ -423,13 +406,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate min-w-0">
-                    <PlusCircle className="w-4.5 h-4.5 text-blue-400 shrink-0" />
+                    <FileText className="w-4.5 h-4.5 text-blue-400 shrink-0" />
                     <span className="truncate">প্রশ্নপত্র তৈরি</span>
                   </div>
                 </button>
               </div>
 
-              {/* Menu: আমার প্রশ্ন লাইব্রেরি */}
+              {/* Menu: প্রশ্ন লাইব্রেরি */}
               <div>
                 <button
                   type="button"
@@ -440,10 +423,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onSelectParentTab('library');
                     });
                   }}
-                  onMouseEnter={(e) => handleItemMouseEnter('আমার প্রশ্ন লাইব্রেরি (আর্কাইভ)', e)}
+                  onMouseEnter={(e) => handleItemMouseEnter('প্রশ্ন লাইব্রেরি (আর্কাইভ)', e)}
                   onMouseMove={handleItemMouseMove}
                   onMouseLeave={handleItemMouseLeave}
-                  title="আমার প্রশ্ন লাইব্রেরি (আর্কাইভ)"
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                     parentTab === 'library' && activeView === 'dashboard'
                       ? 'bg-indigo-600/30 text-white font-bold border-l-2 border-indigo-400'
@@ -452,7 +434,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <div className="flex items-center gap-2.5 truncate min-w-0">
                     <FolderArchive className="w-4.5 h-4.5 text-indigo-400 shrink-0" />
-                    <span className="truncate">আমার প্রশ্ন লাইব্রেরি</span>
+                    <span className="truncate">প্রশ্ন লাইব্রেরি</span>
                   </div>
                   <span className="text-[10px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded font-mono font-bold">
                     আর্কাইভ
@@ -472,7 +454,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onMouseEnter={(e) => handleItemMouseEnter('ফলাফল ও রিপোর্ট', e)}
                   onMouseMove={handleItemMouseMove}
                   onMouseLeave={handleItemMouseLeave}
-                  title="ফলাফল ও রিপোর্ট"
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                     parentTab === 'report' && activeView === 'dashboard'
                       ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
@@ -498,7 +479,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onMouseEnter={(e) => handleItemMouseEnter('কুইজ ও ব্রেইন গেমস', e)}
                   onMouseMove={handleItemMouseMove}
                   onMouseLeave={handleItemMouseLeave}
-                  title="কুইজ ও ব্রেইন গেমস"
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
                     parentTab === 'games' && activeView === 'dashboard'
                       ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
@@ -549,7 +529,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onMouseEnter={(e) => handleItemMouseEnter('নির্ধারিত পরীক্ষাসমূহ', e)}
                   onMouseMove={handleItemMouseMove}
                   onMouseLeave={handleItemMouseLeave}
-                  title="নির্ধারিত পরীক্ষাসমূহ"
                   className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors bg-emerald-600/25 text-white font-bold border-l-2 border-emerald-500 hover:bg-emerald-600/35 cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 truncate min-w-0">
@@ -571,7 +550,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onMouseEnter={(e) => handleItemMouseEnter('পিন দিয়ে নতুন পরীক্ষা শুরু করুন', e)}
                   onMouseMove={handleItemMouseMove}
                   onMouseLeave={handleItemMouseLeave}
-                  title="পিন দিয়ে নতুন পরীক্ষা শুরু করুন"
                   className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 truncate min-w-0">
@@ -593,7 +571,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onMouseEnter={(e) => handleItemMouseEnter('কুইজ ও ব্রেইন গেমস', e)}
                   onMouseMove={handleItemMouseMove}
                   onMouseLeave={handleItemMouseLeave}
-                  title="কুইজ ও ব্রেইন গেমস"
                   className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors hover:bg-slate-800/60 text-slate-200 hover:text-white cursor-pointer"
                 >
                   <div className="flex items-center gap-2.5 truncate min-w-0">
@@ -633,7 +610,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onMouseMove={handleItemMouseMove}
             onMouseLeave={handleItemMouseLeave}
             className="flex items-center gap-2.5 p-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800/80 border border-slate-800 hover:border-blue-500/40 transition-all cursor-pointer group"
-            title="মূল ল্যান্ডিং পেজে যান"
           >
             {/* Avatar / Crown */}
             {activeView === 'admin' ? (
@@ -701,20 +677,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
             </div>
           </div>
-
-          {/* Explicit Landing Page Action Button */}
-          <button
-            type="button"
-            onClick={() => handleLinkClick(onNavigateHome)}
-            onMouseEnter={(e) => handleItemMouseEnter('মূল ল্যান্ডিং পেজে ফিরে যান', e)}
-            onMouseMove={handleItemMouseMove}
-            onMouseLeave={handleItemMouseLeave}
-            className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 hover:from-blue-600/30 hover:via-indigo-600/30 hover:to-purple-600/30 border border-blue-500/30 hover:border-blue-400/60 text-blue-300 hover:text-white text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-98 shadow-xs"
-            title="মূল ল্যান্ডিং পেজে যান"
-          >
-            <Home className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-            <span className="truncate">ল্যান্ডিং পেজে যান</span>
-          </button>
         </div>
         {/* Interactive Cursor-Following Tooltip                     */}
         {/* ======================================================== */}
