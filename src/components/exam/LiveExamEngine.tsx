@@ -1845,66 +1845,56 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               </button>
             </div>
 
-            {/* User-Requested Highlighted Instruction in the Exact Red-Marked Location */}
-            <div className="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-900 to-emerald-950 border-2 border-emerald-400 text-emerald-100 shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2.5 text-xs sm:text-sm font-black text-center transition-all animate-pulse ring-2 ring-emerald-400/40">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
-              <span className="tracking-wide">
-                সোজা দৃষ্টি রাখুন • ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন (স্বয়ংক্রিয় ছবি উঠছে...)
-              </span>
-            </div>
-
             {/* Content: Mode 1 - Live 3-Second Baseline Capture */}
             {!calibrationPhotos.center ? (
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4 items-center">
-                {/* Center Video Viewport with Biometric Target Guide */}
-                <div className="sm:col-span-7 relative w-full h-52 sm:h-56 bg-slate-950 rounded-2xl overflow-hidden border-2 border-emerald-500/50 flex items-center justify-center shadow-lg">
-                  {cameraActive ? (
-                    <video 
-                      ref={(el) => {
-                        videoRef.current = el;
-                        if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
-                          attachStream(mediaStreamRef.current);
-                        }
-                      }}
-                      autoPlay 
-                      playsInline 
-                      muted 
-                      className="w-full h-full object-cover -scale-x-100"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-center p-4 text-slate-400">
-                      <Camera className="w-8 h-8 mb-2 text-emerald-400 animate-pulse" />
-                      <span className="text-xs font-bold">ক্যামেরা চালু হচ্ছে...</span>
-                      <button
-                        type="button"
-                        onClick={requestWebcamAccess}
-                        className="mt-2 text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer shadow-md"
-                      >
-                        ক্যামেরা অনুমতি দিন
-                      </button>
-                    </div>
-                  )}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4 items-start">
+                {/* Left Column: Highlighted Instruction Banner + Center Video Viewport */}
+                <div className="sm:col-span-7 flex flex-col gap-2.5">
+                  {/* User-Requested Highlighted Instruction placed directly above the video camera box */}
+                  <div className="w-full py-2.5 px-3.5 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-900 to-emerald-950 border-2 border-emerald-400 text-emerald-100 shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 text-xs sm:text-sm font-black text-center transition-all animate-pulse ring-2 ring-emerald-400/40">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+                    <span className="tracking-wide">
+                      সোজা দৃষ্টি রাখুন • ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন (স্বয়ংক্রিয় ছবি উঠছে...)
+                    </span>
+                  </div>
 
-                  {/* White Shutter Flash Feedback */}
-                  {shutterFlash && (
-                    <div className="absolute inset-0 bg-white/90 z-40 pointer-events-none animate-ping" />
-                  )}
+                  {/* Clean Center Video Viewport */}
+                  <div className="relative w-full h-52 sm:h-56 bg-slate-950 rounded-2xl overflow-hidden border-2 border-emerald-500/50 flex items-center justify-center shadow-lg">
+                    {cameraActive ? (
+                      <video 
+                        ref={(el) => {
+                          videoRef.current = el;
+                          if (el && mediaStreamRef.current && el.srcObject !== mediaStreamRef.current) {
+                            attachStream(mediaStreamRef.current);
+                          }
+                        }}
+                        autoPlay 
+                        playsInline 
+                        muted 
+                        className="w-full h-full object-cover -scale-x-100"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-center p-4 text-slate-400">
+                        <Camera className="w-8 h-8 mb-2 text-emerald-400 animate-pulse" />
+                        <span className="text-xs font-bold">ক্যামেরা চালু হচ্ছে...</span>
+                        <button
+                          type="button"
+                          onClick={requestWebcamAccess}
+                          className="mt-2 text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-xl font-bold transition-all cursor-pointer shadow-md"
+                        >
+                          ক্যামেরা অনুমতি দিন
+                        </button>
+                      </div>
+                    )}
 
-                  {/* Biometric Oval Target Helper Overlay */}
-                  <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="bg-black/75 backdrop-blur-xs text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded text-[9.5px] font-mono font-bold flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                        <span>লাইভ বায়োমেট্রিক ফ্রেম</span>
-                      </span>
-                      <span className="text-[9px] font-mono text-slate-300 bg-black/70 px-1.5 py-0.5 rounded">
-                        আন্তর্জাতিক স্ট্যান্ডার্ড
-                      </span>
-                    </div>
+                    {/* White Shutter Flash Feedback */}
+                    {shutterFlash && (
+                      <div className="absolute inset-0 bg-white/90 z-40 pointer-events-none animate-ping" />
+                    )}
 
-                    {/* Centered Face Alignment Oval */}
-                    <div className="flex items-center justify-center">
-                      <div className="w-28 h-36 sm:w-32 sm:h-40 border-2 border-dashed border-emerald-400/90 rounded-full flex flex-col items-center justify-center animate-pulse shadow-lg shadow-emerald-500/20">
+                    {/* Centered Face Alignment Oval Guide */}
+                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                      <div className="w-28 h-36 sm:w-32 sm:h-40 border-2 border-dashed border-emerald-400/80 rounded-full flex flex-col items-center justify-center animate-pulse shadow-lg shadow-emerald-500/20">
                         <div className="w-2 h-2 rounded-full bg-emerald-400 mb-1"></div>
                         <span className="text-[8.5px] font-bold text-emerald-300 bg-black/75 px-1.5 py-0.5 rounded">
                           মুখমণ্ডল সোজা রাখুন
@@ -1912,37 +1902,25 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                       </div>
                     </div>
 
-                    <div className="text-center">
-                      <span className="bg-black/80 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded text-[9.5px] font-mono">
-                        ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন
-                      </span>
-                    </div>
+                    {/* Automated Countdown Number Overlay (Clean countdown without duplicate pills) */}
+                    {calibrationCountdown !== null && (
+                      <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/45 backdrop-blur-[1px] pointer-events-none">
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-2xl sm:text-3xl shadow-2xl border-4 border-white animate-pulse">
+                          {calibrationCountdown > 0 ? (
+                            <span>{calibrationCountdown.toLocaleString('bn-BD')}</span>
+                          ) : (
+                            <span className="text-2xl">📸</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-
-                  {/* Automated Spoken Voice & Countdown Overlay */}
-                  {calibrationCountdown !== null && (
-                    <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[2px] pointer-events-none p-3 text-center">
-                      <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-2xl sm:text-3xl shadow-2xl border-4 border-white animate-pulse mb-2">
-                        {calibrationCountdown > 0 ? (
-                          <span>{calibrationCountdown.toLocaleString('bn-BD')}</span>
-                        ) : (
-                          <span className="text-2xl">📸</span>
-                        )}
-                      </div>
-                      <div className="bg-slate-900/95 text-emerald-300 border border-emerald-500/50 px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-1.5 max-w-[90%]">
-                        <Volume2 className="w-4 h-4 text-amber-300 animate-pulse shrink-0" />
-                        <span className="truncate">
-                          {calibrationCountdown > 0 ? "সোজা দৃষ্টি রাখুন • স্বয়ংক্রিয় ছবি উঠছে..." : "✓ সফলভাবে ছবি সংরক্ষিত হয়েছে!"}
-                        </span>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                {/* Right Side: Voice Guidance Card & Actions */}
-                <div className="sm:col-span-5 flex flex-col justify-between space-y-3">
+                {/* Right Side: Clean Voice Guidance Card & Actions */}
+                <div className="sm:col-span-5 flex flex-col justify-between space-y-3.5">
                   {/* Spoken Voice Prompt Card */}
-                  <div className="bg-slate-900/90 border border-emerald-500/40 rounded-2xl p-3 space-y-2 shadow-md">
+                  <div className="bg-slate-900/90 border border-emerald-500/40 rounded-2xl p-3.5 space-y-2.5 shadow-md">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold">
                         <Volume2 className="w-4 h-4 text-amber-300 animate-pulse shrink-0" />
@@ -1952,10 +1930,10 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                         অটো ৩ সে.
                       </span>
                     </div>
-                    <p className="text-xs text-white font-bold leading-relaxed">
+                    <p className="text-xs sm:text-sm text-white font-bold leading-relaxed">
                       “অনুগ্রহ করে ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন। আপনার বায়োমেট্রিক ও রিডিং সেফ-জোন নির্ধারণ করা হচ্ছে।”
                     </p>
-                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1.5 border-t border-slate-800">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800">
                       <span>স্বয়ংক্রিয় কাউন্টডাউন:</span>
                       <span className="text-amber-300 font-bold font-mono">
                         {calibrationCountdown !== null && calibrationCountdown > 0 
@@ -1965,21 +1943,8 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                     </div>
                   </div>
 
-                  {/* Key Rules list */}
-                  <div className="bg-slate-950/80 border border-slate-800 rounded-2xl p-2.5 text-[11px] text-slate-300 space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[11.5px]">
-                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                      <span>আন্তর্জাতিক প্রোটোকলের সুবিধা:</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 leading-snug">
-                      • কোনো কৃত্রিম মাথা ঘোরানোর প্রয়োজন নেই।<br />
-                      • পরীক্ষায় প্রশ্ন ও অপশন পড়া ১০০% নিরাপদ হিসেবে গণ্য হবে।<br />
-                      • কেবল বাইরে তাকালে বা বই/মোবাইল ব্যবহার করলে সতর্ক করবে।
-                    </p>
-                  </div>
-
-                  {/* Immediate Manual Snap / Replay Voice Controls */}
-                  <div className="flex items-center gap-2">
+                  {/* Immediate Manual Snap Button (Clean full width, confusing speaker icon removed) */}
+                  <div className="pt-1">
                     <button
                       type="button"
                       onClick={() => {
@@ -1987,21 +1952,11 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                         setShutterFlash(true);
                         setTimeout(() => setShutterFlash(false), 350);
                       }}
-                      className="flex-1 py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-600/30 cursor-pointer transition-all"
+                      className="w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xl shadow-emerald-600/30 cursor-pointer transition-all"
                       title="টাইমার শেষ হওয়ার আগেই এখনই ছবি তুলুন"
                     >
                       <Camera className="w-4 h-4" />
                       <span>📸 এখনই ছবি তুলুন</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        speakObservationAudio("অনুগ্রহ করে ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন। আপনার বায়োমেট্রিক ও রিডিং সেফ-জোন নির্ধারণ করা হচ্ছে।");
-                      }}
-                      className="py-2.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 hover:text-white font-bold text-xs flex items-center justify-center gap-1 border border-slate-700 cursor-pointer transition-all"
-                      title="ভয়েস নির্দেশ পুনরায় শুনুন"
-                    >
-                      <Volume2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
