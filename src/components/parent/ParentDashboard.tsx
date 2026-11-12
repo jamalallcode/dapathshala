@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, PlusCircle, Trash2, Copy, Check, Eye, FileText, FileCheck, CheckCircle2, 
-  Clock, Shield, ShieldAlert, AlertTriangle, MessageSquare, ChevronRight, Share2,
+  Clock, Shield, ShieldAlert, AlertTriangle, MessageSquare, ChevronRight, ChevronLeft, Share2,
   TrendingUp, Award, BookOpen, Sparkles, RefreshCw, Edit3, X,
   Save, AlertCircle, Camera, ExternalLink, HelpCircle, GraduationCap, ArrowRight, ArrowLeft,
   RotateCcw, MessageCircle, Lightbulb, ChevronDown, Printer, Settings,
@@ -95,6 +95,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [copiedPin, setCopiedPin] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedSnapshot, setSelectedSnapshot] = useState<ViolationSnapshot | null>(null);
+
 
   // Configuration for AI Question Builder & NCTB Question Bank
   const [selectedClass, setSelectedClass] = useState<string>('১০ম শ্রেণি (এসএসসি নির্বাচনী/বোর্ড)');
@@ -197,6 +198,34 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   const [reviewTest, setReviewTest] = useState<AssignedTest | null>(null);
   const [parentComment, setParentComment] = useState('');
   const [approvedScore, setApprovedScore] = useState<number>(0);
+
+  // Keyboard navigation for violation snapshot proof gallery modal
+  useEffect(() => {
+    if (!selectedSnapshot) return;
+    const availableSnapshots = (reviewTest?.violationSnapshots || []).filter(s => s && s.photo);
+    if (availableSnapshots.length <= 1) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const currentIndex = availableSnapshots.findIndex(s => (s.id && s.id === selectedSnapshot.id) || s.photo === selectedSnapshot.photo);
+      if (currentIndex === -1) return;
+
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        const prevIdx = currentIndex > 0 ? currentIndex - 1 : availableSnapshots.length - 1;
+        setSelectedSnapshot(availableSnapshots[prevIdx]);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        const nextIdx = currentIndex < availableSnapshots.length - 1 ? currentIndex + 1 : 0;
+        setSelectedSnapshot(availableSnapshots[nextIdx]);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setSelectedSnapshot(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedSnapshot, reviewTest]);
 
   // Controlling Action States (Delete, Share, Retake)
   const [deletingTestId, setDeletingTestId] = useState<string | null>(null);
@@ -1516,7 +1545,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-6 sm:pt-6 sm:pb-8 space-y-4">
+    <div className="w-full max-w-6xl mx-auto p-4 sm:p-6 space-y-4">
       
       {/* Toast Alert: repositioned to bottom center to prevent covering header/navigation */}
       {toastMessage && (
@@ -1528,95 +1557,296 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
 
       {/* ======================================================== */}
       {/* 1. TOP PORTAL HEADER & MAIN VIEW SWITCHER                */}
+      {/* (Hidden when creation mode page is actively open)         */}
       {/* ======================================================== */}
-      <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
-            {activeTab === 'report' ? (
-              <Award className="w-6 h-6 text-amber-300" />
-            ) : activeTab === 'games' ? (
-              <Brain className="w-6 h-6 text-rose-300" />
-            ) : activeTab === 'review' ? (
-              <FileCheck className="w-6 h-6 text-emerald-300" />
-            ) : activeTab === 'library' ? (
-              <FolderArchive className="w-6 h-6 text-indigo-200" />
-            ) : (
-              <GraduationCap className="w-6 h-6" />
-            )}
-          </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                {activeTab === 'report' 
-                  ? 'ফলাফল ও সার্বিক রিপোর্ট' 
-                  : activeTab === 'games' 
-                  ? 'কুইজ ও ব্রেইন গেমস' 
-                  : activeTab === 'review'
-                  ? 'খাতা মূল্যায়ন ও পরীক্ষণ'
-                  : activeTab === 'library'
-                  ? 'আমার প্রশ্ন লাইব্রেরি ও প্রশ্নব্যাংক'
-                  : 'অভিভাবক ও শিক্ষক পোর্টাল'}
-              </h1>
+      {!showCreationModeModal && (
+        <div className="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200/90 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
+              {activeTab === 'report' ? (
+                <Award className="w-6 h-6 text-amber-300" />
+              ) : activeTab === 'games' ? (
+                <Brain className="w-6 h-6 text-rose-300" />
+              ) : activeTab === 'review' ? (
+                <FileCheck className="w-6 h-6 text-emerald-300" />
+              ) : activeTab === 'library' ? (
+                <FolderArchive className="w-6 h-6 text-indigo-200" />
+              ) : (
+                <GraduationCap className="w-6 h-6" />
+              )}
             </div>
-            <p className="text-xs sm:text-sm text-slate-500 font-semibold">
-              {activeTab === 'report'
-                ? 'সন্তানের সম্পন্ন পরীক্ষার ফলাফল, অর্জিত গ্রেড ও বিস্তারিত মূল্যায়ন রিপোর্ট'
-                : activeTab === 'games'
-                ? 'দ্রুত মেধা বিকাশ, সাধারণ জ্ঞান ও গণিত চ্যালেঞ্জের ইন্টারেক্টিভ প্ল্যাটফর্ম'
-                : activeTab === 'review'
-                ? 'সন্তানের জমা দেওয়া উত্তরপত্র যাচাই, প্রতিটি প্রশ্নে নম্বর প্রদান ও ফিডব্যাক'
-                : activeTab === 'library'
-                ? 'আজীবন সংরক্ষিত প্রশ্নপত্র, পরিমার্জন, ডুপ্লিকেট সেট তৈরি, ফিল্টারিং ও প্রিন্টিং সুবিধা'
-                : 'এআই প্রশ্নপত্র তৈরি, লিংক শেয়ার ও ফ্রন্ট ক্যামেরা লাইভ খাতা মূল্যায়ন'}
-            </p>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                  {activeTab === 'report' 
+                    ? 'ফলাফল ও সার্বিক রিপোর্ট' 
+                    : activeTab === 'games' 
+                    ? 'কুইজ ও ব্রেইন গেমস' 
+                    : activeTab === 'review'
+                    ? 'খাতা মূল্যায়ন ও পরীক্ষণ'
+                    : activeTab === 'library'
+                    ? 'আমার প্রশ্ন লাইব্রেরি ও প্রশ্নব্যাংক'
+                    : 'অভিভাবক ও শিক্ষক পোর্টাল'}
+                </h1>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-500 font-semibold">
+                {activeTab === 'report'
+                  ? 'সন্তানের সম্পন্ন পরীক্ষার ফলাফল, অর্জিত গ্রেড ও বিস্তারিত মূল্যায়ন রিপোর্ট'
+                  : activeTab === 'games'
+                  ? 'দ্রুত মেধা বিকাশ, সাধারণ জ্ঞান ও গণিত চ্যালেঞ্জের ইন্টারেক্টিভ প্ল্যাটফর্ম'
+                  : activeTab === 'review'
+                  ? 'সন্তানের জমা দেওয়া উত্তরপত্র যাচাই, প্রতিটি প্রশ্নে নম্বর প্রদান ও ফিডব্যাক'
+                  : activeTab === 'library'
+                  ? 'আজীবন সংরক্ষিত প্রশ্নপত্র, পরিমার্জন, ডুপ্লিকেট সেট তৈরি, ফিল্টারিং ও প্রিন্টিং সুবিধা'
+                  : 'এআই প্রশ্নপত্র তৈরি, লিংক শেয়ার ও ফ্রন্ট ক্যামেরা লাইভ খাতা মূল্যায়ন'}
+              </p>
+            </div>
           </div>
-        </div>
 
-        {/* Header Right Status / Back Button */}
-        {activeTab === 'report' || activeTab === 'games' || activeTab === 'library' ? (
-          <button
-            type="button"
-            onClick={() => onTabChange?.('assigned')}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs sm:text-sm font-bold transition-all cursor-pointer border border-blue-200 shadow-2xs"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>← ড্যাশবোর্ডে ফিরে যান</span>
-          </button>
-        ) : (activeViewMode === 'builder' || activeViewMode === 'institution_papers') ? (
-          <button
-            type="button"
-            onClick={() => {
-              setActiveViewMode('tests');
-              setEditingPaperId(null);
-            }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold transition-all cursor-pointer border border-slate-200 shadow-2xs"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>← ড্যাশবোর্ডে ফিরে যান</span>
-          </button>
-        ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            {/* নতুন প্রশ্ন তৈরি করুন */}
+          {/* Header Right Status / Back Button */}
+          {activeTab === 'report' || activeTab === 'games' || activeTab === 'library' ? (
+            <button
+              type="button"
+              onClick={() => onTabChange?.('assigned')}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs sm:text-sm font-bold transition-all cursor-pointer border border-blue-200 shadow-2xs"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>← ড্যাশবোর্ডে ফিরে যান</span>
+            </button>
+          ) : (activeViewMode === 'builder' || activeViewMode === 'institution_papers') ? (
             <button
               type="button"
               onClick={() => {
+                setActiveViewMode('tests');
                 setEditingPaperId(null);
-                setShowCreationModeModal(true);
               }}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-md active:scale-98"
-              title="নতুন প্রশ্নপত্র বা পরীক্ষা তৈরি করুন"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-bold transition-all cursor-pointer border border-slate-200 shadow-2xs"
             >
-              <Plus className="w-4 h-4 text-white" />
-              <span>নতুন প্রশ্ন তৈরি করুন</span>
+              <ArrowLeft className="w-4 h-4" />
+              <span>← ড্যাশবোর্ডে ফিরে যান</span>
+            </button>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              {/* নতুন প্রশ্ন তৈরি করুন */}
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingPaperId(null);
+                  setShowCreationModeModal(true);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-md active:scale-98"
+                title="নতুন প্রশ্নপত্র বা পরীক্ষা তৈরি করুন"
+              >
+                <Plus className="w-4 h-4 text-white" />
+                <span>নতুন প্রশ্ন তৈরি করুন</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* VIEW: TEST CREATION MODE SELECTION PAGE (স্বাভাবিক পেজ)   */}
+      {/* ======================================================== */}
+      {showCreationModeModal && (
+        <div className="w-full bg-white rounded-3xl p-5 sm:p-7 border border-slate-200/90 shadow-xs space-y-5 animate-in fade-in">
+          
+          {/* Header */}
+          <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
+                <PlusCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                  পরীক্ষা কীভাবে তৈরি করতে চান?
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
+                  নিচের যেকোনো একটি অপশন বেছে নিয়ে পরীক্ষা তৈরি শুরু করুন:
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCreationModeModal(false)}
+              className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              aria-label="বন্ধ করুন"
+              title="বন্ধ করুন"
+            >
+              <X className="w-5 h-5" />
             </button>
           </div>
-        )}
-      </div>
+
+          {/* Proctoring Level Quick Selector */}
+          <div className="p-3.5 bg-gradient-to-r from-purple-50 to-indigo-50/70 rounded-2xl border border-purple-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <ShieldAlert className="w-5 h-5 text-purple-600 shrink-0" />
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-bold text-slate-800">
+                    প্রক্টরিং কঠোরতার মাত্রা:
+                  </span>
+                  <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-purple-600 text-white shadow-2xs">
+                    লেভেল {proctoringLevel === 1 ? '১ (মৃদু)' : proctoringLevel === 2 ? '২ (মাঝারি)' : proctoringLevel === 3 ? '৩ (কঠোর - আড় চোখ সনাক্ত)' : '৪ (সর্বোচ্চ কঠোর - অতি-সংবেদনশীল)'}
+                  </span>
+                </div>
+                <p className="text-[10.5px] text-slate-500 mt-0.5">
+                  পরীক্ষার্থীর জন্য নির্ধারিত এই লেভেল অনুযায়ী পরীক্ষা পর্যবেক্ষণ করা হবে (ন্যূনতম ১০০ বারে সমাপ্তি)।
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0 flex-wrap">
+              {[
+                { lvl: 1, name: 'লেভেল ১' },
+                { lvl: 2, name: 'লেভেল ২' },
+                { lvl: 3, name: 'লেভেল ৩' },
+                { lvl: 4, name: 'লেভেল ৪' }
+              ].map(item => (
+                <button
+                  key={item.lvl}
+                  type="button"
+                  onClick={() => {
+                    setProctoringLevel(item.lvl as 1 | 2 | 3 | 4);
+                    localStorage.setItem('dapathshala_parent_proctoring_level', String(item.lvl));
+                    showToast(`✓ প্রক্টরিং কঠোরতার মাত্রা লেভেল ${item.lvl} এ সেট করা হয়েছে!`);
+                  }}
+                  className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    proctoringLevel === item.lvl 
+                      ? 'bg-purple-600 text-white shadow-xs ring-2 ring-purple-600/30' 
+                      : 'bg-white text-purple-800 hover:bg-purple-100 border border-purple-200'
+                  }`}
+                >
+                  {item.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Three Choices - Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            {/* Option 1: নিজে প্রশ্ন তৈরি করুন */}
+            <button
+              type="button"
+              onClick={() => handleSelectCreationMode('manual')}
+              className="group relative flex flex-col items-start p-4 sm:p-5 rounded-2xl border-2 border-blue-200 hover:border-blue-600 bg-blue-50/40 hover:bg-blue-50 text-left transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer active:scale-[0.98]"
+            >
+              <div className="flex items-center justify-between w-full mb-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
+                  শিক্ষক ও অভিভাবক
+                </span>
+              </div>
+              
+              <h4 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-blue-700 mb-1.5 transition-colors flex items-center gap-1.5">
+                <span>১. ম্যানুয়াল মোড (ব্যাচ ও স্কিপ)</span>
+              </h4>
+              
+              <p className="text-xs text-slate-600 leading-relaxed font-medium mb-4">
+                নির্বাচিত অধ্যায়সমূহ থেকে নির্দিষ্ট ব্যাচে (১০/২০/৫০টি) প্রশ্ন আসবে। কোনো প্রশ্ন পছন্দ না হলে "স্কিপ ও পরিবর্তন" করে ওই অধ্যায় থেকেই নতুন প্রশ্ন প্রতিস্থাপন করতে পারবেন।
+              </p>
+
+              <div className="mt-auto w-full pt-3 border-t border-blue-100 flex items-center justify-between text-xs font-bold text-blue-700 group-hover:translate-x-0.5 transition-transform">
+                <span>ম্যানুয়াল ব্যাচে প্রশ্ন সাজাতে ক্লিক করুন</span>
+                <ArrowRight className="w-4 h-4" />
+              </div>
+            </button>
+
+            {/* Option 2: এআই দিয়ে তৈরি করুন */}
+            <button
+              type="button"
+              onClick={() => handleSelectCreationMode('ai')}
+              className="group relative flex flex-col items-start p-4 sm:p-5 rounded-2xl border-2 border-amber-200 hover:border-amber-500 bg-amber-50/40 hover:bg-amber-50 text-left transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer active:scale-[0.98]"
+            >
+              <div className="flex items-center justify-between w-full mb-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-400 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                  স্বয়ংক্রিয় ও দ্রুত
+                </span>
+              </div>
+              
+              <h4 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-amber-700 mb-1.5 transition-colors flex items-center gap-1.5">
+                <span>২. এআই দিয়ে তৈরি করুন</span>
+              </h4>
+              
+              <p className="text-xs text-slate-600 leading-relaxed font-medium mb-4">
+                শ্রেণি, বিষয় ও অধ্যায় বাছাই করলেই এআই পাঠ্যবই থেকে দ্রুত মানসম্মত প্রশ্নপত্র সাজিয়ে দেবে (পরে ইচ্ছেমতো এডিটও করা যাবে)।
+              </p>
+
+              <div className="mt-auto w-full pt-3 border-t border-amber-100 flex items-center justify-between text-xs font-bold text-amber-700 group-hover:translate-x-0.5 transition-transform">
+                <span>এআই দিয়ে বানাতে ক্লিক করুন</span>
+                <ArrowRight className="w-4 h-4" />
+              </div>
+            </button>
+
+            {/* Option 3: বিভিন্ন প্রতিষ্ঠান ও সালের প্রশ্ন */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowCreationModeModal(false);
+                setActiveViewMode('institution_papers');
+              }}
+              className="group relative flex flex-col items-start p-4 sm:p-5 rounded-2xl border-2 border-purple-200 hover:border-purple-600 bg-purple-50/40 hover:bg-purple-50 text-left transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer active:scale-[0.98]"
+            >
+              <div className="flex items-center justify-between w-full mb-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-700 to-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
+                  <Landmark className="w-5 h-5" />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
+                  স্কুল ও বোর্ড প্রশ্ন
+                </span>
+              </div>
+              
+              <h4 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-purple-700 mb-1.5 transition-colors flex items-center gap-1.5">
+                <span>৩. বিভিন্ন প্রতিষ্ঠান ও সালের প্রশ্ন</span>
+              </h4>
+              
+              <p className="text-xs text-slate-600 leading-relaxed font-medium mb-4">
+                মতিঝিল আইডিয়াল, ভিকারুননিসা, রাজউক কিংবা শিক্ষা বোর্ডের আসল প্রশ্নপত্র ১-ক্লিকেই রেডি করে সন্তানের পরীক্ষা নিন।
+              </p>
+
+              <div className="mt-auto w-full pt-3 border-t border-purple-100 flex items-center justify-between text-xs font-bold text-purple-700 group-hover:translate-x-0.5 transition-transform">
+                <span>প্রশ্নপত্র দেখতে ক্লিক করুন</span>
+                <ArrowRight className="w-4 h-4" />
+              </div>
+            </button>
+
+          </div>
+
+          {/* Footer with discreet Admin Lock button */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => {
+                setShowCreationModeModal(false);
+                setShowAdminUploadModal(true);
+              }}
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-amber-700 transition-colors cursor-pointer"
+              title="কেবলমাত্র অ্যাডমিন এক্সেস"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>অ্যাডমিন প্রশ্ন আপলোড</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowCreationModeModal(false)}
+              className="px-5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold transition-colors cursor-pointer"
+            >
+              বাতিল করুন
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ======================================================== */}
       {/* VIEW 3: ফলাফল ও সার্বিক রিপোর্ট কার্ড (REPORT CARD)        */}
       {/* ======================================================== */}
-      {activeTab === 'report' && (
+      {!showCreationModeModal && activeTab === 'report' && (
         <div className="space-y-6">
           {/* Overview Stat Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -1784,7 +2014,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* ======================================================== */}
       {/* VIEW 4: কুইজ ও ব্রেইন গেমস হাব (QUIZ & BRAIN GAMES)       */}
       {/* ======================================================== */}
-      {activeTab === 'games' && (
+      {!showCreationModeModal && activeTab === 'games' && (
         <div className="space-y-6">
           {/* Game Switcher Tabs */}
           <div className="flex border-b border-slate-200 bg-white p-2 rounded-2xl shadow-xs gap-2">
@@ -1957,7 +2187,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* ======================================================== */}
       {/* VIEW 5: শিক্ষকের নিজস্ব লাইব্রেরি ও প্রশ্ন আর্কাইভ (STEP 5) */}
       {/* ======================================================== */}
-      {activeTab === 'library' && (
+      {!showCreationModeModal && activeTab === 'library' && (
         <TeacherQuestionLibrary
           tests={tests}
           onSaveTests={(updated) => {
@@ -1979,7 +2209,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* ======================================================== */}
       {/* VIEW 1: DUAL-MODE BUILDER: MANUAL OR AI                  */}
       {/* ======================================================== */}
-      {activeTab !== 'report' && activeTab !== 'games' && activeTab !== 'library' && activeViewMode === 'builder' && (
+      {!showCreationModeModal && activeTab !== 'report' && activeTab !== 'games' && activeTab !== 'library' && activeViewMode === 'builder' && (
         <div className="space-y-6">
           {/* Editing Mode Alert Banner */}
           {editingPaperId && (
@@ -3143,7 +3373,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* ======================================================== */}
       {/* VIEW 2: TESTS LIST & EVALUATION (SUBMITTED EXAMS)        */}
       {/* ======================================================== */}
-      {activeTab !== 'report' && activeTab !== 'games' && activeTab !== 'library' && activeViewMode === 'tests' && (
+      {!showCreationModeModal && activeTab !== 'report' && activeTab !== 'games' && activeTab !== 'library' && activeViewMode === 'tests' && (
         <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
             <div>
@@ -3548,7 +3778,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
       {/* VIEW 3: INSTITUTION & BOARD PAPERS FULL EXPLORER         */}
       {/* (কোনো পপাপ নয় - সরাসরি ড্যাশবোর্ড ক্যানভাসে উন্মুক্ত ভিউ)  */}
       {/* ======================================================== */}
-      {activeTab !== 'report' && activeTab !== 'games' && activeTab !== 'library' && activeViewMode === 'institution_papers' && (
+      {!showCreationModeModal && activeTab !== 'report' && activeTab !== 'games' && activeTab !== 'library' && activeViewMode === 'institution_papers' && (
         <InstitutionPaperExplorer
           onBack={() => setActiveViewMode('tests')}
           onSelectPaper={handleSelectInstitutionPaper}
@@ -4449,206 +4679,7 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* MODAL 6: TEST CREATION MODE SELECTION MODAL              */}
-      {/* (১. নিজে প্রশ্ন তৈরি করুন / ২. এআই দিয়ে তৈরি করুন)         */}
-      {/* ======================================================== */}
-      {showCreationModeModal && (
-        <div className="fixed inset-0 lg:left-[var(--sidebar-width,208px)] z-[80] bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 animate-in fade-in">
-          <div className="bg-white rounded-3xl p-5 sm:p-7 max-w-4xl w-full border border-slate-200 shadow-2xl space-y-5 relative animate-in zoom-in-95">
-            
-            {/* Modal Header */}
-            <div className="flex items-start justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0 shadow-2xs">
-                  <PlusCircle className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
-                    পরীক্ষা কীভাবে তৈরি করতে চান?
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">
-                    নিচের যেকোনো একটি অপশন বেছে নিয়ে পরীক্ষা তৈরি শুরু করুন:
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowCreationModeModal(false)}
-                className="w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-                aria-label="বন্ধ করুন"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Proctoring Level Quick Selector inside Modal */}
-            <div className="p-3.5 bg-gradient-to-r from-purple-50 to-indigo-50/70 rounded-2xl border border-purple-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
-              <div className="flex items-center gap-2.5">
-                <ShieldAlert className="w-5 h-5 text-purple-600 shrink-0" />
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs font-bold text-slate-800">
-                      প্রক্টরিং কঠোরতার মাত্রা:
-                    </span>
-                    <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-purple-600 text-white shadow-2xs">
-                      লেভেল {proctoringLevel === 1 ? '১ (মৃদু)' : proctoringLevel === 2 ? '২ (মাঝারি)' : proctoringLevel === 3 ? '৩ (কঠোর - আড় চোখ সনাক্ত)' : '৪ (সর্বোচ্চ কঠোর - অতি-সংবেদনশীল)'}
-                    </span>
-                  </div>
-                  <p className="text-[10.5px] text-slate-500 mt-0.5">
-                    পরীক্ষার্থীর জন্য নির্ধারিত এই লেভেল অনুযায়ী পরীক্ষা পর্যবেক্ষণ করা হবে (ন্যূনতম ১০০ বারে সমাপ্তি)।
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0 flex-wrap">
-                {[
-                  { lvl: 1, name: 'লেভেল ১' },
-                  { lvl: 2, name: 'লেভেল ২' },
-                  { lvl: 3, name: 'লেভেল ৩' },
-                  { lvl: 4, name: 'লেভেল ৪' }
-                ].map(item => (
-                  <button
-                    key={item.lvl}
-                    type="button"
-                    onClick={() => {
-                      setProctoringLevel(item.lvl as 1 | 2 | 3 | 4);
-                      localStorage.setItem('dapathshala_parent_proctoring_level', String(item.lvl));
-                      showToast(`✓ প্রক্টরিং কঠোরতার মাত্রা লেভেল ${item.lvl} এ সেট করা হয়েছে!`);
-                    }}
-                    className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      proctoringLevel === item.lvl 
-                        ? 'bg-purple-600 text-white shadow-xs ring-2 ring-purple-600/30' 
-                        : 'bg-white text-purple-800 hover:bg-purple-100 border border-purple-200'
-                    }`}
-                  >
-                    {item.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Three Choices - Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              
-              {/* Option 1: নিজে প্রশ্ন তৈরি করুন */}
-              <button
-                type="button"
-                onClick={() => handleSelectCreationMode('manual')}
-                className="group relative flex flex-col items-start p-4 sm:p-5 rounded-2xl border-2 border-blue-200 hover:border-blue-600 bg-blue-50/40 hover:bg-blue-50 text-left transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer active:scale-[0.98]"
-              >
-                <div className="flex items-center justify-between w-full mb-3">
-                  <div className="w-10 h-10 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
-                    <Edit3 className="w-5 h-5" />
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200">
-                    শিক্ষক ও অভিভাবক
-                  </span>
-                </div>
-                
-                <h4 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-blue-700 mb-1.5 transition-colors flex items-center gap-1.5">
-                  <span>১. ম্যানুয়াল মোড (ব্যাচ ও স্কিপ)</span>
-                </h4>
-                
-                <p className="text-xs text-slate-600 leading-relaxed font-medium mb-4">
-                  নির্বাচিত অধ্যায়সমূহ থেকে নির্দিষ্ট ব্যাচে (১০/২০/৫০টি) প্রশ্ন আসবে। কোনো প্রশ্ন পছন্দ না হলে "স্কিপ ও পরিবর্তন" করে ওই অধ্যায় থেকেই নতুন প্রশ্ন প্রতিস্থাপন করতে পারবেন।
-                </p>
-
-                <div className="mt-auto w-full pt-3 border-t border-blue-100 flex items-center justify-between text-xs font-bold text-blue-700 group-hover:translate-x-0.5 transition-transform">
-                  <span>ম্যানুয়াল ব্যাচে প্রশ্ন সাজাতে ক্লিক করুন</span>
-                  <ArrowRight className="w-4 h-4" />
-                </div>
-              </button>
-
-              {/* Option 2: এআই দিয়ে তৈরি করুন */}
-              <button
-                type="button"
-                onClick={() => handleSelectCreationMode('ai')}
-                className="group relative flex flex-col items-start p-4 sm:p-5 rounded-2xl border-2 border-amber-200 hover:border-amber-500 bg-amber-50/40 hover:bg-amber-50 text-left transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer active:scale-[0.98]"
-              >
-                <div className="flex items-center justify-between w-full mb-3">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-400 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
-                    <Sparkles className="w-5 h-5" />
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
-                    স্বয়ংক্রিয় ও দ্রুত
-                  </span>
-                </div>
-                
-                <h4 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-amber-700 mb-1.5 transition-colors flex items-center gap-1.5">
-                  <span>২. এআই দিয়ে তৈরি করুন</span>
-                </h4>
-                
-                <p className="text-xs text-slate-600 leading-relaxed font-medium mb-4">
-                  শ্রেণি, বিষয় ও অধ্যায় বাছাই করলেই এআই পাঠ্যবই থেকে দ্রুত মানসম্মত প্রশ্নপত্র সাজিয়ে দেবে (পরে ইচ্ছেমতো এডিটও করা যাবে)।
-                </p>
-
-                <div className="mt-auto w-full pt-3 border-t border-amber-100 flex items-center justify-between text-xs font-bold text-amber-700 group-hover:translate-x-0.5 transition-transform">
-                  <span>এআই দিয়ে বানাতে ক্লিক করুন</span>
-                  <ArrowRight className="w-4 h-4" />
-                </div>
-              </button>
-
-              {/* Option 3: বিভিন্ন প্রতিষ্ঠান ও সালের প্রশ্ন */}
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCreationModeModal(false);
-                  setActiveViewMode('institution_papers');
-                }}
-                className="group relative flex flex-col items-start p-4 sm:p-5 rounded-2xl border-2 border-purple-200 hover:border-purple-600 bg-purple-50/40 hover:bg-purple-50 text-left transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer active:scale-[0.98]"
-              >
-                <div className="flex items-center justify-between w-full mb-3">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-700 to-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform">
-                    <Landmark className="w-5 h-5" />
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-200">
-                    স্কুল ও বোর্ড প্রশ্ন
-                  </span>
-                </div>
-                
-                <h4 className="text-sm sm:text-base font-black text-slate-900 group-hover:text-purple-700 mb-1.5 transition-colors flex items-center gap-1.5">
-                  <span>৩. বিভিন্ন প্রতিষ্ঠান ও সালের প্রশ্ন</span>
-                </h4>
-                
-                <p className="text-xs text-slate-600 leading-relaxed font-medium mb-4">
-                  মতিঝিল আইডিয়াল, ভিকারুননিসা, রাজউক কিংবা শিক্ষা বোর্ডের আসল প্রশ্নপত্র ১-ক্লিকেই রেডি করে সন্তানের পরীক্ষা নিন।
-                </p>
-
-                <div className="mt-auto w-full pt-3 border-t border-purple-100 flex items-center justify-between text-xs font-bold text-purple-700 group-hover:translate-x-0.5 transition-transform">
-                  <span>প্রশ্নপত্র দেখতে ক্লিক করুন</span>
-                  <ArrowRight className="w-4 h-4" />
-                </div>
-              </button>
-
-            </div>
-
-            {/* Footer with discreet Admin Lock button */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCreationModeModal(false);
-                  setShowAdminUploadModal(true);
-                }}
-                className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-400 hover:text-amber-700 transition-colors cursor-pointer"
-                title="কেবলমাত্র অ্যাডমিন এক্সেস"
-              >
-                <Lock className="w-3.5 h-3.5" />
-                <span>অ্যাডমিন প্রশ্ন আপলোড</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowCreationModeModal(false)}
-                className="px-5 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold transition-colors cursor-pointer"
-              >
-                বাতিল করুন
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
+      {/* MODAL 6 removed - converted into inline normal page */}
 
       {/* Secure Admin Bulk Question Paper Upload Portal Modal */}
       <AdminPaperBulkUploadModal
@@ -4674,70 +4705,179 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
         }}
       />
 
-      {/* Feature 1: Zoom Modal for Violation Snapshot Photo Proof */}
-      {selectedSnapshot && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in">
-          <div className="bg-slate-900 border-2 border-rose-500 rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl text-white">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/40">
-                  <ShieldAlert className="w-4 h-4" />
+      {/* Feature 1: Zoom Modal for Violation Snapshot Photo Proof with Prev/Next Navigation */}
+      {selectedSnapshot && (() => {
+        const availableSnapshots = (reviewTest?.violationSnapshots || []).filter(s => s && s.photo);
+        const currentIndex = availableSnapshots.findIndex(s => (s.id && s.id === selectedSnapshot.id) || s.photo === selectedSnapshot.photo);
+
+        const handlePrev = (e?: React.MouseEvent) => {
+          e?.stopPropagation();
+          if (availableSnapshots.length <= 1) return;
+          const prevIdx = currentIndex > 0 ? currentIndex - 1 : availableSnapshots.length - 1;
+          setSelectedSnapshot(availableSnapshots[prevIdx]);
+        };
+
+        const handleNext = (e?: React.MouseEvent) => {
+          e?.stopPropagation();
+          if (availableSnapshots.length <= 1) return;
+          const nextIdx = currentIndex < availableSnapshots.length - 1 ? currentIndex + 1 : 0;
+          setSelectedSnapshot(availableSnapshots[nextIdx]);
+        };
+
+        return (
+          <div 
+            className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5 animate-in fade-in select-none"
+            onClick={() => setSelectedSnapshot(null)}
+          >
+            {/* Modal Container with Left & Right Arrows */}
+            <div 
+              className="relative max-w-xl w-full flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Left Arrow Button (পূর্ববর্তী ছবি) - as drawn in Image 1 */}
+              {availableSnapshots.length > 1 && (
+                <button
+                  type="button"
+                  onClick={handlePrev}
+                  className="absolute -left-3 sm:-left-16 z-30 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-slate-900/90 hover:bg-rose-600 text-white border-2 border-rose-500 shadow-2xl flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md group"
+                  title="পূর্ববর্তী ছবি (← কিবোর্ড লেফট অ্যারো)"
+                  aria-label="পূর্ববর্তী ছবি"
+                >
+                  <ChevronLeft className="w-6 h-6 sm:w-8 sm:h-8 group-hover:-translate-x-0.5 transition-transform text-rose-200 group-hover:text-white" />
+                </button>
+              )}
+
+              {/* Main Dialog Box */}
+              <div className="bg-slate-900 border-2 border-rose-500 rounded-3xl w-full overflow-hidden shadow-2xl text-white">
+                <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center border border-rose-500/40">
+                      <ShieldAlert className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-black text-rose-200">
+                          নকল সতর্কতার সচিত্র প্রমাণ (সতর্কতা #{toBn(selectedSnapshot.strike)})
+                        </h4>
+                        {availableSnapshots.length > 1 && currentIndex >= 0 && (
+                          <span className="text-[10px] font-bold bg-rose-500/30 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/40 font-mono">
+                            ছবি {toBn(currentIndex + 1)}/{toBn(availableSnapshots.length)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 font-mono">
+                        রেকর্ড সময়: {selectedSnapshot.timestamp}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSnapshot(null)}
+                    className="w-8 h-8 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white cursor-pointer"
+                    title="বন্ধ করুন (Esc)"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
-                <div>
-                  <h4 className="text-sm font-black text-rose-200">
-                    নকল সতর্কতার সচিত্র প্রমাণ (সতর্কতা #{toBn(selectedSnapshot.strike)})
-                  </h4>
-                  <p className="text-[11px] text-slate-400 font-mono">
-                    রেকর্ড সময়: {selectedSnapshot.timestamp}
-                  </p>
+
+                <div className="p-4 flex flex-col items-center relative">
+                  <div className="w-full rounded-2xl overflow-hidden border-2 border-slate-700 bg-black shadow-inner relative group">
+                    <img
+                      src={selectedSnapshot.photo}
+                      alt={selectedSnapshot.reason}
+                      className="w-full h-auto object-contain max-h-[420px] mx-auto select-none"
+                    />
+
+                    {/* Touch overlay navigation for mobile screens */}
+                    {availableSnapshots.length > 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handlePrev}
+                          className="sm:hidden absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-rose-600 transition-colors cursor-pointer"
+                          aria-label="পূর্ববর্তী ছবি"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleNext}
+                          className="sm:hidden absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-rose-600 transition-colors cursor-pointer"
+                          aria-label="পরবর্তী ছবি"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="w-full mt-3.5 p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">সনাক্তকৃত কারণ:</span>
+                      <span className="font-bold text-rose-300">{selectedSnapshot.reason}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400">প্রমাণ আইডি:</span>
+                      <span className="font-mono text-[10px] text-slate-400">{selectedSnapshot.id}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3.5 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {availableSnapshots.length > 1 && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={handlePrev}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-600 text-white text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-slate-700 active:scale-95"
+                          title="পূর্ববর্তী ছবি"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                          <span>পূর্ববর্তী</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleNext}
+                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-600 text-white text-xs font-bold transition-all flex items-center gap-1 cursor-pointer border border-slate-700 active:scale-95"
+                          title="পরবর্তী ছবি"
+                        >
+                          <span>পরবর্তী</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                    <span className="text-[11px] text-slate-400 hidden sm:inline">
+                      ফ্রন্ট ক্যামেরা থেকে স্বয়ংক্রিয়ভাবে ধারণকৃত প্রমাণ
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSnapshot(null)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors cursor-pointer border border-slate-700"
+                  >
+                    বন্ধ করুন
+                  </button>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedSnapshot(null)}
-                className="w-8 h-8 rounded-full hover:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white cursor-pointer"
-                title="বন্ধ করুন"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="p-4 flex flex-col items-center">
-              <div className="w-full rounded-2xl overflow-hidden border-2 border-slate-700 bg-black shadow-inner">
-                <img
-                  src={selectedSnapshot.photo}
-                  alt={selectedSnapshot.reason}
-                  className="w-full h-auto object-contain max-h-[380px]"
-                />
-              </div>
-
-              <div className="w-full mt-3.5 p-3 rounded-xl bg-slate-800/80 border border-slate-700 text-xs space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">সনাক্তকৃত কারণ:</span>
-                  <span className="font-bold text-rose-300">{selectedSnapshot.reason}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">প্রমাণ আইডি:</span>
-                  <span className="font-mono text-[10px] text-slate-400">{selectedSnapshot.id}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3.5 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between">
-              <span className="text-[11px] text-slate-400">
-                ফ্রন্ট ক্যামেরা থেকে স্বয়ংক্রিয়ভাবে ধারণকৃত প্রমাণ
-              </span>
-              <button
-                type="button"
-                onClick={() => setSelectedSnapshot(null)}
-                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors cursor-pointer border border-slate-700"
-              >
-                বন্ধ করুন
-              </button>
+              {/* Right Arrow Button (পরবর্তী ছবি) - as drawn in Image 1 */}
+              {availableSnapshots.length > 1 && (
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  className="absolute -right-3 sm:-right-16 z-30 w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-slate-900/90 hover:bg-rose-600 text-white border-2 border-rose-500 shadow-2xl flex items-center justify-center transition-all transform hover:scale-110 active:scale-95 cursor-pointer backdrop-blur-md group"
+                  title="পরবর্তী ছবি (→ কিবোর্ড রাইট অ্যারো)"
+                  aria-label="পরবর্তী ছবি"
+                >
+                  <ChevronRight className="w-6 h-6 sm:w-8 sm:h-8 group-hover:translate-x-0.5 transition-transform text-rose-200 group-hover:text-white" />
+                </button>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );
