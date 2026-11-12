@@ -426,22 +426,22 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       violationType,
       violationDetails: reason,
       flagCount: nextCount,
-      isAutoSubmitted: nextCount >= 50
+      isAutoSubmitted: nextCount >= 100
     }).catch(err => console.warn('Proctoring log record note:', err));
 
-    if (nextCount >= 50) {
-      // 50th violation: Auto-submit exam immediately (ন্যূনতম ৫০ বার সতর্ক করার পর)
+    if (nextCount >= 100) {
+      // 100th violation: Auto-submit exam immediately (ন্যূনতম ১০০ বার সতর্ক করার পর)
       setWarningModal({
         isOpen: true,
-        reason: 'সর্বোচ্চ সতর্কতার মাত্রা অতিক্রান্ত (৫০/৫০)! ৫০ বার নিয়ম ভঙ্গের কারণে পরীক্ষাটি স্বয়ংক্রিয়ভাবে জমা (Auto-submit) করা হয়েছে।',
-        count: 50,
+        reason: 'সর্বোচ্চ সতর্কতার মাত্রা অতিক্রান্ত (১০০/১০০)! ১০০ বার নিয়ম ভঙ্গের কারণে পরীক্ষাটি স্বয়ংক্রিয়ভাবে জমা (Auto-submit) করা হয়েছে।',
+        count: 100,
         isAutoSubmit: true
       });
-      calculateResult(true, 50);
+      calculateResult(true, 100);
     } else {
       setWarningModal({
         isOpen: true,
-        reason: `${reason} (সতর্কতা: ${nextCount}/৫০ — ৫০ বার না হওয়া পর্যন্ত পরীক্ষা শেষ হবে না)`,
+        reason: `${reason} (সতর্কতা: ${nextCount}/১০০ — ১০০ বার না হওয়া পর্যন্ত পরীক্ষা শেষ হবে না)`,
         count: nextCount,
         isAutoSubmit: false
       });
@@ -1121,7 +1121,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
                       : 'bg-red-50 text-red-700 border border-red-200'
                   }`}>
-                    সতর্কতা: {suspiciousCount}/৫০ (সর্বনিম্ন ৫০)
+                    সতর্কতা: {suspiciousCount}/১০০ (সর্বনিম্ন ১০০)
                   </div>
                 </div>
               </div>
@@ -1254,7 +1254,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               className="relative z-10 max-w-lg w-full bg-white rounded-3xl shadow-2xl border-2 border-red-200 overflow-hidden p-6 sm:p-8 space-y-5 text-center"
             >
               <div className={`w-16 h-16 rounded-2xl mx-auto flex items-center justify-center shadow-lg ${
-                warningModal.count >= 50 
+                warningModal.count >= 100 
                   ? 'bg-red-600 text-white shadow-red-200 animate-bounce' 
                   : 'bg-amber-100 text-amber-600 shadow-amber-100'
               }`}>
@@ -1263,7 +1263,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
 
               <div className="space-y-2">
                 <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-snug">
-                  {warningModal.count >= 50 
+                  {warningModal.count >= 100 
                     ? 'পরীক্ষা অটো-সাবমিট হয়েছে!' 
                     : 'সতর্কতা! পরীক্ষা চলাকালীন অন্য ট্যাবে যাওয়া বা দৃষ্টি সরানো নিষেধ'}
                 </h3>
@@ -1275,34 +1275,34 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               {/* Suspicious Flags Counter Visualization */}
               <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
                 <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-600">সতর্কতার সংখ্যা (সর্বনিম্ন ৫০ বারে সমাপ্তি):</span>
+                  <span className="text-slate-600">সতর্কতার সংখ্যা (সর্বনিম্ন ১০০ বারে সমাপ্তি):</span>
                   <span className={`px-2 py-0.5 rounded-lg ${
-                    warningModal.count >= 50 ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'
+                    warningModal.count >= 100 ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'
                   }`}>
-                    {warningModal.count} / ৫০
+                    {warningModal.count} / ১০০
                   </span>
                 </div>
 
-                {/* Progress bar up to 50 */}
+                {/* Progress bar up to 100 */}
                 <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
                   <div
                     className={`h-full transition-all duration-300 ${
-                      warningModal.count >= 50 ? 'bg-red-600' : 'bg-amber-500'
+                      warningModal.count >= 100 ? 'bg-red-600' : 'bg-amber-500'
                     }`}
-                    style={{ width: `${Math.min(100, (warningModal.count / 50) * 100)}%` }}
+                    style={{ width: `${Math.min(100, (warningModal.count / 100) * 100)}%` }}
                   />
                 </div>
 
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  {warningModal.count >= 50
-                    ? '⛔ সর্বোচ্চ ৫০ বার নিয়ম ভাঙার কারণে পরীক্ষাটি স্বয়ংক্রিয়ভাবে সমাপ্ত ও সাবমিট করা হয়েছে।'
-                    : `⚠️ বর্তমান সতর্কতা: ${warningModal.count}/৫০। মনে রাখবেন, ন্যূনতম ৫০ বার সতর্কবার্তা লঙ্ঘিত না হওয়া পর্যন্ত পরীক্ষা কখনই স্বয়ংক্রিয়ভাবে বাতিল বা সমাপ্ত হবে না।`}
+                  {warningModal.count >= 100
+                    ? '⛔ সর্বোচ্চ ১০০ বার নিয়ম ভাঙার কারণে পরীক্ষাটি স্বয়ংক্রিয়ভাবে সমাপ্ত ও সাবমিট করা হয়েছে।'
+                    : `⚠️ বর্তমান সতর্কতা: ${warningModal.count}/১০০। মনে রাখবেন, ন্যূনতম ১০০ বার সতর্কবার্তা লঙ্ঘিত না হওয়া পর্যন্ত পরীক্ষা কখনই স্বয়ংক্রিয়ভাবে বাতিল বা সমাপ্ত হবে না।`}
                 </p>
               </div>
 
               {/* Modal Action Button */}
               <div>
-                {warningModal.count < 50 ? (
+                {warningModal.count < 100 ? (
                   <Button
                     variant="primary"
                     className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-lg shadow-indigo-200 cursor-pointer"

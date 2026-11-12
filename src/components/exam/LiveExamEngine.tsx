@@ -86,7 +86,38 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const [isCameraMinimized, setIsCameraMinimized] = useState(false);
   const [violationCount, setViolationCount] = useState(0);
   const [lastWarning, setLastWarning] = useState<string | null>(null);
+  const [isWarningFading, setIsWarningFading] = useState<boolean>(false);
   const warningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper to show steady alert banner with smooth 5-second fade-out
+  const showWarningWithAutoFade = (message: string, durationMs: number = 30000) => {
+    if (isSubmitted || isReviewOnly) return;
+
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+      warningTimeoutRef.current = null;
+    }
+    if (fadeTimeoutRef.current) {
+      clearTimeout(fadeTimeoutRef.current);
+      fadeTimeoutRef.current = null;
+    }
+
+    setIsWarningFading(false);
+    setLastWarning(message);
+
+    // Keep visible for durationMs (e.g. 30s for first warning)
+    warningTimeoutRef.current = setTimeout(() => {
+      // Begin very slow, smooth fade-out over at least 5 seconds (5000ms)
+      setIsWarningFading(true);
+      fadeTimeoutRef.current = setTimeout(() => {
+        setLastWarning(null);
+        setIsWarningFading(false);
+        fadeTimeoutRef.current = null;
+      }, 5000); // exactly 5-second gradual fade-out
+      warningTimeoutRef.current = null;
+    }, durationMs);
+  };
   const [isFullscreen, setIsFullscreen] = useState(() => !!document.fullscreenElement);
   const [isHoveringTopBar, setIsHoveringTopBar] = useState(false);
   
@@ -1466,7 +1497,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   // 1. শিক্ষার্থীকে ঘন ঘন বা বারবার পপআপ দিয়ে সতর্ক করা হবে না।
   // 2. প্রথমবার শুধুমাত্র একবার স্পষ্ট সতর্কবার্তা দেওয়া হবে: “আপনি ডানে-বামে যে দিকেই তাকান না কেন বা আপনাকে কেউ সহায়তা করলে সব রেকর্ড হচ্ছে!”
   // 3. পরবর্তীতে ডানে/বামে তাকালে স্ক্রিনে কোনো বিরক্তিকর সতর্কবার্তা পপআপ ভাসবে না, কিন্তু ব্যাকগ্রাউন্ডে নীরবে ডিজিটাল প্রমাণ হিসেবে ছবি (স্ন্যাপশট) তুলে রাখা হবে।
-  // 4. Strict requirement: minimum 50 warnings before auto-termination!
+  // 4. Strict requirement: minimum 100 warnings before auto-termination!
   const handleGazeAway = (reason: string) => {
     const next = gazeAwayCountRef.current + 1;
     gazeAwayCountRef.current = next;
@@ -1483,14 +1514,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     // Feature 1: ALWAYS capture photographic snapshot proof silently into audit archive
     const snap = captureViolationSnapshot(reason, next);
     if (snap) {
-      const updatedSnaps = [...violationSnapshotsRef.current, snap].slice(-50);
+      const updatedSnaps = [...violationSnapshotsRef.current, snap].slice(-100);
       violationSnapshotsRef.current = updatedSnaps;
       setViolationSnapshots(updatedSnaps);
     }
 
-    // Auto-termination STRICTLY occurs ONLY after minimum 50 warnings! Before 50, test continues.
-    if (next >= 50) {
-      setLastWarning(`⛔ সর্বোচ্চ ৫০ বার সতর্কতার মাত্রা লঙ্ঘিত হয়েছে! পরীক্ষাটি স্বয়ংক্রিয়ভাবে সমাপ্ত ও জমা নেওয়া হচ্ছে...`);
+    // Auto-termination STRICTLY occurs ONLY after minimum 100 warnings! Before 100, test continues.
+    if (next >= 100) {
+      showWarningWithAutoFade(`⛔ সর্বোচ্চ ১০০ বার সতর্কতার মাত্রা লঙ্ঘিত হয়েছে! পরীক্ষাটি স্বয়ংক্রিয়ভাবে সমাপ্ত ও জমা নেওয়া হচ্ছে...`, 5000);
       setTimeout(() => {
         handleSubmitExam(true);
       }, 1600);
@@ -1498,20 +1529,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }
 
     // USER SPECIFICATION: শুধুমাত্র একবার সতর্ক করা হবে। পরবর্তীতে কোনো পপআপ বা শব্দ ছাড়াই ব্যাকগ্রাউন্ডে ছবি তোলা হবে।
+    // ১ম সতর্কবার্তাটি ৩০ সেকেন্ড ধরে থাকবে যাতে ৫ম শ্রেণির শিক্ষার্থীর এই বার্তাটি পড়তে কোন অসুবিধা না হয়।
     // অডিও সতর্ক বার্তার দরকার নেই।
     if (!hasShownOneTimeWarningRef.current) {
       hasShownOneTimeWarningRef.current = true;
       const oneTimeWarningText = "⚠️ আপনি ডানে-বামে যে দিকেই তাকান না কেন বা আপনাকে কেউ সহায়তা করলে সব রেকর্ড হচ্ছে! অনুগ্রহ করে সততার সাথে পরীক্ষা দিন।";
-      setLastWarning(oneTimeWarningText);
-      // NOTE: User requested NO audio alert: "অডিও সতর্ক বার্তাটির দরকার নেই।"
-      if (warningTimeoutRef.current) {
-        clearTimeout(warningTimeoutRef.current);
-        warningTimeoutRef.current = null;
-      }
-      warningTimeoutRef.current = setTimeout(() => {
-        setLastWarning(null);
-        warningTimeoutRef.current = null;
-      }, 10000); // ১০ সেকেন্ড স্থিরভাবে থাকবে যাতে পরীক্ষার্থী অবশ্যই স্পষ্টভাবে দেখতে পায়
+      showWarningWithAutoFade(oneTimeWarningText, 30000); // ৩০ সেকেন্ড স্থির থাকবে, এরপর ৫ সেকেন্ড ধরে ধীরে ধীরে অদৃশ্য হবে
     } else {
       // পরবর্তী ২য়, ৩য়, ৪র্থ... বারের ক্ষেত্রে স্ক্রিনে কোনো পপআপ দেখানো হবে না এবং কোনো শব্দও করা হবে না।
       // শিক্ষার্থী শান্তভাবে পরীক্ষা দিতে থাকবে এবং তার প্রতিটি সন্দেহজনক মুহূর্তের ছবি ও প্রমাণ স্বয়ংক্রিয়ভাবে রেকর্ড হতে থাকবে।
@@ -1522,25 +1545,22 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     handleGazeAway(reason);
   };
 
-  // 5-minute periodic steady reminder banner (৫ মিনিট পরপর পরীক্ষার্থীকে স্থির সতর্কবার্তা প্রদর্শন)
+  // Periodic steady reminder banner: পরীক্ষার মোট সময়ের অর্ধেক সময় পর পর (৫ মিনিটের পরীক্ষায় ২.৩০ মিনিট, ১০ মিনিটের পরীক্ষায় ৫ মিনিট...)
   useEffect(() => {
     if (isReviewOnly || isSubmitted || isCalibrating) return;
 
+    const examDurationMinutes = Number(test.durationMinutes) || 15;
+    const halfDurationSeconds = Math.max(60, (examDurationMinutes * 60) / 2);
+    const periodicIntervalMs = halfDurationSeconds * 1000;
+
     const periodicInterval = setInterval(() => {
+      if (isSubmitted || isReviewOnly) return;
       const reminderMsg = "⚠️ আপনি ডানে-বামে যে দিকেই তাকান না কেন বা আপনাকে কেউ সহায়তা করলে সব রেকর্ড হচ্ছে! অনুগ্রহ করে সততার সাথে পরীক্ষা দিন।";
-      setLastWarning(reminderMsg);
-      if (warningTimeoutRef.current) {
-        clearTimeout(warningTimeoutRef.current);
-        warningTimeoutRef.current = null;
-      }
-      warningTimeoutRef.current = setTimeout(() => {
-        setLastWarning(null);
-        warningTimeoutRef.current = null;
-      }, 10000); // ১০ সেকেন্ড স্থিরভাবে থাকবে যাতে পরীক্ষার্থী অবশ্যই স্পষ্টভাবে দেখতে পায়
-    }, 5 * 60 * 1000); // প্রতি ৫ মিনিট (৩০০ সেকেন্ড) পরপর
+      showWarningWithAutoFade(reminderMsg, 15000); // ১৫ সেকেন্ড স্থিরভাবে থাকবে, এরপর ৫ সেকেন্ডে ধীরে ধীরে অদৃশ্য হবে
+    }, periodicIntervalMs);
 
     return () => clearInterval(periodicInterval);
-  }, [isReviewOnly, isSubmitted, isCalibrating]);
+  }, [isReviewOnly, isSubmitted, isCalibrating, test.durationMinutes]);
 
   // Timer countdown & Auto-submit (ক্যালিব্রেশন চলাকালীন টাইমার পজ থাকবে)
   useEffect(() => {
@@ -1654,6 +1674,18 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       mediaStreamRef.current.getTracks().forEach(t => t.stop());
     }
 
+    // Immediately clear all warning banners upon submission so NO warning can ever show on submitted view
+    setLastWarning(null);
+    setIsWarningFading(false);
+    if (warningTimeoutRef.current) {
+      clearTimeout(warningTimeoutRef.current);
+      warningTimeoutRef.current = null;
+    }
+    if (fadeTimeoutRef.current) {
+      clearTimeout(fadeTimeoutRef.current);
+      fadeTimeoutRef.current = null;
+    }
+
     let correctCount = 0;
     const questionsList = activeQuestions || [];
     const updatedQuestions = questionsList.map((q) => {
@@ -1672,10 +1704,10 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     
     const recordedLogs = proctorLogsRef.current.length > 0 ? proctorLogsRef.current : proctorLogs;
     const totalWarnings = gazeAwayCountRef.current;
-    const summaryFlag = isForcedByProctor || totalWarnings >= 50
-      ? [`সর্বোচ্চ ৫০ বার সতর্কবার্তা লঙ্ঘনের কারণে পরীক্ষাটি স্বয়ংক্রিয়ভাবে সমাপ্ত হয়েছে (মোট সতর্কতাপ্রাপ্ত: ${totalWarnings} বার)`]
+    const summaryFlag = isForcedByProctor || totalWarnings >= 100
+      ? [`সর্বোচ্চ ১০০ বার সতর্কবার্তা লঙ্ঘনের কারণে পরীক্ষাটি স্বয়ংক্রিয়ভাবে সমাপ্ত হয়েছে (মোট সতর্কতাপ্রাপ্ত: ${totalWarnings} বার)`]
       : totalWarnings > 0
-      ? [`পরীক্ষার্থী মোট ${totalWarnings} বার স্ক্রিন ছেড়ে দৃষ্টি সরিয়েছিল বা মাথা ঘুরিয়েছিল (৫০ বারের কম থাকায় পরীক্ষা বাতিল হয়নি)`]
+      ? [`পরীক্ষার্থী মোট ${totalWarnings} বার স্ক্রিন ছেড়ে দৃষ্টি সরিয়েছিল বা মাথা ঘুরিয়েছিল (১০০ বারের কম থাকায় পরীক্ষা বাতিল হয়নি)`]
       : ['পরীক্ষার্থী পূর্ণ মনোযোগ সহকারে স্ক্রিনের দিকে তাকিয়ে পরীক্ষা সম্পন্ন করেছে ✓'];
     const finalFlags = [...summaryFlag, ...recordedLogs];
 
@@ -1705,9 +1737,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     const notifs = getStoredNotifications();
     const newNotif = {
       id: `notif-${Date.now()}`,
-      title: isForcedByProctor || totalWarnings >= 50 ? "পরীক্ষা ৫০ বার সতর্কতায় স্বয়ংক্রিয় সমাপ্ত" : "নতুন উত্তরপত্র জমা হয়েছে",
-      message: isForcedByProctor || totalWarnings >= 50
-        ? `আপনার সন্তান "${test.title}" পরীক্ষায় সর্বোচ্চ ৫০ বার প্রক্টরিং সতর্কতা লঙ্ঘন করায় পরীক্ষাটি স্বয়ংক্রিয়ভাবে সমাপ্ত ও জমা হয়েছে। প্রাপ্ত স্কোর: ${calculatedScore}%।`
+      title: isForcedByProctor || totalWarnings >= 100 ? "পরীক্ষা ১০০ বার সতর্কতায় স্বয়ংক্রিয় সমাপ্ত" : "নতুন উত্তরপত্র জমা হয়েছে",
+      message: isForcedByProctor || totalWarnings >= 100
+        ? `আপনার সন্তান "${test.title}" পরীক্ষায় সর্বোচ্চ ১০০ বার প্রক্টরিং সতর্কতা লঙ্ঘন করায় পরীক্ষাটি স্বয়ংক্রিয়ভাবে সমাপ্ত ও জমা হয়েছে। প্রাপ্ত স্কোর: ${calculatedScore}%।`
         : `আপনার সন্তান "${test.title}" পরীক্ষা সফলভাবে সম্পন্ন করে খাতা জমা দিয়েছে। প্রাপ্ত স্কোর: ${calculatedScore}%। খাতা মূল্যায়ন করুন।`,
       time: "এইমাত্র",
       testId: test.id,
@@ -1763,8 +1795,21 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       className="w-full max-w-4xl mx-auto px-3 sm:px-6 pt-4 sm:pt-6 pb-28 sm:pb-24 space-y-4 sm:space-y-6 select-none overflow-x-hidden"
       onContextMenu={(e) => e.preventDefault()}
     >
-      
-
+      {/* Realtime Anti-Cheating In-Flow Warning Banner (Occupies dedicated space at very top, NEVER overlaps/covers buttons or options) */}
+      {!isSubmitted && !isReviewOnly && lastWarning && (
+        <div 
+          className={`w-full transition-all duration-[5000ms] ease-out ${
+            isWarningFading 
+              ? 'opacity-0 max-h-0 py-0 mb-0 -translate-y-2 pointer-events-none overflow-hidden' 
+              : 'opacity-100 max-h-48 py-1 mb-2'
+          }`}
+        >
+          <div className="w-full bg-rose-600 text-white px-5 py-3.5 rounded-2xl shadow-xl flex items-center justify-center gap-3 text-xs sm:text-sm font-black border-2 border-rose-300 ring-4 ring-rose-500/25 text-center select-none">
+            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-200" />
+            <span className="leading-relaxed">{lastWarning}</span>
+          </div>
+        </div>
+      )}
 
       {/* ------------------------------------------------------------- */}
       {/* INTERACTIVE GAZE & POSTURE CALIBRATION ONBOARDING MODAL       */}
@@ -1798,6 +1843,14 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
               >
                 এড়িয়ে যান ✕
               </button>
+            </div>
+
+            {/* User-Requested Highlighted Instruction in the Exact Red-Marked Location */}
+            <div className="w-full py-2.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-950 via-teal-900 to-emerald-950 border-2 border-emerald-400 text-emerald-100 shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2.5 text-xs sm:text-sm font-black text-center transition-all animate-pulse ring-2 ring-emerald-400/40">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping shrink-0" />
+              <span className="tracking-wide">
+                সোজা দৃষ্টি রাখুন • ক্যামেরার দিকে শান্তভাবে সোজা তাকিয়ে থাকুন (স্বয়ংক্রিয় ছবি উঠছে...)
+              </span>
             </div>
 
             {/* Content: Mode 1 - Live 3-Second Baseline Capture */}
@@ -2056,14 +2109,6 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         </div>
       )}
 
-      {/* Realtime Anti-Cheating Floating Warning (Steady, static notification bar at top - কাপাকাপি ছাড়া স্থির) */}
-      {lastWarning && (
-        <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-[110] bg-rose-600 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 text-xs sm:text-sm font-black border-2 border-rose-300 ring-4 ring-rose-500/30 max-w-[94vw] sm:max-w-xl text-center select-none backdrop-blur-md transition-all duration-300">
-          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-200" />
-          <span className="leading-snug">{lastWarning}</span>
-        </div>
-      )}
-
       {/* Floating Live Camera PIP Window during active exam - Moved to top-right on mobile so it NEVER blocks the submit button */}
       {!isReviewOnly && !isSubmitted && (
         <div className="fixed top-16 right-3 sm:top-auto sm:bottom-5 sm:right-5 z-40 transition-all duration-300">
@@ -2163,9 +2208,9 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 )}
 
                 <div className="flex items-center justify-between text-[7.5px] sm:text-[8px] font-mono text-white/90 bg-black/70 px-1 sm:px-1.5 py-0.5 rounded">
-                  <span>সতর্কতা (সর্বনিম্ন ৫০):</span>
+                  <span>সতর্কতা (সর্বনিম্ন ১০০):</span>
                   <span className={violationCount > 0 ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>
-                    {violationCount}/৫০ {violationCount >= 50 ? '⛔' : violationCount > 0 ? '⚠️' : '✓'}
+                    {violationCount}/১০০ {violationCount >= 100 ? '⛔' : violationCount > 0 ? '⚠️' : '✓'}
                   </span>
                 </div>
               </div>
@@ -2194,15 +2239,15 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 </div>
 
                 <div className={`py-1 px-0.5 rounded transition-colors ${
-                  violationCount >= 50 
+                  violationCount >= 100 
                     ? 'bg-rose-900 text-white border border-rose-500 font-bold'
                     : violationCount > 0
                     ? 'bg-amber-950 text-amber-300 border border-amber-600 font-bold' 
                     : 'bg-slate-800 text-slate-300 border border-slate-700/60'
                 }`}>
-                  <span className="block text-[6.5px] sm:text-[7px] text-slate-400">৫০ বারে সমাপ্তি</span>
+                  <span className="block text-[6.5px] sm:text-[7px] text-slate-400">১০০ বারে সমাপ্তি</span>
                   <span className="truncate block">
-                    সতর্কতা: {violationCount}/৫০
+                    সতর্কতা: {violationCount}/১০০
                   </span>
                 </div>
               </div>
@@ -2341,7 +2386,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
                 <span className={`hidden lg:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold shrink-0 border ${
                   violationCount > 0 ? "bg-amber-50 text-amber-800 border-amber-300" : "bg-emerald-50 text-emerald-800 border-emerald-300"
                 }`}>
-                  <span>সতর্কতা: {violationCount}/৫০</span>
+                  <span>সতর্কতা: {violationCount}/১০০</span>
                 </span>
               </>
             )}
