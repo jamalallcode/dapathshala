@@ -1498,12 +1498,12 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
     }
 
     // USER SPECIFICATION: শুধুমাত্র একবার সতর্ক করা হবে। পরবর্তীতে কোনো পপআপ বা শব্দ ছাড়াই ব্যাকগ্রাউন্ডে ছবি তোলা হবে।
+    // অডিও সতর্ক বার্তার দরকার নেই।
     if (!hasShownOneTimeWarningRef.current) {
       hasShownOneTimeWarningRef.current = true;
       const oneTimeWarningText = "⚠️ আপনি ডানে-বামে যে দিকেই তাকান না কেন বা আপনাকে কেউ সহায়তা করলে সব রেকর্ড হচ্ছে! অনুগ্রহ করে সততার সাথে পরীক্ষা দিন।";
       setLastWarning(oneTimeWarningText);
-      speakObservationAudio("আপনি ডানে বামে যে দিকেই তাকান না কেন বা আপনাকে কেউ সহায়তা করলে সব রেকর্ড হচ্ছে।");
-
+      // NOTE: User requested NO audio alert: "অডিও সতর্ক বার্তাটির দরকার নেই।"
       if (warningTimeoutRef.current) {
         clearTimeout(warningTimeoutRef.current);
         warningTimeoutRef.current = null;
@@ -1511,7 +1511,7 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
       warningTimeoutRef.current = setTimeout(() => {
         setLastWarning(null);
         warningTimeoutRef.current = null;
-      }, 5500);
+      }, 10000); // ১০ সেকেন্ড স্থিরভাবে থাকবে যাতে পরীক্ষার্থী অবশ্যই স্পষ্টভাবে দেখতে পায়
     } else {
       // পরবর্তী ২য়, ৩য়, ৪র্থ... বারের ক্ষেত্রে স্ক্রিনে কোনো পপআপ দেখানো হবে না এবং কোনো শব্দও করা হবে না।
       // শিক্ষার্থী শান্তভাবে পরীক্ষা দিতে থাকবে এবং তার প্রতিটি সন্দেহজনক মুহূর্তের ছবি ও প্রমাণ স্বয়ংক্রিয়ভাবে রেকর্ড হতে থাকবে।
@@ -1521,6 +1521,26 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
   const triggerSuspiciousFlag = (reason: string) => {
     handleGazeAway(reason);
   };
+
+  // 5-minute periodic steady reminder banner (৫ মিনিট পরপর পরীক্ষার্থীকে স্থির সতর্কবার্তা প্রদর্শন)
+  useEffect(() => {
+    if (isReviewOnly || isSubmitted || isCalibrating) return;
+
+    const periodicInterval = setInterval(() => {
+      const reminderMsg = "⚠️ আপনি ডানে-বামে যে দিকেই তাকান না কেন বা আপনাকে কেউ সহায়তা করলে সব রেকর্ড হচ্ছে! অনুগ্রহ করে সততার সাথে পরীক্ষা দিন।";
+      setLastWarning(reminderMsg);
+      if (warningTimeoutRef.current) {
+        clearTimeout(warningTimeoutRef.current);
+        warningTimeoutRef.current = null;
+      }
+      warningTimeoutRef.current = setTimeout(() => {
+        setLastWarning(null);
+        warningTimeoutRef.current = null;
+      }, 10000); // ১০ সেকেন্ড স্থিরভাবে থাকবে যাতে পরীক্ষার্থী অবশ্যই স্পষ্টভাবে দেখতে পায়
+    }, 5 * 60 * 1000); // প্রতি ৫ মিনিট (৩০০ সেকেন্ড) পরপর
+
+    return () => clearInterval(periodicInterval);
+  }, [isReviewOnly, isSubmitted, isCalibrating]);
 
   // Timer countdown & Auto-submit (ক্যালিব্রেশন চলাকালীন টাইমার পজ থাকবে)
   useEffect(() => {
@@ -2036,15 +2056,11 @@ export const LiveExamEngine: React.FC<LiveExamEngineProps> = ({
         </div>
       )}
 
-      {/* Realtime Anti-Cheating Floating Warning (Non-blocking notification bar at top) */}
+      {/* Realtime Anti-Cheating Floating Warning (Steady, static notification bar at top - কাপাকাপি ছাড়া স্থির) */}
       {lastWarning && (
-        <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-[110] bg-rose-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs sm:text-sm font-black border-2 border-rose-300 ring-4 ring-rose-500/40 animate-bounce max-w-[92vw] sm:max-w-xl text-center">
-          {isSpeakingAudio ? (
-            <Volume2 className="w-5 h-5 shrink-0 text-amber-300 animate-pulse" />
-          ) : (
-            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-200 animate-pulse" />
-          )}
-          <span>{lastWarning}</span>
+        <div className="fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-[110] bg-rose-600 text-white px-6 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 text-xs sm:text-sm font-black border-2 border-rose-300 ring-4 ring-rose-500/30 max-w-[94vw] sm:max-w-xl text-center select-none backdrop-blur-md transition-all duration-300">
+          <AlertTriangle className="w-5 h-5 shrink-0 text-amber-200" />
+          <span className="leading-snug">{lastWarning}</span>
         </div>
       )}
 

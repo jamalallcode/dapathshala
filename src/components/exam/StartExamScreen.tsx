@@ -277,29 +277,7 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ test: initialT
               </div>
             </div>
 
-            {/* Anti-Cheating & Exam Rules */}
-            <div className="space-y-2 text-xs text-slate-700 bg-amber-50/80 p-4 rounded-2xl border border-amber-200">
-              <div className="flex items-center gap-2 font-bold text-amber-900 mb-1.5 text-xs sm:text-sm">
-                <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>পরীক্ষার বিশেষ নির্দেশনাবলী:</span>
-              </div>
-              <ul className="space-y-2 text-slate-700 text-xs sm:text-sm font-semibold">
-                <li className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                  <span>'পরীক্ষা শুরু করুন' বাটন চাপার আগে প্রশ্ন দেখা যাবে না</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                  <span>নকল এড়াতে ফ্রন্ট ক্যামেরা নজরদারি ও স্মার্ট প্রক্টরিং সক্রিয়</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                  <span>নির্দিষ্ট সময় শেষে স্বয়ংক্রিয়ভাবে খাতা অটো-সাবমিট</span>
-                </li>
-              </ul>
-            </div>
-
-            {/* Start Exam CTA */}
+            {/* Start Exam CTA - Placed at TOP for immediate visibility without scrolling */}
             <button
               type="button"
               onClick={async () => {
@@ -313,11 +291,33 @@ export const StartExamScreen: React.FC<StartExamScreenProps> = ({ test: initialT
                 }
                 setIsExamStarted(true);
               }}
-              className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-base shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all"
+              className="w-full py-4 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-base sm:text-lg shadow-xl shadow-emerald-200/80 flex items-center justify-center gap-2.5 cursor-pointer active:scale-95 transition-all ring-4 ring-emerald-500/20"
             >
-              <Play className="w-5 h-5 fill-white" />
+              <Play className="w-5 h-5 sm:w-6 sm:h-6 fill-white" />
               <span>পরীক্ষা শুরু করুন</span>
             </button>
+
+            {/* Anti-Cheating & Exam Rules - Placed Below the CTA Button */}
+            <div className="space-y-2 text-xs text-slate-700 bg-amber-50/80 p-3.5 sm:p-4 rounded-2xl border border-amber-200">
+              <div className="flex items-center gap-2 font-bold text-amber-900 mb-1 text-xs sm:text-sm">
+                <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>পরীক্ষার বিশেষ নির্দেশনাবলী:</span>
+              </div>
+              <ul className="space-y-1.5 text-slate-700 text-xs sm:text-sm font-semibold">
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                  <span>'পরীক্ষা শুরু করুন' বাটন চাপার পরই প্রশ্নপত্র চালু হবে</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                  <span>নকল এড়াতে ফ্রন্ট ক্যামেরা নজরদারি ও স্মার্ট প্রক্টরিং সক্রিয়</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                  <span>নির্দিষ্ট সময় শেষে স্বয়ংক্রিয়ভাবে খাতা অটো-সাবমিট</span>
+                </li>
+              </ul>
+            </div>
           </div>
         )}
 
