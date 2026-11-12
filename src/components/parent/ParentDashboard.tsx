@@ -1596,68 +1596,18 @@ export const ParentDashboard: React.FC<ParentDashboardProps> = ({
           </button>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
-            {/* নতুন প্রশ্ন তৈরি করুন (স্থানান্তরিত: উপরে ব্যানার কার্ডে) */}
+            {/* নতুন প্রশ্ন তৈরি করুন */}
             <button
               type="button"
               onClick={() => {
                 setEditingPaperId(null);
                 setShowCreationModeModal(true);
               }}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs active:scale-98"
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-md active:scale-98"
               title="নতুন প্রশ্নপত্র বা পরীক্ষা তৈরি করুন"
             >
               <Plus className="w-4 h-4 text-white" />
               <span>নতুন প্রশ্ন তৈরি করুন</span>
-            </button>
-
-            {/* আমার প্রশ্ন লাইব্রেরি Tab Button */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveViewMode('tests');
-                onTabChange?.('library');
-              }}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs bg-indigo-50 border-indigo-200 text-indigo-900 hover:bg-indigo-100 hover:border-indigo-300"
-              title="সংরক্ষিত সকল প্রশ্নপত্র ও শিক্ষকের আর্কাইভ দেখুন"
-            >
-              <FolderArchive className="w-4 h-4 text-indigo-600" />
-              <span>প্রশ্ন লাইব্রেরি ({toBn(tests.length)})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveViewMode('tests');
-                setFilterMode('all');
-                onTabChange?.('assigned');
-              }}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs ${
-                activeTab === 'assigned' && filterMode === 'all'
-                  ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
-                  : 'bg-blue-50 border-blue-200 text-blue-900 hover:bg-blue-100 hover:border-blue-300'
-              }`}
-              title="সকল নির্ধারিত পরীক্ষা দেখুন"
-            >
-              <FileText className={`w-4 h-4 ${activeTab === 'assigned' && filterMode === 'all' ? 'text-white' : 'text-blue-600'}`} />
-              <span>নির্ধারিত পরীক্ষা: {toBn(tests.length)}টি</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setActiveViewMode('tests');
-                setFilterMode('unreviewed');
-                onTabChange?.('review');
-              }}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-2xs ${
-                activeTab === 'review' || filterMode === 'unreviewed'
-                  ? 'bg-blue-600 border-blue-600 text-white shadow-xs'
-                  : 'bg-blue-50 border-blue-200 text-blue-900 hover:bg-blue-100 hover:border-blue-300'
-              }`}
-              title="যেসব উত্তরপত্র এখনো দেখা হয়নি সব সামনে আনুন"
-            >
-              <FileCheck className={`w-4 h-4 ${activeTab === 'review' || filterMode === 'unreviewed' ? 'text-white' : 'text-blue-600'}`} />
-              <span>সকল উত্তরপত্র</span>
             </button>
           </div>
         )}

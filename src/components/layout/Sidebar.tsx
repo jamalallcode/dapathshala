@@ -20,11 +20,13 @@ import {
   Sliders,
   Sparkles,
   ShieldAlert,
-  FolderArchive
+  FolderArchive,
+  FileCheck
 } from 'lucide-react';
 import { UserRole, AssignedTest } from '../../types';
 import { getCurrentParent, ParentUser, updateParentProfile } from '../../lib/parentAuth';
 import { getCurrentStudent, StudentUser, updateStudentProfile, logoutStudent } from '../../lib/studentAuth';
+import { getStoredTests } from '../../lib/storage';
 
 export interface SidebarProps {
   isOpen: boolean;
@@ -72,6 +74,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
     return localStorage.getItem('dapathshala_is_admin') === 'true';
   });
+  const [parentTests, setParentTests] = useState<AssignedTest[]>(() => {
+    try {
+      return getStoredTests();
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      try {
+        setParentTests(getStoredTests());
+      } catch {}
+    };
+    window.addEventListener('dapathshala_tests_updated', handleUpdate);
+    window.addEventListener('dapathshala_submissions_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('dapathshala_tests_updated', handleUpdate);
+      window.removeEventListener('dapathshala_submissions_updated', handleUpdate);
+    };
+  }, []);
+
+  const totalTestsCount = parentTests.length;
+  const submittedAnswerCount = parentTests.filter(t => t.status === 'submitted' || t.status === 'reviewed').length;
+
   const [cursorTooltip, setCursorTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -385,7 +412,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           ) : currentRole === 'parent' ? (
             <>
-              {/* Menu: প্রশ্নপত্র তৈরি */}
+              {/* Menu 1: প্রশ্নপত্র তৈরি */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleLinkClick(() => {
+                      onRoleChange('parent');
+                      onNavigateDashboard();
+                      onOpenCreateExam();
+                    });
+                  }}
+                  onMouseEnter={(e) => handleItemMouseEnter('নতুন প্রশ্নপত্র তৈরি', e)}
+                  onMouseMove={handleItemMouseMove}
+                  onMouseLeave={handleItemMouseLeave}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer hover:bg-slate-800/60 text-slate-200 hover:text-white"
+                >
+                  <div className="flex items-center gap-2.5 truncate min-w-0">
+                    <FileText className="w-4.5 h-4.5 text-blue-400 shrink-0" />
+                    <span className="truncate">প্রশ্নপত্র তৈরি</span>
+                  </div>
+                  <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                    + নতুন
+                  </span>
+                </button>
+              </div>
+
+              {/* Menu 2: নির্ধারিত পরীক্ষা (Moved from top banner to Sidebar) */}
               <div>
                 <button
                   type="button"
@@ -396,7 +449,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onSelectParentTab('assigned');
                     });
                   }}
-                  onMouseEnter={(e) => handleItemMouseEnter('প্রশ্নপত্র তৈরি', e)}
+                  onMouseEnter={(e) => handleItemMouseEnter('নির্ধারিত পরীক্ষা', e)}
                   onMouseMove={handleItemMouseMove}
                   onMouseLeave={handleItemMouseLeave}
                   className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
@@ -406,9 +459,44 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }`}
                 >
                   <div className="flex items-center gap-2.5 truncate min-w-0">
-                    <FileText className="w-4.5 h-4.5 text-blue-400 shrink-0" />
-                    <span className="truncate">প্রশ্নপত্র তৈরি</span>
+                    <FileText className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
+                    <span className="truncate">নির্ধারিত পরীক্ষা</span>
                   </div>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                    {totalTestsCount.toLocaleString('bn-BD')}টি
+                  </span>
+                </button>
+              </div>
+
+              {/* Menu 3: সকল উত্তরপত্র (Moved from top banner to Sidebar) */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleLinkClick(() => {
+                      onRoleChange('parent');
+                      onNavigateDashboard();
+                      onSelectParentTab('review');
+                    });
+                  }}
+                  onMouseEnter={(e) => handleItemMouseEnter('সকল উত্তরপত্র ও খাতা মূল্যায়ন', e)}
+                  onMouseMove={handleItemMouseMove}
+                  onMouseLeave={handleItemMouseLeave}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors cursor-pointer ${
+                    parentTab === 'review' && activeView === 'dashboard'
+                      ? 'bg-blue-600/30 text-white font-bold border-l-2 border-blue-500'
+                      : 'hover:bg-slate-800/60 text-slate-200 hover:text-white'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 truncate min-w-0">
+                    <FileCheck className="w-4.5 h-4.5 text-sky-400 shrink-0" />
+                    <span className="truncate">সকল উত্তরপত্র</span>
+                  </div>
+                  {submittedAnswerCount > 0 ? (
+                    <span className="text-[10px] bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded font-mono font-bold">
+                      {submittedAnswerCount.toLocaleString('bn-BD')}টি
+                    </span>
+                  ) : null}
                 </button>
               </div>
 
