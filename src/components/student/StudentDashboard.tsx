@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   BookOpen, Clock, GraduationCap, Flame, Zap, 
   CircleCheck, CirclePlay, FileCheck, CircleAlert, Key, ArrowRight 
@@ -10,6 +10,7 @@ import {
 } from "../../lib/storage";
 import { AssignedTest } from "../../types";
 import { getCurrentStudent, logoutStudent, StudentUser } from "../../lib/studentAuth";
+import { getInitialRecentPins, saveRecentPinToStorage, RecentPinItem } from "../landing/LandingPage";
 
 interface StudentDashboardProps {
   onStartExam: (test: AssignedTest) => void;
@@ -21,6 +22,32 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
   const [tests, setTests] = useState<AssignedTest[]>([]);
   const [pinInput, setPinInput] = useState("");
   const [pinError, setPinError] = useState("");
+
+  const [recentPins, setRecentPins] = useState<RecentPinItem[]>(() => getInitialRecentPins());
+  const [isPinDropdownOpen, setIsPinDropdownOpen] = useState(false);
+  const pinDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (pinDropdownRef.current && !pinDropdownRef.current.contains(e.target as Node)) {
+        setIsPinDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleOpenPinSuggestions = () => {
+    setRecentPins(getInitialRecentPins());
+    setIsPinDropdownOpen(true);
+  };
+
+  const handleSelectSuggestedPin = (selectedPin: string) => {
+    setPinInput(selectedPin);
+    setIsPinDropdownOpen(false);
+    if (pinError) setPinError("");
+    executePinSubmit(selectedPin);
+  };
 
   useEffect(() => {
     setTests(getStoredTests());
@@ -36,10 +63,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
     };
   }, []);
 
-  const handlePinSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const executePinSubmit = async (pinValue: string) => {
     setPinError("");
-    const trimmed = pinInput.trim();
+    const trimmed = pinValue.trim();
     if (!trimmed) {
       setPinError("দয়া করে ৬-সংখ্যার পিন কোডটি লিখুন");
       return;
@@ -58,10 +84,20 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
     }
 
     if (matched) {
+      saveRecentPinToStorage(trimmed, matched);
+      setRecentPins(getInitialRecentPins());
       onStartExam(matched);
     } else {
+      saveRecentPinToStorage(trimmed);
+      setRecentPins(getInitialRecentPins());
       setPinError("এই পিনের কোনো পরীক্ষা পাওয়া যায়নি অথবা এটি মুছে ফেলা হয়েছে। সঠিক পিন দিন অথবা অভিভাবককে পরীক্ষা তৈরি করতে বলুন।");
     }
+  };
+
+  const handlePinSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setIsPinDropdownOpen(false);
+    executePinSubmit(pinInput);
   };
 
   return (
@@ -131,15 +167,75 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onStartExam,
         </div>
 
         <form onSubmit={handlePinSubmit} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-          <div className="relative">
+          <div ref={pinDropdownRef} className="relative">
             <input
               id="student-pin-input"
               type="text"
               value={pinInput}
-              onChange={(e) => setPinInput(e.target.value)}
+              onFocus={handleOpenPinSuggestions}
+              onClick={handleOpenPinSuggestions}
+              onChange={(e) => {
+                setPinInput(e.target.value);
+                if (pinError) setPinError("");
+                setIsPinDropdownOpen(true);
+              }}
               placeholder="পিন কোড লিখুন (যেমন: 787193)"
               className="w-full sm:w-64 px-4 py-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100 text-sm font-semibold outline-hidden text-slate-900"
+              autoComplete="off"
             />
+
+            {/* Recent 3 PINs Suggestion */}
+            {isPinDropdownOpen && recentPins.length > 0 && (
+              <div className="absolute top-full left-0 right-0 sm:w-80 mt-2 z-40 bg-white border-2 border-emerald-500 rounded-2xl shadow-2xl overflow-hidden animate-fadeIn">
+                <div className="flex items-center justify-between px-3.5 py-2 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-b border-emerald-100 text-[11px] font-bold text-emerald-950">
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>পূর্বের সর্বশেষ ৩টি পিন:</span>
+                  </span>
+                  <span className="text-[9.5px] text-emerald-700 font-bold bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-200">
+                    ট্যাপ করলেই শুরু
+                  </span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {recentPins.map((item, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSelectSuggestedPin(item.pin);
+                      }}
+                      className="w-full px-3.5 py-2.5 text-left hover:bg-emerald-50 active:bg-emerald-100 transition-colors flex items-center justify-between cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-emerald-100 group-hover:bg-emerald-200 text-emerald-700 text-[10px] font-black flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="font-mono font-black text-slate-900 text-sm tracking-wider flex items-center gap-1.5">
+                            <span>{item.pin}</span>
+                            {item.subject && (
+                              <span className="text-[9.5px] font-sans font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                {item.subject}
+                              </span>
+                            )}
+                          </div>
+                          {item.title && (
+                            <p className="text-[10.5px] text-slate-500 truncate max-w-[170px]">
+                              {item.title}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold text-emerald-600 group-hover:text-emerald-700 flex items-center gap-0.5 shrink-0 ml-1 bg-emerald-50 group-hover:bg-emerald-100 px-2 py-1 rounded-xl border border-emerald-200/70 transition-all">
+                        <span>নির্বাচন</span>
+                        <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <button
             type="submit"

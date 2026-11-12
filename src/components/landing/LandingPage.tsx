@@ -30,6 +30,73 @@ interface LandingPageProps {
   onAdminLogin?: () => void;
 }
 
+export interface RecentPinItem {
+  pin: string;
+  title?: string;
+  subject?: string;
+}
+
+const RECENT_PINS_STORAGE_KEY = 'dapathshala_recent_pins';
+
+export const getInitialRecentPins = (): RecentPinItem[] => {
+  try {
+    const raw = localStorage.getItem(RECENT_PINS_STORAGE_KEY);
+    const stored: RecentPinItem[] = raw ? JSON.parse(raw) : [];
+    
+    // Also extract valid pins from stored tests
+    const tests = getStoredTests();
+    const list: RecentPinItem[] = [...stored];
+    
+    for (const test of tests) {
+      if (test.pin && !list.some(item => item.pin === test.pin)) {
+        list.push({
+          pin: test.pin,
+          title: test.title,
+          subject: test.subject
+        });
+      }
+    }
+
+    // Default sample pins if fewer than 3 are present
+    const fallbacks: RecentPinItem[] = [
+      { pin: '787193', title: 'গণিত মডেল টেস্ট • ৫ম শ্রেণি', subject: 'প্রাথমিক গণিত' },
+      { pin: '542819', title: 'বাংলা ১ম পত্র • ৫ম শ্রেণি', subject: 'বাংলা' },
+      { pin: '631902', title: 'প্রাথমিক বিজ্ঞান • ৫ম শ্রেণি', subject: 'বিজ্ঞান' }
+    ];
+
+    for (const fb of fallbacks) {
+      if (!list.some(item => item.pin === fb.pin)) {
+        list.push(fb);
+      }
+    }
+
+    return list.slice(0, 3);
+  } catch {
+    return [
+      { pin: '787193', title: 'গণিত মডেল টেস্ট • ৫ম শ্রেণি', subject: 'প্রাথমিক গণিত' },
+      { pin: '542819', title: 'বাংলা ১ম পত্র • ৫ম শ্রেণি', subject: 'বাংলা' },
+      { pin: '631902', title: 'প্রাথমিক বিজ্ঞান • ৫ম শ্রেণি', subject: 'বিজ্ঞান' }
+    ];
+  }
+};
+
+export const saveRecentPinToStorage = (pin: string, matchedTest?: AssignedTest) => {
+  try {
+    const raw = localStorage.getItem(RECENT_PINS_STORAGE_KEY);
+    const existing: RecentPinItem[] = raw ? JSON.parse(raw) : [];
+    const filtered = existing.filter(item => item.pin !== pin);
+    const updated = [
+      {
+        pin,
+        title: matchedTest?.title || 'পূর্বের পরীক্ষা পিন',
+        subject: matchedTest?.subject
+      },
+      ...filtered
+    ].slice(0, 6);
+    localStorage.setItem(RECENT_PINS_STORAGE_KEY, JSON.stringify(updated));
+  } catch {}
+};
+
 export const LandingPage: React.FC<LandingPageProps> = ({
   onSelectRole,
   onOpenExamWithPin,
@@ -43,6 +110,34 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [authPrompt, setAuthPrompt] = useState<string | undefined>(undefined);
   const [pinInput, setPinInput] = useState('');
   const [pinError, setPinError] = useState('');
+
+  // Recent 3 PINs Suggestion Dropdown
+  const [recentPins, setRecentPins] = useState<RecentPinItem[]>(() => getInitialRecentPins());
+  const [isPinDropdownOpen, setIsPinDropdownOpen] = useState(false);
+  const pinDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close PIN dropdown
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (pinDropdownRef.current && !pinDropdownRef.current.contains(e.target as Node)) {
+        setIsPinDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleOpenPinSuggestions = () => {
+    setRecentPins(getInitialRecentPins());
+    setIsPinDropdownOpen(true);
+  };
+
+  const handleSelectSuggestedPin = (selectedPin: string) => {
+    setPinInput(selectedPin);
+    setIsPinDropdownOpen(false);
+    if (pinError) setPinError('');
+    executePinLookup(selectedPin);
+  };
 
   // 20-clicks Secret Admin Trigger
   const [adminClicks, setAdminClicks] = useState(0);
@@ -128,10 +223,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     onSelectRole('parent');
   };
 
-  const handlePinSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const executePinLookup = async (pinValue: string) => {
     setPinError('');
-    const trimmed = pinInput.trim();
+    const trimmed = pinValue.trim();
     if (!trimmed) {
       setPinError('দয়া করে ৬-সংখ্যার পিন লিখুন');
       return;
@@ -149,10 +243,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     }
 
     if (matched) {
+      saveRecentPinToStorage(trimmed, matched);
+      setRecentPins(getInitialRecentPins());
       onOpenExamWithPin(matched);
     } else {
+      saveRecentPinToStorage(trimmed);
+      setRecentPins(getInitialRecentPins());
       setPinError('এই পিনের কোনো পরীক্ষা পাওয়া যায়নি অথবা এটি মুছে ফেলা হয়েছে। অভিভাবক ড্যাশবোর্ড থেকে নতুন পরীক্ষা তৈরি করুন।');
     }
+  };
+
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsPinDropdownOpen(false);
+    executePinLookup(pinInput);
   };
 
   return (
@@ -304,9 +408,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           {/* ---------------------------------------------------- */}
           {/* OPTION 2: সন্তান / শিক্ষার্থী (STUDENT / CHILD)        */}
           {/* ---------------------------------------------------- */}
-          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-md hover:shadow-xl transition-all flex flex-col justify-between relative overflow-hidden group">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-md hover:shadow-xl transition-all flex flex-col justify-between relative group z-10">
             {/* Top Accent Line */}
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r from-emerald-500 to-teal-500" />
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-linear-to-r from-emerald-500 to-teal-500 rounded-t-3xl" />
 
             <div>
               <h2 className="text-xl sm:text-2xl font-black text-slate-900 mb-2">
@@ -322,24 +426,83 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                   🔑 পরীক্ষার ৬-সংখ্যার পিন (PIN) দিন:
                 </label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={pinInput}
-                    onChange={(e) => {
-                      setPinInput(e.target.value);
-                      if (pinError) setPinError('');
-                    }}
-                    placeholder="যেমন: 787193"
-                    className="flex-1 bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 tracking-wider"
-                    maxLength={10}
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-colors shrink-0 cursor-pointer"
-                  >
-                    প্রবেশ করুন
-                  </button>
+                <div ref={pinDropdownRef} className="relative">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={pinInput}
+                      onFocus={handleOpenPinSuggestions}
+                      onClick={handleOpenPinSuggestions}
+                      onChange={(e) => {
+                        setPinInput(e.target.value);
+                        if (pinError) setPinError('');
+                        setIsPinDropdownOpen(true);
+                      }}
+                      placeholder="যেমন: 787193"
+                      className="flex-1 bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 tracking-wider"
+                      maxLength={10}
+                      autoComplete="off"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-bold shadow-xs transition-colors shrink-0 cursor-pointer"
+                    >
+                      প্রবেশ করুন
+                    </button>
+                  </div>
+
+                  {/* পূর্বের সর্বশেষ ৩টি পিন সাজেশন ড্রপডাউন (মার্ক করা স্থানের জন্য) */}
+                  {isPinDropdownOpen && recentPins.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-2 z-40 bg-white border-2 border-emerald-500 rounded-2xl shadow-2xl overflow-hidden animate-fadeIn">
+                      <div className="flex items-center justify-between px-3.5 py-2 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 border-b border-emerald-100 text-[11px] font-bold text-emerald-950">
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>পূর্বের সর্বশেষ ৩টি পিন:</span>
+                        </span>
+                        <span className="text-[9.5px] text-emerald-700 font-bold bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-200">
+                          ট্যাপ করলেই অটো-সিলেক্ট
+                        </span>
+                      </div>
+                      <div className="divide-y divide-slate-100">
+                        {recentPins.map((item, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              handleSelectSuggestedPin(item.pin);
+                            }}
+                            className="w-full px-3.5 py-2.5 text-left hover:bg-emerald-50 active:bg-emerald-100 transition-colors flex items-center justify-between cursor-pointer group"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="w-5 h-5 rounded-full bg-emerald-100 group-hover:bg-emerald-200 text-emerald-700 text-[10px] font-black flex items-center justify-center shrink-0">
+                                {idx + 1}
+                              </span>
+                              <div className="min-w-0">
+                                <div className="font-mono font-black text-slate-900 text-sm tracking-wider flex items-center gap-2">
+                                  <span>{item.pin}</span>
+                                  {item.subject && (
+                                    <span className="text-[9.5px] font-sans font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                      {item.subject}
+                                    </span>
+                                  )}
+                                </div>
+                                {item.title && (
+                                  <p className="text-[10.5px] text-slate-500 truncate max-w-[190px] sm:max-w-[240px]">
+                                    {item.title}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-[11px] font-bold text-emerald-600 group-hover:text-emerald-700 flex items-center gap-1 shrink-0 ml-2 bg-emerald-50 group-hover:bg-emerald-100 px-2.5 py-1 rounded-xl border border-emerald-200/70 transition-all">
+                              <span>নির্বাচন</span>
+                              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {pinError && (
                   <div className="flex items-center gap-1.5 text-rose-600 text-xs font-semibold mt-2">
